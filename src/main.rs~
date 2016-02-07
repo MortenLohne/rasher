@@ -27,7 +27,20 @@ use std::fmt::Formatter;
 extern crate lazy_static;
 
 fn main() {
-    uci::connect_engine();
+    let mut reader = io::stdin();
+    let mut input = "".to_string();
+    loop {
+        println!("Enter input");
+        reader.read_line(&mut input).unwrap();
+        match (&input[..]) {
+            "uci\n" => uci::connect_engine(),
+            "play_self\n" => play_game(&board::START_BOARD.clone()),
+            "play\n" => play_human(),
+            s => println!("Unrecognized command \"{}\".", s),
+        }
+    }
+    
+    
     
     //play_game(&board::START_BOARD.clone());
     //play_human();

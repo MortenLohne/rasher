@@ -5,15 +5,15 @@ mod board;
 mod tests;
 mod move_gen;
 mod monte_carlo;
+mod bit_board;
+
+extern crate time;
 
 use Score::{Val, Draw, MateW, MateB};
-use board::PieceType;
+use board::*;
+
 use board::PieceType::*;
 use board::Color::*;
-use board::Square;
-use board::Piece;
-use board::Board;
-use board::Move;
 
 use std::sync::{Arc, Mutex};
 use std::io;
@@ -23,19 +23,21 @@ use std::cmp::*;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use std::fs;
+
 #[macro_use]
 extern crate lazy_static;
 
 fn main() {
-    let mut reader = io::stdin();
+    let reader = io::stdin();
     let mut input = "".to_string();
     loop {
-        println!("Enter input");
+        // println!("Enter input");
         reader.read_line(&mut input).unwrap();
-        match (&input[..]) {
-            "uci\n" => uci::connect_engine(),
-            "play_self\n" => play_game(&board::START_BOARD.clone()),
-            "play\n" => play_human(),
+        match &input[..] {
+            "uci\n" => { uci::connect_engine().unwrap() }, //TODO: Use error value
+            //"play_self\n" => play_game(&board::START_BOARD.clone()),
+            //"play\n" => play_human(),
             s => println!("Unrecognized command \"{}\".", s),
         }
     }
@@ -46,11 +48,15 @@ fn main() {
     //play_human();
 }
 
+/*
 #[allow(dead_code)]
 fn play_game(board : &Board) {
     println!("Board:\n{}\nHalf move count: {}", board, (*board).half_move_clock);
     println!("\n");
-    let (score, moves, _) = find_best_move_ab (&board, 5, None);
+    let engine_comm = Mutex::new(uci::EngineComm::new());
+    engine_comm.lock().unwrap().engine_is_running = true;
+    
+    let (score, moves, _) = find_best_move_ab (&board, 5, &engine_comm, None);
     if moves.len() > 0 {
         println!("Found move with score {}.", score);
         play_game(&board.do_move(moves[0]));
@@ -67,6 +73,9 @@ fn play_game(board : &Board) {
         }
     }
 }
+*/
+
+/*
 #[allow(dead_code)]
 fn play_human() {
     let mut board = board::START_BOARD.clone();
@@ -76,7 +85,7 @@ fn play_human() {
         if board.to_move == White {
             println!("Type your move as long algebraic notation (e2-e4):");
 
-            let mut reader = io::stdin();
+            let reader = io::stdin();
             let mut input_str = "".to_string();
             let legal_moves = move_gen::all_legal_moves(&board);
             // Loop until user enters a valid move
@@ -105,13 +114,15 @@ fn play_human() {
             }
 
             let c_move = Move::from_alg(&input_str).unwrap();
-            input_str = "".to_string();
             println!("Doing move");
             board = board.do_move(c_move);
             
         }
         else {
-            let (score, moves, _) = find_best_move_ab (&board, 3, None);
+            let engine_comm = Mutex::new(uci::EngineComm::new());
+            engine_comm.lock().unwrap().engine_is_running = true;
+            
+            let (score, moves, _) = find_best_move_ab (&board, 3, &engine_comm, None);
             if moves.len() > 0 {
                 println!("Found move with score {}.", score);
                 board = board.do_move(moves[0]);
@@ -131,9 +142,10 @@ but it was not mate or staltemate! Board:\n{}",
         }
     }
 }
+*/
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct NodeCount {
+pub struct NodeCount {
     intern : u64,
     leaf : u64,
 }
@@ -208,6 +220,7 @@ fn score_board (board : &board::Board) -> Score {
     Val(value)
 }
 
+/// Old find_best_move method, without alpha-beta pruning
 #[allow(dead_code)]
 fn find_best_move (board : &Board, depth : u8) -> (Score, Option<Move>) {
     if depth == 0 {
@@ -258,25 +271,58 @@ fn find_best_move (board : &Board, depth : u8) -> (Score, Option<Move>) {
      best_move)
 }
 
+fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
+                 time_restriction : uci::TimeRestriction,
+                 log_writer : Arc<Mutex<io::BufWriter<fs::File>>>) {
+    
+    engine_comm.lock().unwrap().engine_is_running = true;
+    
+    let max_depth : u8 = match time_restriction {
+        uci::TimeRestriction::Depth(d) => d,
+        uci::TimeRestriction::Mate(d) => d as u8,
+        _ => 128,
+    };;
+    
+    let start_time = time::get_time();
+    
+    for depth in 1..max_depth {
+        let (score, moves, node_count) =
+            find_best_move_ab(&board, depth, &*engine_comm, time_restriction);
+        
+        let ms_taken = (time::get_time() - start_time).num_milliseconds();
+        
+        if moves.len() > 0 {
+            engine_comm.lock().unwrap().best_move = Some(moves[0]);
+        }
+        else {
+            engine_comm.lock().unwrap().best_move = None;
+        }
+
+        uci::send_eval_to_gui(log_writer.clone(), depth,
+                         ms_taken, score, moves, node_count);
+    }
+    
+}
+
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab (board : &Board, depth : u8, stop_signal : Option<Arc<Mutex<Box<bool>>>>)
+fn find_best_move_ab (board : &Board, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
+                      time_restriction : uci::TimeRestriction )
                       -> (Score, Vec<Move>, NodeCount) {
 
     fn find_best_move_ab_rec (board: &Board, depth : u8, mut alpha : Score, mut beta : Score,
-                              stop_signal : Option<Arc<Mutex<Box<bool>>>>,
+                              engine_comm : &Mutex<uci::EngineComm>,
+                              time_restriction : uci::TimeRestriction,
                               node_counter : &mut NodeCount)
                               -> (Score, Vec<Move>) {
-
-        let should_abort = match stop_signal.clone() {
-            Some(mutex) => {
-                let stop_signal = mutex.lock().unwrap();
-                *(stop_signal.clone())
-            },
-            None => false,
-        };
+        use uci::TimeRestriction::*;
+        {
+            let mut engine_comm = engine_comm.lock().unwrap();
         
-        if should_abort { panic!() }
-        
+            if engine_comm.engine_should_stop {
+                engine_comm.engine_is_running = true;
+                panic!()
+            }
+        } 
         if depth == 0 {
             node_counter.leaf += 1;
             return (score_board(&board), vec![]);
@@ -284,6 +330,19 @@ fn find_best_move_ab (board : &Board, depth : u8, stop_signal : Option<Arc<Mutex
         else {
             node_counter.intern += 1;
         }
+
+        match time_restriction {
+            GameTime(_) => (),
+            Depth(_) => (),
+            Nodes(n) => if node_counter.leaf + node_counter.intern > n {
+                engine_comm.lock().unwrap().engine_is_running = true;
+                panic!();
+            },
+            Mate(_) => (),
+            MoveTime(_) => (), //TODO: Might want to check the clock here, and not just on every depth increase
+            Infinite => (),
+        };
+        
         if board.half_move_clock > 50 {
             return (Draw(0), vec![]);
         }
@@ -294,6 +353,8 @@ fn find_best_move_ab (board : &Board, depth : u8, stop_signal : Option<Arc<Mutex
         let mut best_line = vec![];
         
         let legal_moves = move_gen::all_legal_moves(board);
+        
+        // Check if the player is checkmated or in stalemate
         if legal_moves.len() == 0 {
             if move_gen::is_attacked(board, board.king_pos()) {
                 if color == White {
@@ -316,8 +377,9 @@ fn find_best_move_ab (board : &Board, depth : u8, stop_signal : Option<Arc<Mutex
                 }
             else {
                 let tried_board = board.do_move(c_move);
-                let (tried_score, tried_line) = find_best_move_ab_rec(
-                    &tried_board, depth - 1, alpha, beta, stop_signal.clone(), node_counter);
+                let (tried_score, tried_line) =
+                    find_best_move_ab_rec( &tried_board, depth - 1, alpha, beta,
+                                            engine_comm, time_restriction, node_counter);
                 
                 if color == White && tried_score > alpha {
                     alpha = tried_score;
@@ -345,8 +407,9 @@ fn find_best_move_ab (board : &Board, depth : u8, stop_signal : Option<Arc<Mutex
             
     };
     let mut node_counter = NodeCount { intern: 0, leaf: 0 };
-    let (score, mut moves) = find_best_move_ab_rec(board, depth, MateB(0), MateW(0),
-                                                   stop_signal, &mut node_counter);
+    let (score, mut moves) =
+        find_best_move_ab_rec(board, depth, MateB(0), MateW(0),
+                              engine_comm, time_restriction, &mut node_counter);
     moves.reverse();
     // println!("Evaluated {} internal nodes and {} leaves", node_counter.intern, node_counter.leaf);
     (score, moves, node_counter)

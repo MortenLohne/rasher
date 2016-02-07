@@ -1,9 +1,7 @@
 #[allow(unused_imports)]
 use board::PieceType::{Pawn, Knight, Bishop, Rook, Queen, King, Empty};
-use board::Piece;
 use board::Color::{Black, White};
-use board::Move;
-use board::Board;
+use board::*;
 use board;
 use ::Score;
 use std::thread;
@@ -15,15 +13,16 @@ use std::io;
 use std::io::Write;
 use std::fs;
 use std::path;
+use std::process;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine() {
+pub fn connect_engine() -> Result<(),String> {
 
     // Prepare to create log file
     let mut options = fs::OpenOptions::new();
     options.write(true).append(true);
-    let path = path::Path::new("log.txt");
+    let path = path::Path::new("mc_log.txt");
 
     let log_file = match fs::File::create(path) {
         Ok(file) => file,
@@ -37,13 +36,14 @@ pub fn connect_engine() {
     uci_send("id name morten_chess", &mut writer);
     uci_send("uciok", &mut writer);
     
-
     // The engine would send any customizable options here. For now, there are none.
     
     let mut board = None;
-    let stop_signal = Arc::new(Mutex::new(Box::new(false)));
-    let best_move = Arc::new(Mutex::new(None));
-    
+    let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
+    //let stop_signal = Arc::new(Mutex::new(Box::new(false)));
+    //let best_move = Arc::new(Mutex::new(None));
+
+    // Listen to commands from GUI forever
     loop {
         let input = get_engine_input(&mut writer);
         let tokens = input.split_whitespace().collect::<Vec<_>>();
@@ -51,23 +51,22 @@ pub fn connect_engine() {
             to_log(&format!("Unrecognized input \"{}\"", input), &mut writer);
             continue;
         }
-        match tokens[0] {
+        match tokens[0] { // Parse the first word of the input
             "isready" => uci_send("readyok", &mut writer),
-            "quit" => panic!(),
+            "quit" => { to_log("Quitting...", &mut writer); process::exit(0); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => {
-                board = match parse_position(&input, &mut writer) {
+            "position" => board = Some(try!(parse_position(&input, &mut writer))), /*{
                     Ok(b) => Some(b),
                     Err(err) => {
                         to_log(&err, &mut writer);
                         panic!(err);
                     },
-                };
-            },
+                };*/
+            
             "stop" => {
-                let mut stop_signal = stop_signal.lock().unwrap();
-                *stop_signal = Box::new(true);
-                let best_move : board::Move = match best_move.lock().unwrap().clone() {
+                let mut engine_comm = engine_comm.lock().unwrap();
+                engine_comm.engine_should_stop = true;
+                let best_move : board::Move = match engine_comm.best_move.clone() {
                     Some(mv) => mv,
                     None => {
                         to_log(&"Haven't found a move yet: ignoring stop command.", &mut writer);
@@ -77,15 +76,10 @@ pub fn connect_engine() {
                 uci_send(&format!("bestmove {}", best_move.to_alg()), &mut writer);
             },
             "go" => {
-                match board {
-                    Some(ref board) => parse_go(&input, board, writer.clone(),
-                                                stop_signal.clone(), best_move.clone()),
-                    None => {
-                        to_log(&"Received go command with receiving a position first. Exiting...",
-                               &mut writer);
-                        panic!();
-                    },
-                }
+                let board = try!(board.clone().ok_or("Received go command without receiving a position first. Exiting..."));
+                let time_restriction = try!(parse_go(&input, writer.clone()));
+                
+                start_engine(&board, writer.clone(), time_restriction);
             },
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), &mut writer);
@@ -93,125 +87,137 @@ pub fn connect_engine() {
         }
     }
 }
-    
-fn parse_go (input : &String, board : &Board,
-             mut writer : Arc<Mutex<io::BufWriter<fs::File>>>,
-             stop_signal : Arc<Mutex<Box<bool>>>, best_move : Arc<Mutex<Option<board::Move>>>) {
 
-    let mut tokens_it = input.split_whitespace().skip(1);
-    let mut move_time = None;
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum TimeRestriction {
+    GameTime(TimeInfo),
+    Depth(u8),
+    Nodes(u64),
+    Mate(u16),
+    MoveTime(u64),
+    Infinite,   
+}
 
-    // Parses a string from the iterator to return a u32
-    fn parse_int (next_token : Option<&str>, writer : &mut Arc<Mutex<io::BufWriter<fs::File>>> )
-                  -> Option<u32>
-    {
-        match next_token {
-            Some (token) => match u32::from_str_radix(token, 10) {
-                Ok(n) => Some(n),
-                Err(_) =>  {
-                    to_log("Error: \"movetime\" token formatted incorrectly", writer);
-                    None
-                },
-            },
-            None => {
-                to_log("Error: Expected int after \"movetime\" token", writer);
-                None
-            },
-        }
+/// Struct for communicating with the engine from another thread
+#[derive(PartialEq, Eq, Clone)]
+pub struct EngineComm {
+    pub engine_should_stop : bool,
+    pub engine_is_running : bool,
+    pub best_move : Option<Move>,
+}
+
+impl EngineComm {
+    pub fn new() -> Self {
+        EngineComm{ engine_should_stop: false, engine_is_running: false, best_move : None }
     }
+}
+
+fn start_engine (board : &Board, log_writer : Arc<Mutex<io::BufWriter<fs::File>>>,
+                 time_restriction : TimeRestriction) -> Arc<Mutex<EngineComm>> {
+    let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
+    engine_comm.lock().unwrap().engine_is_running = true;
+
+    let (new_board, new_comm, new_logger) = (board.clone(), engine_comm.clone(), log_writer.clone());
+    thread::spawn (move || {
+        ::search_moves(new_board, new_comm,
+                       time_restriction, new_logger);
+    });
+    engine_comm
+}
+
+fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
+             -> Result<TimeRestriction, String> {
+
+    // Parses an optional string to return a u32
+    fn parse_int (next_token : Option<&str>) -> Result<u32, String> {
+        
+        match next_token {
+            Some(token) => u32::from_str_radix(token, 10).map_err(|_| String::from("Error: \"movetime\" token formatted incorrectly")),
+            None => Err(String::from("Error: Expected int after \"movetime\" token, but it was the last token in the command")),
+        }
+    }        
+
+    match input.split_whitespace().skip(1).next() {
+        Some("infinite") => return Ok(TimeRestriction::Infinite),
+        None => { to_log("Received no restriction \"go\" command, assuming \"infinite\"",
+                         &mut writer);
+        },
+        Some(_) => (),
+    }
+    
+    let mut tokens_it = input.split_whitespace().skip(1);
+    
+    let (mut white_time, mut black_time, mut white_inc, mut black_inc, mut moves_to_go) =
+        (None, None, None, None, None);
     
     loop {
         match tokens_it.next() {
-            Some("movetime") =>
-                move_time = parse_int(tokens_it.next(), &mut writer),
+            Some("moves_to_go") => {
+                moves_to_go = Some(try!(parse_int(tokens_it.next())));
+            }
             Some("btime") => {
-                if board.to_move == Black {
-                    move_time = parse_int(tokens_it.next(), &mut writer).map(|i| i / 15);
-                }
+                black_time = Some(try!(parse_int(tokens_it.next())));
             },
             Some("wtime") => {
-                if board.to_move == White {
-                    move_time = parse_int(tokens_it.next(), &mut writer).map(|i| i / 15);
-                }
+                white_time = Some(try!(parse_int(tokens_it.next())));
             },
-            Some (s) => to_log(&format!("Unknown token \"{}\" in go command", s), &mut writer),
+            Some("winc") => white_inc = Some(try!(parse_int(tokens_it.next()))),
+            Some("binc") => black_inc = Some(try!(parse_int(tokens_it.next()))),
+            Some (s) => return Err(format!("Unknown token \"{}\" in go command", s)),
             None => break,
         }
     }
-    
-    {
-        let mut stop_signal = stop_signal.lock().unwrap();
-        *stop_signal = Box::new(false);
+    if white_time == None || black_time == None {
+        return Err(String::from("Did not receive time left for white and black, nor other restrictions on \"go\" command."))
     }
-    calc_from_pos(board.clone(), writer.clone(), stop_signal.clone(), best_move.clone());
-    
-    match move_time {
-        Some(n) => {
-            thread::spawn(move || {
-                thread::sleep_ms(n - 20);
-                let mut stop_signal = stop_signal.lock().unwrap();
-                *stop_signal = Box::new(true);
-                let best_move : board::Move = match best_move.lock().unwrap().clone() {
-                    Some(mv) => mv,
-                    None => {
-                        to_log(&"Error: Didn't find a move in time", &mut writer);
-                        return;
-                    },
-                };
-                uci_send(&format!("bestmove {}", best_move.to_alg()), &mut writer); 
-            });
-        },
-        None => (),
+    if white_inc == None {
+        to_log("Did not receive white increment times, assuming 0", &mut writer);
+        white_inc = Some(0);
     }
+    if black_inc == None {
+        to_log("Did not receive black increment times, assuming 0", &mut writer);
+        black_inc = Some(0);
+    }
+    let time_info = TimeInfo {white_time: white_time.unwrap(), black_time: black_time.unwrap(),
+                              white_inc: white_inc.unwrap(), black_inc: black_inc.unwrap(),
+                              moves_to_go: moves_to_go.map(|v| v as u16 )};
+    Ok(TimeRestriction::GameTime(time_info))
 }
 
-/// Calulates progressively deeper from a certain position,
-/// printing the results to standard output in a UCI compatible way
-fn calc_from_pos (board : Board, mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>,
-                  stop_calc : Arc<Mutex<Box<bool>>>,
-                  best_move : Arc<Mutex<Option<board::Move>>>) {
-
-    thread::spawn(move || {
-        let start_time = time::get_time();
-        for depth in 1.. {
-            let (score, moves, node_count) = ::find_best_move_ab(&board, depth,
-                                                                 Some(stop_calc.clone()));
-            if moves.len() > 0 {
-                let mut best_move = best_move.lock().unwrap();
-                *best_move = Some(moves[0]);
-            }
-
-            let eng_score = match score {
-                Score::Val(f) => "cp ".to_string() + &((100.0 * f) as i16).to_string(),
-                Score::MateW(n) => "mate ".to_string() + &(n as i16 / 2).to_string(),
-                Score::MateB(n) => "mate ".to_string() + &(n as i16 / -2).to_string(),
-                Score::Draw(_) => "0 ".to_string(),
-                
-            };
-            
-            let mut inf_str = "info ".to_string();
-            inf_str.push_str(&format!("depth {} ", depth));
-            // inf_str.push_str(&format!("seldepth {} ", depth));
-            inf_str.push_str(&format!("score {} ", eng_score));
-            
-            let total_nodes = node_count.intern + node_count.leaf;
-            let ms_taken = (time::get_time() - start_time).num_milliseconds();
-            
-            inf_str.push_str(&format!("nodes {} ", total_nodes));
-            inf_str.push_str(&format!("time {} ", ms_taken));
-            if ms_taken > 0 {   
-                inf_str.push_str(&format!("nps {} ", total_nodes * 1000 / ms_taken as u64));
-            }
-            if moves.len() > 0 {
-                inf_str.push_str("pv ");
-            }
-            for c_move in moves {
-                inf_str.push_str(&format!("{} ", c_move.to_alg()));
-            }
-            uci_send(&inf_str, &mut log_writer);
-        }
-    });
+/// Sends the engine's evaluation to the GUI via uci, along with other data
+/// like node count, time taken, etc
+pub fn send_eval_to_gui (mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>, depth : u8,
+                         ms_taken : i64, 
+                         score : Score, moves : Vec<Move>, node_count : ::NodeCount) {
+    let eng_score = match score {
+        Score::Val(f) => "cp ".to_string() + &((100.0 * f) as i16).to_string(),
+        Score::MateW(n) => "mate ".to_string() + &(n as i16 / 2).to_string(),
+        Score::MateB(n) => "mate ".to_string() + &(n as i16 / -2).to_string(),
+        Score::Draw(_) => "0 ".to_string(),
+        
+    };
+    
+    let mut inf_str = "info ".to_string();
+    inf_str.push_str(&format!("depth {} ", depth));
+    // inf_str.push_str(&format!("selDepth {} ", depth));
+    inf_str.push_str(&format!("score {} ", eng_score));
+    
+    let total_nodes = node_count.intern + node_count.leaf;
+    
+    inf_str.push_str(&format!("nodes {} ", total_nodes));
+    inf_str.push_str(&format!("time {} ", ms_taken));
+    if ms_taken > 0 {   
+        inf_str.push_str(&format!("nps {} ", total_nodes * 1000 / ms_taken as u64));
+    }
+    if moves.len() > 0 {
+        inf_str.push_str("pv ");
+    }
+    for c_move in moves {
+        inf_str.push_str(&format!("{} ", c_move.to_alg()));
+    }
+    uci_send(&inf_str, &mut log_writer);
 }
+
 #[allow(unused_must_use)]
 /// Simple helper method to write a line to the log
 pub fn to_log (message : &str, log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>) {
@@ -235,11 +241,11 @@ pub fn uci_send (message : &str, log_writer : &mut Arc<Mutex<io::BufWriter<fs::F
     println!("{}", message);
 }
 
-/// Waits for input from the GUI, and writes the input to the log
+/// Waits for input from the GUI, and writes the input to the log and returns it
 #[allow(unused_must_use)]
 fn get_engine_input(log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>) -> String {
 
-    let mut reader = io::stdin();
+    let reader = io::stdin();
     let mut input = "".to_string();
     reader.read_line(&mut input).unwrap();
     
@@ -280,8 +286,8 @@ fn parse_position(input : &String, log_writer : &mut Arc<Mutex<io::BufWriter<fs:
             }
         }
         else {
-            return Err(format!("Illegally formatted position string, 
-2nd token is {} and string has {} tokens", words[1], words.len()))
+            return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
+                               input, words[1], words.len()))
         };
         if words.len() > moves_pos  {
             if words[moves_pos] == "moves" {

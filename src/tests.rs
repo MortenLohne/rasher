@@ -6,6 +6,9 @@ use move_gen;
 extern crate test;
 extern crate time;
 
+use uci;
+use std::sync::Mutex;
+
 #[allow(unused_imports)]
 use board::PieceType::*;
 #[allow(unused_imports)]
@@ -169,7 +172,8 @@ fn basic_tactics_test() {
 #[allow(dead_code)]
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &Board, best_move : Move) {
-    let (score, tried_moves, node_count) = ::find_best_move_ab(board, 4, None);
+    let (score, tried_moves, node_count) =
+        ::find_best_move_ab(board, 4, &Mutex::new(uci::EngineComm::new()), uci::TimeRestriction::Infinite);
     assert!(tried_moves[0] == best_move,
             format!("Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
 expected {}, board:\n{}",
@@ -281,7 +285,7 @@ fn move_is_unavailable_prop(board : &Board, c_move : Move) {
 }
 
 #[test]
-fn correct_move_gen_test() {
+fn correct_move_gen_test1() {
     let board1 = board::START_BOARD.clone();
     assert_eq!(legal_moves_after_plies(&board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&board1, 2), 400);
@@ -289,9 +293,12 @@ fn correct_move_gen_test() {
     assert_eq!(legal_moves_after_plies(&board1, 4), 197_281);
     assert_eq!(legal_moves_after_plies(&board1, 5), 4_865_609);
     assert_eq!(legal_moves_after_plies(&board1, 6), 119_060_324);
-    assert_eq!(legal_moves_after_plies(&board1, 7), 3_195_901_860); //~10 min
+    //assert_eq!(legal_moves_after_plies(&board1, 7), 3_195_901_860); //~10 min
     //assert_eq!(legal_moves_after_plies(&board, 8), 84_998_978_956);
+}
 
+#[test]
+fn correct_move_gen_test2() {
     let board2 = Board::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
     assert_eq!(legal_moves_after_plies(&board2, 1), 48);
@@ -299,7 +306,10 @@ fn correct_move_gen_test() {
     assert_eq!(legal_moves_after_plies(&board2, 3), 97_862);
     assert_eq!(legal_moves_after_plies(&board2, 4), 4_085_603);
     assert_eq!(legal_moves_after_plies(&board2, 5), 193_690_690);
+}
 
+#[test]
+fn correct_move_gen_test3() {
     let board3 = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
     assert_eq!(legal_moves_after_plies(&board3, 1), 14);
     assert_eq!(legal_moves_after_plies(&board3, 2), 191);
@@ -308,32 +318,46 @@ fn correct_move_gen_test() {
     assert_eq!(legal_moves_after_plies(&board3, 5), 674_624);
     assert_eq!(legal_moves_after_plies(&board3, 6), 11_030_083);
     assert_eq!(legal_moves_after_plies(&board3, 7), 178_633_661);
+}
 
+#[test]
+fn correct_move_gen_test4() {
     let board4 = Board::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..7).zip(
         [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) {
         assert_eq!(legal_moves_after_plies(&board4, depth), *nodes);
     }
+}
 
+#[test]
+fn correct_move_gen_test5() {
     let board5 = Board::from_fen(
         "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq - 1 8").unwrap();
     for (depth, nodes) in (1..).zip([42, 1352, 53_392].iter()) {
         assert_eq!(legal_moves_after_plies(&board5, depth), *nodes);
     }
+}
 
+#[test]
+fn correct_move_gen_test6() {
     let board6 = Board::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
-    for (depth, nodes) in (1..7).zip(
+    for (depth, nodes) in (1..6).zip(
         [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
         assert_eq!(legal_moves_after_plies(&board6, depth), *nodes);
     }
+}
 
+#[test]
+fn correct_move_gen_test7() {
     let board7 = Board::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
     assert_eq!(legal_moves_after_plies(&board7, 3), 62_379);
 }
 
+/// Checks that the engine finds the total number of legal moves after n plies.
+/// This provides a very strong indication that the move generator is correct
 #[allow(dead_code)]
 fn legal_moves_after_plies(board : &Board, n : u8) -> u64 {
     if n == 1 { move_gen::all_legal_moves(board).len() as u64 }
@@ -347,6 +371,7 @@ fn legal_moves_after_plies(board : &Board, n : u8) -> u64 {
 }
 
 // Prevent the benchmark from running forever by interrupting it after 10 runs
+#[allow(dead_code)]
 static mut BENCHES_RUN : u32 = 0;
 
 #[bench]
@@ -360,7 +385,7 @@ fn eval_start_pos_bench (bencher : &mut test::Bencher) {
                 return;
             }
         }
-        let (_, _, node_counter) = ::find_best_move_ab (&board, 5, None);
+        let (_, _, node_counter) = ::find_best_move_ab (&board, 5, &Mutex::new(uci::EngineComm::new()), uci::TimeRestriction::Infinite);
         total_nodes.intern += node_counter.intern;
         total_nodes.leaf += node_counter.leaf;
     });

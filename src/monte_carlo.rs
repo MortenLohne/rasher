@@ -1,5 +1,8 @@
 
-/// This function takes a GameState and a function 
+/// This function takes a GameState and a function
+
+#[allow(dead_code)]
+#[allow(unused_variables)]
 fn monte_carlo_search<GS, M, F, G> (game_state : GS,
                                  legal_moves : F, do_move : G, is_won : fn(GS) -> bool
                                  ) -> !

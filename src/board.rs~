@@ -1,5 +1,5 @@
-use self::PieceType::{Pawn, Knight, Bishop, Rook, Queen, King, Empty};
-use self::Color::{Black, White};
+use self::PieceType::*;
+use self::Color::*;
 
 use std::collections::HashMap;
 use std::fmt::Error;
@@ -254,14 +254,17 @@ impl Board {
         new_board
     }
 
-    pub fn pos_of(piece : Piece) {
-        for rank in 0..8 {
-            for file in 0..8 {
-                if self.board[rank][file] == piece {
-                    return Square::from_ints(file, rank);
-                }
+    pub fn king_pos(&self) -> Square {
+        self.pos_of(Piece(King, self.to_move)).unwrap()
+    }
+    
+    pub fn pos_of(&self, piece : Piece) -> Option<Square> {
+        for i in 0..64 {
+            if self.piece_at(Square(i)) == piece {
+                return Some(Square(i));
             }
         }
+        None
     }
     
     // Creates a new board from a given FEN string
@@ -343,22 +346,6 @@ impl Board {
     pub fn do_move(&self, c_move : Move) -> Board {
         let mut new_board = self.clone();
         new_board.moves.push(c_move);
-        // A debugging check that ensures this move doesn't capture the king
-        if self.piece_at(c_move.to).0 == King {
-            println!("The {} king is exposed at current board! {} is threatened. \n{}",
-                     self.piece_at(c_move.to).1, c_move, self);
-            println!("All legal moves: \n");
-            
-            if new_board.to_move == White {
-                new_board.to_move = Black
-            }
-            else { new_board.to_move = White };
-            
-            for leg_move in all_legal_moves(&new_board) {
-                println!("{}", leg_move);
-            }
-            panic!();
-        }
         // Increment or reset the half-move clock
         match (new_board.piece_at(c_move.from).0, new_board.piece_at(c_move.to).0) {
             (Pawn, _) => new_board.half_move_clock = 0,

@@ -36,7 +36,6 @@ pub enum PieceType {
 }
 
 impl PieceType {
-    #[inline]
     fn value(&self) -> f32 {
         match *self {
             Pawn => 1.0,
@@ -207,6 +206,8 @@ impl Display for Move {
     }
 }
 
+// use std::hash::{Hash, Hasher, SipHasher};
+
 #[derive(Clone, Eq, Debug, PartialEq)]
 pub struct Board {
     pub board : [[Piece; 8]; 8],
@@ -216,7 +217,14 @@ pub struct Board {
     pub half_move_clock : u16,
     pub move_num : u16,
     pub moves : Vec<Move>,
+    //pub hash : Option<Hasher>,
 }
+
+/*impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        
+    }
+}*/
 
 impl Display for Board {
     fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
@@ -464,6 +472,18 @@ impl Board {
         
         new_board
     }
+}
+
+// Stores time information for the game, in milliseconds
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct TimeInfo {
+    pub white_time : u32,
+    pub black_time : u32,
+    pub white_inc : u32,
+    pub black_inc : u32,
+    pub moves_to_go : Option<u16>, // Number of moves to the next time control
+
+    
 }
 
 lazy_static! {
