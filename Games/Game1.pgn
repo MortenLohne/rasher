@@ -1,0 +1,16 @@
+[Event "UCI Game"]
+[Site "?"]
+[Date "2015.05.29"]
+[Round "?"]
+[White "?"]
+[Black "Morten Chess"]
+[Result "1-0"]
+
+1.d4 Nf6 2.c4 d5 3.Nf3 c6 4.Nc3 dxc4 5.e4 Bg4 6.Be3 
+    ( 6.Bxc4 Bxf3 7.Qxf3 Qxd4 )
+6...Qa5 7.h3 Bxf3 8.Qxf3 Qb4 9.Rb1 Nfd7 10.a3 Qb3 11.Be2 Na6 12.Bd1 Qb6 
+13.O-O Nc7 14.d5 Qa5 15.dxc6 Ne5 16.Qf4 Ne6 17.cxb7 Nxf4 18.bxa8=Q+ Qd8 
+19.Qxd8+ Kxd8 20.Bxf4 Nd3 21.Be3 e6 22.Be2 Ne5 23.Bxa7 Kc8 24.Bd4 Nc6 25.
+Rfd1 Bxa3 26.bxa3 e5 27.Bg4+ Kc7 28.Be3 f5 29.Bxf5 h5 30.Rd7+ Kc8 31.Rxg7+
+Kd8 32.Rd7+ Ke8 33.Rc7 Nd8 34.Rb8 Rg8 35.Bc5 h4 36.Re7+ Kf8 37.Rxd8# 1-0
+

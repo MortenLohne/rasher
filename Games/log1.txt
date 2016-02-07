@@ -1,0 +1,577 @@
+[390:912] Log: Opened log file
+[396:154] GUI: setoption name Ponder value false
+[396:155] Log: Unexpected input setoption name Ponder value false
+
+[410:929] GUI: isready
+[410:929] Engine: readyok
+[410:931] GUI: uci
+[410:931] Log: Unrecognized input "uci
+". Ignoring.
+[410:931] GUI: position fen rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1
+[410:932] GUI: go wtime 1201000 btime 600000 winc 15000 binc 10000
+[410:932] Log: Unknown token "1201000" in go command
+[410:932] Log: Unknown token "winc" in go command
+[410:932] Log: Unknown token "15000" in go command
+[410:932] Log: Unknown token "binc" in go command
+[410:932] Log: Unknown token "10000" in go command
+[410:932] Engine: info depth 1 score cp -34 nodes 21 time 2 pv b8c6 
+[410:933] Engine: info depth 2 score cp 9 nodes 173 time 2 pv b8c6 b1c3 
+[410:937] Engine: info depth 3 score cp -77 nodes 1389 time 2 pv b8c6 d4d5 g8f6 
+[411:96] Engine: info depth 4 score cp 74 nodes 45363 time 2 pv e7e6 d1d3 f8b4 b1c3 
+[411:541] Engine: info depth 5 score cp -163 nodes 159695 time 2 pv b8c6 d4d5 c6b4 d1d4 b4d5 
+[423:731] Engine: info depth 6 score cp 124 nodes 2887248 time 2 pv g8f6 d1d3 e7e6 d3c4 f6e4 c4e6 
+[450:913] Engine: bestmove g8f6
+[499:343] GUI: isready
+[499:343] Engine: readyok
+[499:343] GUI: position fen rnbqkb1r/pppppppp/5n2/8/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2
+[499:343] GUI: go wtime 1170000 btime 571000 winc 15000 binc 10000
+[499:343] Log: Unknown token "1170000" in go command
+[499:344] Log: Unknown token "winc" in go command
+[499:344] Log: Unknown token "15000" in go command
+[499:344] Log: Unknown token "binc" in go command
+[499:344] Log: Unknown token "10000" in go command
+[499:344] Engine: info depth 1 score cp -71 nodes 23 time 2 pv b8c6 
+[499:345] Engine: info depth 2 score cp -27 nodes 154 time 2 pv b8c6 b1c3 
+[499:352] Engine: info depth 3 score cp -213 nodes 1635 time 2 pv b8c6 b1c3 c6d4 
+[499:484] Engine: info depth 4 score cp 61 nodes 53496 time 2 pv b8c6 c1g5 f6e4 g5e7 
+[500:12] Engine: info depth 5 score cp -179 nodes 328895 time 2 pv e7e6 d1d3 b8c6 b1c3 c6d4 
+[509:863] Engine: info depth 6 score cp 110 nodes 4069506 time 2 pv d7d5 c1g5 f6e4 d1a4 b7b5 a4b5 
+[537:390] Engine: bestmove d7d5
+[646:631] GUI: isready
+[646:631] Engine: readyok
+[646:632] GUI: position fen rnbqkb1r/ppp1pppp/5n2/3p4/2PP4/5N2/PP2PPPP/RNBQKB1R b KQkq - 1 3
+[646:632] GUI: go wtime 1081000 btime 543000 winc 15000 binc 10000
+[646:632] Log: Unknown token "1081000" in go command
+[646:632] Log: Unknown token "winc" in go command
+[646:632] Log: Unknown token "15000" in go command
+[646:632] Log: Unknown token "binc" in go command
+[646:632] Log: Unknown token "10000" in go command
+[646:632] Engine: info depth 1 score cp -142 nodes 31 time 2 pv d5c4 
+[646:633] Engine: info depth 2 score cp -98 nodes 153 time 2 pv d5c4 b1c3 
+[646:640] Engine: info depth 3 score cp -185 nodes 4296 time 2 pv d5c4 d1a4 b8c6 
+[646:902] Engine: info depth 4 score cp 45 nodes 60928 time 2 pv d5c4 d1a4 b7b5 a4c4 
+[647:561] Engine: info depth 5 score cp -201 nodes 376324 time 2 pv d5c4 c1g5 f6e4 d1a4 b8c6 
+[661:949] Engine: info depth 6 score cp 89 nodes 4112787 time 2 pv c7c6 d1b3 d5c4 b3c4 d8a5 b1c3 
+[682:816] Engine: bestmove c7c6
+[702:780] GUI: isready
+[702:780] Engine: readyok
+[702:781] GUI: position fen rnbqkb1r/pp2pppp/2p2n2/3p4/2PP4/2N2N2/PP2PPPP/R1BQKB1R b KQkq - 1 4
+[702:781] GUI: go wtime 1077000 btime 517000 winc 15000 binc 10000
+[702:781] Log: Unknown token "1077000" in go command
+[702:781] Log: Unknown token "winc" in go command
+[702:781] Log: Unknown token "15000" in go command
+[702:781] Log: Unknown token "binc" in go command
+[702:781] Log: Unknown token "10000" in go command
+[702:782] Engine: info depth 1 score cp -102 nodes 32 time 2 pv d5c4 
+[702:783] Engine: info depth 2 score cp -63 nodes 239 time 2 pv d5c4 d1d3 
+[702:793] Engine: info depth 3 score cp -288 nodes 4423 time 2 pv d5c4 f3e5 d8d4 
+[702:887] Engine: info depth 4 score cp 66 nodes 29097 time 2 pv d5c4 c1g5 f6g4 g5e7 
+[703:938] Engine: info depth 5 score cp -267 nodes 561686 time 2 pv d5c4 c1g5 f6g4 c3e4 d8d4 
+[727:768] Engine: info depth 6 score cp 53 nodes 6456892 time 2 pv d5c4 f3e5 b8d7 e5c4 d8c7 d1d3 
+[737:230] Engine: bestmove d5c4
+[766:477] GUI: isready
+[766:477] Engine: readyok
+[766:477] GUI: position fen rnbqkb1r/pp2pppp/2p2n2/8/2pPP3/2N2N2/PP3PPP/R1BQKB1R b KQkq - 0 5
+[766:477] GUI: go wtime 1064000 btime 493000 winc 15000 binc 10000
+[766:477] Log: Unknown token "1064000" in go command
+[766:477] Log: Unknown token "winc" in go command
+[766:477] Log: Unknown token "15000" in go command
+[766:477] Log: Unknown token "binc" in go command
+[766:477] Log: Unknown token "10000" in go command
+[766:478] Engine: info depth 1 score cp -307 nodes 34 time 2 pv d8d4 
+[766:479] Engine: info depth 2 score cp 43 nodes 968 time 2 pv d8d6 f1c4 
+[766:488] Engine: info depth 3 score cp -437 nodes 4974 time 2 pv c8g4 f1c4 g4f3 
+[766:606] Engine: info depth 4 score cp -7 nodes 47020 time 2 pv c8g4 f1c4 g4f3 d1f3 
+[767:808] Engine: info depth 5 score cp -307 nodes 683073 time 2 pv d8a5 d1a4 a5a4 c3a4 f6e4 
+[779:164] Engine: info depth 6 score cp 25 nodes 4201388 time 2 pv c8g4 f1c4 f6d7 c1f4 g4f3 f4b8 
+[799:324] Engine: bestmove c8g4
+[910:673] GUI: isready
+[910:673] Engine: readyok
+[910:673] GUI: position fen rn1qkb1r/pp2pppp/2p2n2/8/2pPP1b1/2N1BN2/PP3PPP/R2QKB1R b KQkq - 2 6
+[910:673] GUI: go wtime 973000 btime 471000 winc 15000 binc 10000
+[910:673] Log: Unknown token "973000" in go command
+[910:673] Log: Unknown token "winc" in go command
+[910:673] Log: Unknown token "15000" in go command
+[910:673] Log: Unknown token "binc" in go command
+[910:673] Log: Unknown token "10000" in go command
+[910:674] Engine: info depth 1 score cp -590 nodes 36 time 2 pv g4f3 
+[910:676] Engine: info depth 2 score cp -161 nodes 1016 time 2 pv g4f3 d1f3 
+[910:721] Engine: info depth 3 score cp -454 nodes 31088 time 2 pv d8d6 f1c4 g4f3 
+[911:378] Engine: info depth 4 score cp -98 nodes 268567 time 2 pv b7b5 e3g5 g4f3 g5f6 
+[914:195] Engine: info depth 5 score cp -516 nodes 1738955 time 2 pv d8a5 f1c4 g4f3 d1f3 a5c3 
+[942:54] Engine: bestmove d8a5
+[1079:803] GUI: isready
+[1079:803] Engine: readyok
+[1079:803] GUI: position fen rn2kb1r/pp2pppp/2p2n2/q7/2pPP1b1/2N1BN1P/PP3PP1/R2QKB1R b KQkq - 0 7
+[1079:803] GUI: go wtime 857000 btime 450000 winc 15000 binc 10000
+[1079:804] Log: Unknown token "857000" in go command
+[1079:804] Log: Unknown token "winc" in go command
+[1079:804] Log: Unknown token "15000" in go command
+[1079:804] Log: Unknown token "binc" in go command
+[1079:804] Log: Unknown token "10000" in go command
+[1079:804] Engine: info depth 1 score cp -612 nodes 44 time 2 pv a5c3 
+[1079:806] Engine: info depth 2 score cp -158 nodes 625 time 2 pv g4f3 d1f3 
+[1079:834] Engine: info depth 3 score cp -689 nodes 15692 time 2 pv g4f3 d1f3 a5c3 
+[1080:384] Engine: info depth 4 score cp 17 nodes 211526 time 2 pv a5h5 f1c4 g4f3 d1f3 
+[1089:316] Engine: info depth 5 score cp -513 nodes 5188330 time 2 pv g4f3 d1f3 a5b4 f1c4 b4c3 
+[1109:784] Engine: bestmove g4f3
+[1117:150] GUI: isready
+[1117:150] Engine: readyok
+[1117:150] GUI: position fen rn2kb1r/pp2pppp/2p2n2/q7/2pPP3/2N1BQ1P/PP3PP1/R3KB1R b KQkq - 0 8
+[1117:150] GUI: go wtime 865000 btime 431000 winc 15000 binc 10000
+[1117:150] Log: Unknown token "865000" in go command
+[1117:150] Log: Unknown token "winc" in go command
+[1117:150] Log: Unknown token "15000" in go command
+[1117:150] Log: Unknown token "binc" in go command
+[1117:150] Log: Unknown token "10000" in go command
+[1117:150] Engine: info depth 1 score cp -689 nodes 38 time 2 pv a5c3 
+[1117:152] Engine: info depth 2 score cp 25 nodes 557 time 2 pv f6d7 f1c4 
+[1117:184] Engine: info depth 3 score cp -513 nodes 12707 time 2 pv a5b4 f1c4 b4c3 
+[1117:506] Engine: info depth 4 score cp 139 nodes 101259 time 2 pv f6d7 f1c4 a5b4 c4f7 
+[1121:90] Engine: info depth 5 score cp -514 nodes 1985212 time 2 pv a5b4 e3g5 f6d7 f1c4 b4c3 
+[1145:863] Engine: bestmove a5b4
+[1181:581] GUI: isready
+[1181:581] Engine: readyok
+[1181:581] GUI: position fen rn2kb1r/pp2pppp/2p2n2/8/1qpPP3/2N1BQ1P/PP3PP1/1R2KB1R b Kkq - 2 9
+[1181:581] GUI: go wtime 846000 btime 413000 winc 15000 binc 10000
+[1181:581] Log: Unknown token "846000" in go command
+[1181:581] Log: Unknown token "winc" in go command
+[1181:581] Log: Unknown token "15000" in go command
+[1181:581] Log: Unknown token "binc" in go command
+[1181:581] Log: Unknown token "10000" in go command
+[1181:581] Engine: info depth 1 score cp -689 nodes 33 time 2 pv b4c3 
+[1181:582] Engine: info depth 2 score cp 5 nodes 525 time 2 pv f6d7 f1c4 
+[1181:609] Engine: info depth 3 score cp -548 nodes 15151 time 2 pv b8d7 f1c4 b4c3 
+[1181:827] Engine: info depth 4 score cp 11 nodes 86096 time 2 pv f6d7 f3f5 e7e6 f1c4 
+[1183:989] Engine: info depth 5 score cp -417 nodes 1222818 time 2 pv b8d7 e1d1 e7e5 c3e2 f6e4 
+[1200:225] Engine: info depth 6 score cp 21 nodes 6238933 time 2 pv f6d7 a2a3 b4b3 f3f5 e7e6 f1c4 
+[1209:97] Engine: bestmove f6d7
+[1312:994] GUI: isready
+[1312:994] Engine: readyok
+[1312:995] GUI: position fen rn2kb1r/pp1npppp/2p5/8/1qpPP3/P1N1BQ1P/1P3PP1/1R2KB1R b Kkq - 0 10
+[1312:995] GUI: go wtime 762000 btime 396000 winc 15000 binc 10000
+[1312:995] Log: Unknown token "762000" in go command
+[1312:995] Log: Unknown token "winc" in go command
+[1312:995] Log: Unknown token "15000" in go command
+[1312:995] Log: Unknown token "binc" in go command
+[1312:995] Log: Unknown token "10000" in go command
+[1312:995] Engine: info depth 1 score cp -678 nodes 31 time 2 pv b4c3 
+[1312:996] Engine: info depth 2 score cp -11 nodes 392 time 2 pv b4d6 f1c4 
+[1313:7] Engine: info depth 3 score cp -502 nodes 6026 time 2 pv b4b3 f1c4 b3c3 
+[1313:153] Engine: info depth 4 score cp 21 nodes 58468 time 2 pv b4b3 f3f5 e7e6 f1c4 
+[1315:931] Engine: info depth 5 score cp -214 nodes 1489019 time 2 pv b4b3 f3d1 b3b6 f1c4 b6d4 
+[1339:376] Engine: bestmove b4b3
+[1466:504] GUI: isready
+[1466:504] Engine: readyok
+[1466:504] GUI: position fen rn2kb1r/pp1npppp/2p5/8/2pPP3/PqN1BQ1P/1P2BPP1/1R2K2R b Kkq - 2 11
+[1466:504] GUI: go wtime 656000 btime 380000 winc 15000 binc 10000
+[1466:504] Log: Unknown token "656000" in go command
+[1466:504] Log: Unknown token "winc" in go command
+[1466:504] Log: Unknown token "15000" in go command
+[1466:504] Log: Unknown token "binc" in go command
+[1466:504] Log: Unknown token "10000" in go command
+[1466:504] Engine: info depth 1 score cp -665 nodes 31 time 2 pv b3c3 
+[1466:506] Engine: info depth 2 score cp 5 nodes 606 time 2 pv b8a6 e2c4 
+[1466:527] Engine: info depth 3 score cp -512 nodes 14149 time 2 pv b8a6 e2c4 b3c3 
+[1466:670] Engine: info depth 4 score cp 11 nodes 62622 time 2 pv b8a6 f3f5 e7e6 e2c4 
+[1470:683] Engine: info depth 5 score cp -369 nodes 2396130 time 2 pv b3c2 e2c4 e8d8 c4f7 c2c3 
+[1482:253] Engine: info depth 6 score cp 9 nodes 5142023 time 2 pv b8a6 d4d5 c6c5 f3f5 e7e6 e2c4 
+[1491:818] Engine: bestmove b8a6
+[1544:1] GUI: isready
+[1544:1] Engine: readyok
+[1544:1] GUI: position fen r3kb1r/pp1npppp/n1p5/8/2pPP3/PqN1BQ1P/1P3PP1/1R1BK2R b Kkq - 4 12
+[1544:1] GUI: go wtime 621000 btime 365000 winc 15000 binc 10000
+[1544:1] Log: Unknown token "621000" in go command
+[1544:1] Log: Unknown token "winc" in go command
+[1544:1] Log: Unknown token "15000" in go command
+[1544:1] Log: Unknown token "binc" in go command
+[1544:1] Log: Unknown token "10000" in go command
+[1544:2] Engine: info depth 1 score cp -685 nodes 36 time 2 pv b3c3 
+[1544:4] Engine: info depth 2 score cp -36 nodes 945 time 2 pv b3b6 f3f7 
+[1544:39] Engine: info depth 3 score cp -358 nodes 22854 time 2 pv b3b6 f3f5 b6d4 
+[1544:982] Engine: info depth 4 score cp -7 nodes 554858 time 2 pv b3b6 f3f5 e7e6 f5e6 
+[1556:384] Engine: info depth 5 score cp -332 nodes 4124127 time 2 pv b3b6 f3e2 b6a5 b2b4 a6b4 
+[1568:317] Engine: bestmove b3b6
+[1807:948] GUI: isready
+[1807:948] Engine: readyok
+[1807:948] GUI: position fen r3kb1r/pp1npppp/nqp5/8/2pPP3/P1N1BQ1P/1P3PP1/1R1B1RK1 b kq - 6 13
+[1807:948] GUI: go wtime 408000 btime 351000 winc 15000 binc 10000
+[1807:948] Log: Unknown token "408000" in go command
+[1807:948] Log: Unknown token "winc" in go command
+[1807:948] Log: Unknown token "15000" in go command
+[1807:948] Log: Unknown token "binc" in go command
+[1807:948] Log: Unknown token "10000" in go command
+[1807:948] Engine: info depth 1 score cp -368 nodes 32 time 2 pv b6d4 
+[1807:950] Engine: info depth 2 score cp -54 nodes 519 time 2 pv a6c7 f3f7 
+[1807:966] Engine: info depth 3 score cp -376 nodes 10622 time 2 pv a6c7 f3f5 b6d4 
+[1808:95] Engine: info depth 4 score cp -25 nodes 51850 time 2 pv a6c7 f3f5 e7e6 f5e6 
+[1810:241] Engine: info depth 5 score cp -351 nodes 1255152 time 2 pv e7e6 f3e2 f8a3 e2c4 b6d4 
+[1829:645] Engine: info depth 6 score cp 0 nodes 8165738 time 2 pv a6c7 d4d5 b6a5 f3f4 c7a6 d5c6 
+[1831:328] Engine: bestmove a6c7
+[1936:315] GUI: isready
+[1936:315] Engine: readyok
+[1936:316] GUI: position fen r3kb1r/ppnnpppp/1qp5/3P4/2p1P3/P1N1BQ1P/1P3PP1/1R1B1RK1 b kq - 0 14
+[1936:316] GUI: go wtime 323000 btime 338000 winc 15000 binc 10000
+[1936:316] Log: Unknown token "323000" in go command
+[1936:316] Log: Unknown token "winc" in go command
+[1936:316] Log: Unknown token "15000" in go command
+[1936:316] Log: Unknown token "binc" in go command
+[1936:316] Log: Unknown token "10000" in go command
+[1936:316] Engine: info depth 1 score cp -618 nodes 35 time 2 pv b6e3 
+[1936:317] Engine: info depth 2 score cp -34 nodes 747 time 2 pv c6c5 e3c5 
+[1936:341] Engine: info depth 3 score cp -381 nodes 13104 time 2 pv b6a5 b2b4 a5d5 
+[1936:654] Engine: info depth 4 score cp 0 nodes 135638 time 2 pv b6a5 f3f4 c7a6 d5c6 
+[1939:978] Engine: info depth 5 score cp -421 nodes 1285798 time 2 pv b6a5 c3e2 d7e5 f3f4 a5d5 
+[1958:833] Engine: bestmove b6a5
+[1988:255] GUI: isready
+[1988:255] Engine: readyok
+[1988:256] GUI: position fen r3kb1r/ppnnpppp/2P5/q7/2p1P3/P1N1BQ1P/1P3PP1/1R1B1RK1 b kq - 0 15
+[1988:256] GUI: go wtime 310000 btime 326000 winc 15000 binc 10000
+[1988:256] Log: Unknown token "310000" in go command
+[1988:256] Log: Unknown token "winc" in go command
+[1988:256] Log: Unknown token "15000" in go command
+[1988:256] Log: Unknown token "binc" in go command
+[1988:256] Log: Unknown token "10000" in go command
+[1988:256] Engine: info depth 1 score cp -559 nodes 40 time 2 pv a5c3 
+[1988:257] Engine: info depth 2 score cp -55 nodes 220 time 2 pv b7c6 f3f7 
+[1988:266] Engine: info depth 3 score cp -585 nodes 4163 time 2 pv d7e5 f3f4 a5c3 
+[1988:359] Engine: info depth 4 score cp -70 nodes 26560 time 2 pv b7c6 d1e2 a5e5 e2c4 
+[1989:285] Engine: info depth 5 score cp -456 nodes 471066 time 2 pv d7e5 f3e2 a8d8 b2b4 d8d1 
+[2009:969] Engine: bestmove d7e5
+[2193:661] GUI: isready
+[2193:661] Engine: readyok
+[2193:661] GUI: position fen r3kb1r/ppn1pppp/2P5/q3n3/2p1PQ2/P1N1B2P/1P3PP1/1R1B1RK1 b kq - 2 16
+[2193:661] GUI: go wtime 150000 btime 315000 winc 15000 binc 10000
+[2193:661] Log: Unknown token "150000" in go command
+[2193:661] Log: Unknown token "winc" in go command
+[2193:661] Log: Unknown token "15000" in go command
+[2193:661] Log: Unknown token "binc" in go command
+[2193:661] Log: Unknown token "10000" in go command
+[2193:661] Engine: info depth 1 score cp -585 nodes 36 time 2 pv a5c3 
+[2193:662] Engine: info depth 2 score cp 282 nodes 400 time 2 pv e5c6 f4c7 
+[2193:675] Engine: info depth 3 score cp -612 nodes 7497 time 2 pv c7e6 f4f5 a5c3 
+[2193:854] Engine: info depth 4 score cp 45 nodes 66088 time 2 pv e5d3 f4g3 c7e6 c6b7 
+[2194:655] Engine: info depth 5 score cp -490 nodes 398499 time 2 pv c7e6 f4g3 a8d8 b2b4 d8d1 
+[2214:641] Engine: bestmove c7e6
+[2250:405] GUI: isready
+[2250:405] Engine: readyok
+[2250:405] GUI: position fen r3kb1r/pP2pppp/4n3/q3n3/2p1PQ2/P1N1B2P/1P3PP1/1R1B1RK1 b kq - 0 17
+[2250:405] GUI: go wtime 131000 btime 305000 winc 15000 binc 10000
+[2250:405] Log: Unknown token "131000" in go command
+[2250:405] Log: Unknown token "winc" in go command
+[2250:405] Log: Unknown token "15000" in go command
+[2250:405] Log: Unknown token "binc" in go command
+[2250:405] Log: Unknown token "10000" in go command
+[2250:406] Engine: info depth 1 score cp -1058 nodes 37 time 2 pv e6f4 
+[2250:407] Engine: info depth 2 score cp -143 nodes 163 time 2 pv e6f4 b7b8q 
+[2250:413] Engine: info depth 3 score cp -1076 nodes 2722 time 2 pv e6f4 e3f4 a5c3 
+[2270:719] Engine: bestmove e6f4
+[2281:198] GUI: isready
+[2281:198] Engine: readyok
+[2281:198] GUI: position fen Q3kb1r/p3pppp/8/q3n3/2p1Pn2/P1N1B2P/1P3PP1/1R1B1RK1 b k - 0 18
+[2281:198] GUI: go wtime 136000 btime 295000 winc 15000 binc 10000
+[2281:199] Log: Unknown token "136000" in go command
+[2281:199] Log: Unknown token "winc" in go command
+[2281:199] Log: Unknown token "15000" in go command
+[2281:199] Log: Unknown token "binc" in go command
+[2281:199] Log: Unknown token "10000" in go command
+[2281:199] Engine: info depth 1 score cp 343 nodes 3 time 2 pv e8d7 
+[2281:199] Engine: info depth 2 score cp 857 nodes 50 time 2 pv e8d7 e3f4 
+[2281:200] Engine: info depth 3 score cp 359 nodes 228 time 2 pv e8d7 a8b7 a5c7 
+[2281:213] Engine: info depth 4 score cp 1281 nodes 6005 time 2 pv e8d7 e3f4 e5d3 a8f8 
+[2281:322] Engine: info depth 5 score cp 866 nodes 22512 time 2 pv e8d7 e3f4 f7f5 a8b7 a5c7 
+[2282:611] Engine: info depth 6 score cp 1285 nodes 579448 time 2 pv e8d7 e3f4 e5d3 d1g4 f7f5 a8f8 
+[2291:937] Engine: info depth 7 score cp 885 nodes 1763970 time 2 pv a5d8 d1a4 e5d7 a8d8 e8d8 e3f4 d7e5 
+[2300:845] Engine: bestmove a5d8
+[2313:402] GUI: isready
+[2313:402] Engine: readyok
+[2313:403] GUI: position fen 3Qkb1r/p3pppp/8/4n3/2p1Pn2/P1N1B2P/1P3PP1/1R1B1RK1 b k - 0 19
+[2313:403] GUI: go wtime 139000 btime 286000 winc 15000 binc 10000
+[2313:403] Log: Unknown token "139000" in go command
+[2313:403] Log: Unknown token "winc" in go command
+[2313:403] Log: Unknown token "15000" in go command
+[2313:403] Log: Unknown token "binc" in go command
+[2313:403] Log: Unknown token "10000" in go command
+[2313:403] Engine: info depth 1 score cp 372 nodes 2 time 2 pv e8d8 
+[2313:403] Engine: info depth 2 score cp 885 nodes 33 time 2 pv e8d8 e3f4 
+[2313:403] Engine: info depth 3 score cp 878 nodes 231 time 2 pv e8d8 e3f4 f7f5 
+[2313:412] Engine: info depth 4 score cp 931 nodes 3091 time 2 pv e8d8 e3f4 e5d3 c3d5 
+[2313:501] Engine: info depth 5 score cp 782 nodes 23880 time 2 pv e8d8 e3f4 e5d3 f4e3 d3f2 
+[2314:245] Engine: info depth 6 score cp 1024 nodes 334141 time 2 pv e8d8 e3f4 e5d3 f4g5 d3e5 g5e7 
+[2319:77] Engine: info depth 7 score cp 899 nodes 1463534 time 2 pv e8d8 e3f4 e5d3 c3d5 e7e5 f4g5 f8e7 
+[2332:449] Engine: bestmove e8d8
+[2348:202] GUI: isready
+[2348:202] Engine: readyok
+[2348:202] GUI: position fen 3k1b1r/p3pppp/8/4n3/2p1PB2/P1N4P/1P3PP1/1R1B1RK1 b - - 0 20
+[2348:202] GUI: go wtime 139000 btime 277000 winc 15000 binc 10000
+[2348:202] Log: Unknown token "139000" in go command
+[2348:202] Log: Unknown token "winc" in go command
+[2348:202] Log: Unknown token "15000" in go command
+[2348:202] Log: Unknown token "binc" in go command
+[2348:202] Log: Unknown token "10000" in go command
+[2348:202] Engine: info depth 1 score cp 878 nodes 21 time 2 pv f7f5 
+[2348:203] Engine: info depth 2 score cp 931 nodes 369 time 2 pv e5d3 c3d5 
+[2348:209] Engine: info depth 3 score cp 782 nodes 2877 time 2 pv e5d3 f4e3 d3f2 
+[2348:284] Engine: info depth 4 score cp 1024 nodes 37407 time 2 pv e5d3 f4g5 d3e5 g5e7 
+[2349:125] Engine: info depth 5 score cp 899 nodes 319638 time 2 pv e5d3 c3d5 e7e5 f4g5 f8e7 
+[2357:104] Engine: info depth 6 score cp 1055 nodes 3933013 time 2 pv e5d3 f4g3 d3c5 d1e2 f7f5 e2c4 
+[2366:648] Engine: bestmove e5d3
+[2410:782] GUI: isready
+[2410:783] Engine: readyok
+[2410:783] GUI: position fen 3k1b1r/p3pppp/8/8/2p1P3/P1NnB2P/1P3PP1/1R1B1RK1 b - - 2 21
+[2410:783] GUI: go wtime 112000 btime 269000 winc 15000 binc 10000
+[2410:783] Log: Unknown token "112000" in go command
+[2410:783] Log: Unknown token "winc" in go command
+[2410:783] Log: Unknown token "15000" in go command
+[2410:783] Log: Unknown token "binc" in go command
+[2410:783] Log: Unknown token "10000" in go command
+[2410:783] Engine: info depth 1 score cp 782 nodes 24 time 2 pv d3f2 
+[2410:785] Engine: info depth 2 score cp 927 nodes 340 time 2 pv a7a5 c3d5 
+[2410:798] Engine: info depth 3 score cp 871 nodes 6617 time 2 pv e7e5 e3g5 f8e7 
+[2410:955] Engine: info depth 4 score cp 1051 nodes 73577 time 2 pv d3e5 d1e2 f7f5 e2c4 
+[2412:54] Engine: info depth 5 score cp 904 nodes 475633 time 2 pv e7e6 e3a7 d8c8 a7d4 f8a3 
+[2428:697] Engine: bestmove e7e6
+[2447:618] GUI: isready
+[2447:618] Engine: readyok
+[2447:618] GUI: position fen 3k1b1r/p4ppp/4p3/8/2p1P3/P1NnB2P/1P2BPP1/1R3RK1 b - - 1 22
+[2447:618] GUI: go wtime 109000 btime 262000 winc 15000 binc 10000
+[2447:618] Log: Unknown token "109000" in go command
+[2447:618] Log: Unknown token "winc" in go command
+[2447:618] Log: Unknown token "15000" in go command
+[2447:618] Log: Unknown token "binc" in go command
+[2447:618] Log: Unknown token "10000" in go command
+[2447:619] Engine: info depth 1 score cp 765 nodes 29 time 2 pv f8a3 
+[2447:620] Engine: info depth 2 score cp 1053 nodes 691 time 2 pv d3e5 e2c4 
+[2447:635] Engine: info depth 3 score cp 869 nodes 7201 time 2 pv d3e5 a3a4 f8d6 
+[2447:940] Engine: info depth 4 score cp 1143 nodes 163192 time 2 pv d3e5 e3a7 f8d6 e2c4 
+[2450:172] Engine: info depth 5 score cp 982 nodes 756451 time 2 pv d3e5 e3a7 d8c8 a3a4 f8d6 
+[2465:66] Engine: bestmove d3e5
+[2477:638] GUI: isready
+[2477:638] Engine: readyok
+[2477:638] GUI: position fen 3k1b1r/B4ppp/4p3/4n3/2p1P3/P1N4P/1P2BPP1/1R3RK1 b - - 0 23
+[2477:638] GUI: go wtime 112000 btime 255000 winc 15000 binc 10000
+[2477:638] Log: Unknown token "112000" in go command
+[2477:638] Log: Unknown token "winc" in go command
+[2477:638] Log: Unknown token "15000" in go command
+[2477:638] Log: Unknown token "binc" in go command
+[2477:638] Log: Unknown token "10000" in go command
+[2477:638] Engine: info depth 1 score cp 860 nodes 24 time 2 pv f8a3 
+[2477:641] Engine: info depth 2 score cp 1143 nodes 446 time 2 pv f8d6 e2c4 
+[2477:646] Engine: info depth 3 score cp 982 nodes 904 time 2 pv d8c8 a3a4 f8d6 
+[2477:696] Engine: info depth 4 score cp 1208 nodes 13709 time 2 pv e5c6 a7b6 d8c8 e2c4 
+[2477:834] Engine: info depth 5 score cp 1002 nodes 53482 time 2 pv d8c8 a7e3 f8d6 a3a4 f7f5 
+[2479:165] Engine: info depth 6 score cp 1217 nodes 524408 time 2 pv d8c8 a7e3 f8e7 e3d4 e5c6 e2c4 
+[2494:619] Engine: bestmove d8c8
+[2549:876] GUI: isready
+[2549:876] Engine: readyok
+[2549:876] GUI: position fen 2k2b1r/5ppp/4p3/4n3/2pBP3/P1N4P/1P2BPP1/1R3RK1 b - - 2 24
+[2549:876] GUI: go wtime 74000 btime 249000 winc 15000 binc 10000
+[2549:876] Log: Unknown token "74000" in go command
+[2549:876] Log: Unknown token "winc" in go command
+[2549:876] Log: Unknown token "15000" in go command
+[2549:876] Log: Unknown token "binc" in go command
+[2549:876] Log: Unknown token "10000" in go command
+[2549:877] Engine: info depth 1 score cp 896 nodes 24 time 2 pv f8a3 
+[2549:878] Engine: info depth 2 score cp 1230 nodes 302 time 2 pv e5c6 e2c4 
+[2549:889] Engine: info depth 3 score cp 916 nodes 2086 time 2 pv e5c6 d4e3 f8a3 
+[2550:2] Engine: info depth 4 score cp 1193 nodes 36967 time 2 pv e5c6 d4e3 c6e5 e2c4 
+[2550:395] Engine: info depth 5 score cp 1009 nodes 152505 time 2 pv e5c6 d4e3 c6e5 a3a4 f8d6 
+[2557:664] Engine: info depth 6 score cp 1230 nodes 3084536 time 2 pv e5c6 d4e3 c6a5 e3d4 a5c6 e2c4 
+[2566:459] Engine: bestmove e5c6
+[2569:621] GUI: isready
+[2569:621] Engine: readyok
+[2569:621] GUI: position fen 2k2b1r/5ppp/2n1p3/8/2pBP3/P1N4P/1P2BPP1/1R1R2K1 b - - 4 25
+[2569:621] GUI: go wtime 86000 btime 243000 winc 15000 binc 10000
+[2569:621] Log: Unknown token "86000" in go command
+[2569:621] Log: Unknown token "winc" in go command
+[2569:621] Log: Unknown token "15000" in go command
+[2569:621] Log: Unknown token "binc" in go command
+[2569:621] Log: Unknown token "10000" in go command
+[2569:621] Engine: info depth 1 score cp 623 nodes 27 time 2 pv c6d4 
+[2569:624] Engine: info depth 2 score cp 1154 nodes 418 time 2 pv c6d4 d1d4 
+[2569:635] Engine: info depth 3 score cp 889 nodes 3299 time 2 pv f7f5 d4e3 f5e4 
+[2569:850] Engine: info depth 4 score cp 1219 nodes 88453 time 2 pv e6e5 e2g4 f7f5 g4f5 
+[2570:776] Engine: info depth 5 score cp 1027 nodes 354573 time 2 pv f8a3 b2a3 h8d8 e2c4 c6d4 
+[2585:801] Engine: bestmove f8a3
+[2607:838] GUI: isready
+[2607:838] Engine: readyok
+[2607:838] GUI: position fen 2k4r/5ppp/2n1p3/8/2pBP3/P1N4P/4BPP1/1R1R2K1 b - - 0 26
+[2607:838] GUI: go wtime 80000 btime 237000 winc 15000 binc 10000
+[2607:838] Log: Unknown token "80000" in go command
+[2607:838] Log: Unknown token "winc" in go command
+[2607:838] Log: Unknown token "15000" in go command
+[2607:838] Log: Unknown token "binc" in go command
+[2607:838] Log: Unknown token "10000" in go command
+[2607:839] Engine: info depth 1 score cp 864 nodes 23 time 2 pv c6d4 
+[2607:841] Engine: info depth 2 score cp 1395 nodes 416 time 2 pv c6d4 d1d4 
+[2607:851] Engine: info depth 3 score cp 1027 nodes 1994 time 2 pv h8d8 e2c4 c6d4 
+[2607:995] Engine: info depth 4 score cp 1460 nodes 58062 time 2 pv e6e5 e2g4 f7f5 g4f5 
+[2608:723] Engine: info depth 5 score cp 1293 nodes 281973 time 2 pv h8d8 d4g7 d8g8 g7f6 g8g2 
+[2620:91] Engine: info depth 6 score cp 1489 nodes 6015725 time 2 pv e6e5 e2g4 c8c7 c3d5 c7d8 d4e5 
+[2623:620] Engine: bestmove e6e5
+[2648:603] GUI: isready
+[2648:603] Engine: readyok
+[2648:603] GUI: position fen 2k4r/5ppp/2n5/4p3/2pBP1B1/P1N4P/5PP1/1R1R2K1 b - - 1 27
+[2648:603] GUI: go wtime 71000 btime 232000 winc 15000 binc 10000
+[2648:603] Log: Unknown token "71000" in go command
+[2648:603] Log: Unknown token "winc" in go command
+[2648:603] Log: Unknown token "15000" in go command
+[2648:603] Log: Unknown token "binc" in go command
+[2648:603] Log: Unknown token "10000" in go command
+[2648:603] Engine: info depth 1 score cp 1297 nodes 4 time 2 pv f7f5 
+[2648:603] Engine: info depth 2 score cp 1460 nodes 82 time 2 pv f7f5 g4f5 
+[2648:604] Engine: info depth 3 score cp 1332 nodes 416 time 2 pv c8c7 c3d5 c7d8 
+[2648:620] Engine: info depth 4 score cp 1489 nodes 6951 time 2 pv c8c7 c3d5 c7d8 d4e5 
+[2648:729] Engine: info depth 5 score cp 1314 nodes 33135 time 2 pv c8c7 c3b5 c7b8 b5d6 b8a8 
+[2650:44] Engine: info depth 6 score cp 1568 nodes 538581 time 2 pv c8c7 c3b5 c7d8 d4e5 d8e8 e5g7 
+[2655:166] Engine: info depth 7 score cp 1429 nodes 1749820 time 2 pv c8c7 d4c5 h7h5 c5d6 c7d8 d6e5 c6d4 
+[2664:50] Engine: bestmove c8c7
+[2720:759] GUI: isready
+[2720:759] Engine: readyok
+[2720:760] GUI: position fen 7r/2k2ppp/2n5/4p3/2p1P1B1/P1N1B2P/5PP1/1R1R2K1 b - - 3 28
+[2720:760] GUI: go wtime 32000 btime 227000 winc 15000 binc 10000
+[2720:760] Log: Unknown token "32000" in go command
+[2720:760] Log: Unknown token "winc" in go command
+[2720:760] Log: Unknown token "15000" in go command
+[2720:760] Log: Unknown token "binc" in go command
+[2720:760] Log: Unknown token "10000" in go command
+[2720:760] Engine: info depth 1 score cp 1266 nodes 21 time 2 pv c6d4 
+[2720:762] Engine: info depth 2 score cp 1319 nodes 270 time 2 pv f7f6 c3d5 
+[2720:775] Engine: info depth 3 score cp 1295 nodes 2740 time 2 pv h8d8 d1d8 c7d8 
+[2720:854] Engine: info depth 4 score cp 1441 nodes 26305 time 2 pv h8a8 d1d7 c7c8 d7f7 
+[2721:624] Engine: info depth 5 score cp 1319 nodes 185381 time 2 pv h7h5 c3b5 c7b8 b5d4 b8a8 
+[2729:258] Engine: info depth 6 score cp 1594 nodes 3597280 time 2 pv f7f5 g4f5 h8a8 d1d7 c7c8 d7g7 
+[2735:873] Engine: bestmove f7f5
+[2741:115] GUI: isready
+[2741:115] Engine: readyok
+[2741:115] GUI: position fen 7r/2k3pp/2n5/4pB2/2p1P3/P1N1B2P/5PP1/1R1R2K1 b - - 0 29
+[2741:115] GUI: go wtime 42000 btime 222000 winc 15000 binc 10000
+[2741:116] Log: Unknown token "42000" in go command
+[2741:116] Log: Unknown token "winc" in go command
+[2741:116] Log: Unknown token "15000" in go command
+[2741:116] Log: Unknown token "binc" in go command
+[2741:116] Log: Unknown token "10000" in go command
+[2741:116] Engine: info depth 1 score cp 1423 nodes 19 time 2 pv c6d4 
+[2741:117] Engine: info depth 2 score cp 1475 nodes 181 time 2 pv h7h5 c3d5 
+[2741:123] Engine: info depth 3 score cp 1451 nodes 1876 time 2 pv h8d8 d1d8 c7d8 
+[2741:197] Engine: info depth 4 score cp 1594 nodes 25718 time 2 pv h8a8 d1d7 c7c8 d7g7 
+[2741:682] Engine: info depth 5 score cp 1476 nodes 130474 time 2 pv g7g6 c3b5 c7b8 b5d4 b8a8 
+[2750:259] Engine: info depth 6 score cp 1950 nodes 4151407 time 2 pv h7h5 c3b5 c7b8 b5d4 b8a8 d4c6 
+[2755:896] Engine: bestmove h7h5
+[2787:162] GUI: isready
+[2787:162] Engine: readyok
+[2787:162] GUI: position fen 7r/2kR2p1/2n5/4pB1p/2p1P3/P1N1B2P/5PP1/1R4K1 b - - 1 30
+[2787:162] GUI: go wtime 27000 btime 218000 winc 15000 binc 10000
+[2787:162] Log: Unknown token "27000" in go command
+[2787:162] Log: Unknown token "winc" in go command
+[2787:162] Log: Unknown token "15000" in go command
+[2787:162] Log: Unknown token "binc" in go command
+[2787:162] Log: Unknown token "10000" in go command
+[2787:162] Engine: info depth 1 score cp 1447 nodes 2 time 2 pv c7c8 
+[2787:163] Engine: info depth 2 score cp 1591 nodes 55 time 2 pv c7c8 d7g7 
+[2787:163] Engine: info depth 3 score cp 1591 nodes 108 time 2 pv c7c8 d7g7 c8d8 
+[2787:168] Engine: info depth 4 score cp 1950 nodes 2748 time 2 pv c7c8 d7d6 c8c7 d6c6 
+[2787:198] Engine: info depth 5 score cp 1595 nodes 6571 time 2 pv c7c8 d7d4 c8c7 d4c4 g7g5 
+[2787:443] Engine: info depth 6 score cp 2098 nodes 142787 time 2 pv c7c8 d7d4 c8c7 d4c4 g7g5 c4c6 
+[2789:807] Engine: info depth 7 score mate 7 nodes 491671 time 2 pv c7c8 c3d5 c6b4 d7a7 
+[2801:677] Engine: bestmove c7c8
+[2857:146] GUI: isready
+[2857:146] Engine: readyok
+[2857:147] GUI: position fen 2k4r/6R1/2n5/4pB1p/2p1P3/P1N1B2P/5PP1/1R4K1 b - - 0 31
+[2857:147] GUI: go wtime -11000 btime 214000 winc 15000 binc 10000
+[2857:147] Log: Unknown token "-11000" in go command
+[2857:147] Log: Unknown token "winc" in go command
+[2857:147] Log: Unknown token "15000" in go command
+[2857:147] Log: Unknown token "binc" in go command
+[2857:147] Log: Unknown token "10000" in go command
+[2857:147] Engine: info depth 1 score cp 1591 nodes 2 time 2 pv c8d8 
+[2857:147] Engine: info depth 2 score cp 1619 nodes 56 time 2 pv c8d8 c3d5 
+[2857:150] Engine: info depth 3 score cp 1591 nodes 264 time 2 pv c8d8 g7d7 d8c8 
+[2857:180] Engine: info depth 4 score cp 1748 nodes 5163 time 2 pv c8d8 b1b5 d8e8 b5e5 
+[2857:265] Engine: info depth 5 score cp 1609 nodes 11435 time 2 pv c8d8 c3d5 d8e8 f5d7 e8d8 
+[2857:699] Engine: info depth 6 score cp 2093 nodes 231594 time 2 pv c8d8 g7g6 c6e7 b1b8 e7c8 b8c8 
+[2861:826] Engine: info depth 7 score cp 2090 nodes 802056 time 2 pv c8d8 b1b6 h8h6 e3h6 c6e7 h6g5 d8c7 
+[2871:394] Engine: bestmove c8d8
+[2874:505] GUI: isready
+[2874:505] Engine: readyok
+[2874:506] GUI: position fen 3k3r/3R4/2n5/4pB1p/2p1P3/P1N1B2P/5PP1/1R4K1 b - - 2 32
+[2874:506] GUI: go wtime 1000 btime 210000 winc 15000 binc 10000
+[2874:506] Log: Unknown token "1000" in go command
+[2874:506] Log: Unknown token "winc" in go command
+[2874:506] Log: Unknown token "15000" in go command
+[2874:506] Log: Unknown token "binc" in go command
+[2874:506] Log: Unknown token "10000" in go command
+[2874:506] Engine: info depth 1 score cp 1591 nodes 3 time 2 pv d8c8 
+[2874:506] Engine: info depth 2 score cp 1619 nodes 80 time 2 pv d8c8 c3d5 
+[2874:511] Engine: info depth 3 score cp 1591 nodes 428 time 2 pv d8c8 d7d6 c8c7 
+[2874:550] Engine: info depth 4 score cp 1772 nodes 6807 time 2 pv d8e8 d7c7 c6a5 c7c4 
+[2874:667] Engine: info depth 5 score cp 1599 nodes 19913 time 2 pv d8e8 d7d6 c6e7 d6e6 e8d8 
+[2875:335] Engine: info depth 6 score cp 2093 nodes 397408 time 2 pv d8e8 d7d6 c6d8 b1b8 e8e7 b8d8 
+[2880:583] Engine: info depth 7 score cp 1947 nodes 1223160 time 2 pv d8e8 c3d5 h8g8 e3c5 g8g2 g1g2 c6d4 
+[2888:486] Engine: bestmove d8e8
+[2897:936] GUI: isready
+[2897:936] Engine: readyok
+[2897:936] GUI: position fen 4k2r/2R5/2n5/4pB1p/2p1P3/P1N1B2P/5PP1/1R4K1 b - - 4 33
+[2897:936] GUI: go wtime 7000 btime 207000 winc 15000 binc 10000
+[2897:936] Log: Unknown token "7000" in go command
+[2897:936] Log: Unknown token "winc" in go command
+[2897:936] Log: Unknown token "15000" in go command
+[2897:936] Log: Unknown token "binc" in go command
+[2897:936] Log: Unknown token "10000" in go command
+[2897:936] Engine: info depth 1 score cp 1562 nodes 15 time 2 pv c6d4 
+[2897:937] Engine: info depth 2 score cp 1772 nodes 195 time 2 pv c6a5 c7c4 
+[2897:941] Engine: info depth 3 score cp 1599 nodes 1402 time 2 pv c6e7 b1b8 e8f7 
+[2898:7] Engine: info depth 4 score cp 2093 nodes 30438 time 2 pv c6e7 b1b8 e7c8 b8c8 
+[2898:251] Engine: info depth 5 score cp 1733 nodes 64137 time 2 pv c6d8 c7c5 d8f7 c5c4 f7d6 
+[2902:6] Engine: info depth 6 score cp 2106 nodes 1858831 time 2 pv c6d8 b1b8 h8f8 f5g6 f8f7 c7f7 
+[2911:720] Engine: bestmove c6d8
+[2922:204] GUI: isready
+[2922:204] Engine: readyok
+[2922:204] GUI: position fen 1R1nk2r/2R5/8/4pB1p/2p1P3/P1N1B2P/5PP1/6K1 b - - 6 34
+[2922:204] GUI: go wtime 12000 btime 204000 winc 15000 binc 10000
+[2922:204] Log: Unknown token "12000" in go command
+[2922:204] Log: Unknown token "winc" in go command
+[2922:204] Log: Unknown token "15000" in go command
+[2922:204] Log: Unknown token "binc" in go command
+[2922:204] Log: Unknown token "10000" in go command
+[2922:204] Engine: info depth 1 score cp 1619 nodes 7 time 2 pv e8f8 
+[2922:205] Engine: info depth 2 score cp 2093 nodes 104 time 2 pv e8f8 b8d8 
+[2922:208] Engine: info depth 3 score cp 1609 nodes 952 time 2 pv h8f8 f5d7 e8e7 
+[2922:248] Engine: info depth 4 score cp 2106 nodes 20394 time 2 pv h8f8 f5g6 f8f7 c7f7 
+[2922:456] Engine: info depth 5 score cp 1975 nodes 55040 time 2 pv h8g8 c7d7 g8g2 g1g2 e8f8 
+[2925:579] Engine: info depth 6 score cp 2450 nodes 1605200 time 2 pv h8g8 c7d7 g8g2 g1g2 e8f8 b8d8 
+[2935:788] Engine: bestmove h8g8
+[2949:380] GUI: isready
+[2949:380] Engine: readyok
+[2949:381] GUI: position fen 1R1nk1r1/2R5/8/2B1pB1p/2p1P3/P1N4P/5PP1/6K1 b - - 8 35
+[2949:381] GUI: go wtime 14000 btime 201000 winc 15000 binc 10000
+[2949:381] Log: Unknown token "14000" in go command
+[2949:381] Log: Unknown token "winc" in go command
+[2949:381] Log: Unknown token "15000" in go command
+[2949:381] Log: Unknown token "binc" in go command
+[2949:381] Log: Unknown token "10000" in go command
+[2949:381] Engine: info depth 1 score cp 1475 nodes 10 time 2 pv g8g2 
+[2949:382] Engine: info depth 2 score cp 1975 nodes 203 time 2 pv g8g2 g1g2 
+[2949:386] Engine: info depth 3 score cp 1619 nodes 1229 time 2 pv g8g5 c7e7 e8f8 
+[2949:431] Engine: info depth 4 score cp 2093 nodes 20315 time 2 pv g8g5 c7e7 e8f8 b8d8 
+[2949:680] Engine: info depth 5 score mate 7 nodes 62958 time 2 pv h5h4 b8d8 
+[2952:667] Engine: info depth 6 score mate 7 nodes 1610164 time 2 pv h5h4 b8d8 
+[2962:761] Engine: bestmove h5h4
+[2965:790] GUI: isready
+[2965:790] Engine: readyok
+[2965:791] GUI: position fen 1R1nk1r1/4R3/8/2B1pB2/2p1P2p/P1N4P/5PP1/6K1 b - - 1 36
+[2965:791] GUI: go wtime 26000 btime 198000 winc 15000 binc 10000
+[2965:791] Log: Unknown token "26000" in go command
+[2965:791] Log: Unknown token "winc" in go command
+[2965:791] Log: Unknown token "15000" in go command
+[2965:791] Log: Unknown token "binc" in go command
+[2965:791] Log: Unknown token "10000" in go command
+[2965:791] Engine: info depth 1 score cp 1619 nodes 2 time 2 pv e8f8 
+[2965:792] Engine: info depth 2 score cp 2093 nodes 49 time 2 pv e8f8 b8d8 
+[2965:792] Engine: info depth 3 score mate 1 nodes 92 time 2 pv e8f8 b8d8 
+[2965:798] Engine: info depth 4 score mate 1 nodes 847 time 2 pv e8f8 b8d8 
+[2965:824] Engine: info depth 5 score mate 1 nodes 2907 time 2 pv e8f8 b8d8 
+[2965:936] Engine: info depth 6 score mate 1 nodes 39523 time 2 pv e8f8 b8d8 
+[2966:350] Engine: info depth 7 score mate 1 nodes 88293 time 2 pv e8f8 b8d8 
+[2969:811] Engine: info depth 8 score mate 1 nodes 1894205 time 2 pv e8f8 b8d8 
+[2978:971] Engine: bestmove e8f8
