@@ -220,57 +220,6 @@ fn score_board (board : &board::Board) -> Score {
     Val(value)
 }
 
-/// Old find_best_move method, without alpha-beta pruning
-#[allow(dead_code)]
-fn find_best_move (board : &Board, depth : u8) -> (Score, Option<Move>) {
-    if depth == 0 {
-        return (score_board(&board), None);
-    }
-    if board.half_move_clock > 50 {
-        return (Draw(0), None);
-    }
-    let mut best_score = if board.to_move == White { MateB(0) } else { MateW(0) };
-    let mut best_move : Option<Move> = None;
-
-    let legal_moves = move_gen::all_legal_moves(&board);
-    if legal_moves.len() == 0 {
-        if move_gen::is_attacked(board, board.king_pos()) {
-            if board.to_move == White {
-                return (MateB(0), None);
-            }
-            else {
-                return (MateW(0), None);
-            }
-        }
-        else {
-            return (Draw(0), None);
-        }
-    }
-    for c_move in legal_moves.iter() {
-
-        let tried_board = board.do_move(*c_move);
-        
-        let (tried_score, _) = find_best_move(&tried_board, depth - 1);
-
-        if board.to_move == White && tried_score == MateB(0) && tried_score < best_score
-             || board.to_move == Black && tried_score == MateW(0) && tried_score > best_score {
-            panic!(format!("{} has best score {}, tried score {}.",
-                           board.to_move, best_score, tried_score));
-        }
-        if board.to_move == White && tried_score > best_score
-            || board.to_move == Black && tried_score < best_score {
-                best_score = tried_score;
-                best_move = Some(*c_move);
-            }
-    }
-    (match best_score {
-        MateB(i) => MateB(i + 1),
-        MateW(i) => MateW(i + 1),
-        Draw(i) => Draw(i + 1),
-        Val(n) => Val(n), },
-     best_move)
-}
-
 fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
                  log_writer : Arc<Mutex<io::BufWriter<fs::File>>>) {
