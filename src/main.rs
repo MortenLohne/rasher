@@ -1,4 +1,3 @@
-#![feature(core)]
 #![feature(test)]
 mod uci;
 mod board;
@@ -24,6 +23,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use std::fs;
+use std::path;
 
 #[macro_use]
 extern crate lazy_static;
@@ -35,7 +35,27 @@ fn main() {
         // println!("Enter input");
         reader.read_line(&mut input).unwrap();
         match &input[..] {
-            "uci\n" => { uci::connect_engine().unwrap() }, //TODO: Use error value
+            "uci\n" => {
+                // Prepare to create log file
+                let mut options = fs::OpenOptions::new();
+                options.write(true).append(true);
+                let path = path::Path::new("mc_log.txt");
+
+                let log_file = match fs::File::create(path) {
+                    Ok(file) => file,
+                    Err(err) => panic!(format!("Error creating log file at {:?} : {}", path, err)),
+                };
+                let mut writer = Arc::new(Mutex::new(io::BufWriter::new(log_file)));
+                uci::to_log("Opened log file", &mut writer);
+                
+                match uci::connect_engine(writer.clone()) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        uci::to_log(&e, &mut writer);
+                        panic!(e);
+                    },
+                }
+            }, 
             //"play_self\n" => play_game(&board::START_BOARD.clone()),
             //"play\n" => play_human(),
             s => println!("Unrecognized command \"{}\".", s),
@@ -222,7 +242,7 @@ fn score_board (board : &board::Board) -> Score {
 
 fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
-                 log_writer : Arc<Mutex<io::BufWriter<fs::File>>>) {
+                 mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>) {
     
     engine_comm.lock().unwrap().engine_is_running = true;
     
@@ -239,17 +259,36 @@ fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
             find_best_move_ab(&board, depth, &*engine_comm, time_restriction);
         
         let ms_taken = (time::get_time() - start_time).num_milliseconds();
-        
+
         if moves.len() > 0 {
             engine_comm.lock().unwrap().best_move = Some(moves[0]);
         }
         else {
+            uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
             engine_comm.lock().unwrap().best_move = None;
         }
 
         uci::send_eval_to_gui(log_writer.clone(), depth,
                          ms_taken, score, moves, node_count);
+        match time_restriction {
+            uci::TimeRestriction::GameTime(info) => { 
+                if (board.to_move == Black && 
+                    ms_taken as u32 > info.black_inc / 5 + info.black_time / 50) ||
+                    (board.to_move == White && 
+                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 50)
+                {
+                    break;
+                }
+                
+            },
+            uci::TimeRestriction::MoveTime(time) => if ms_taken > time / 2 { break },
+               
+            _ => (),
+        }
     }
+    uci::uci_send(&format!("bestmove {}", engine_comm.lock().unwrap().best_move.unwrap().to_alg()), 
+             &mut log_writer);
+    engine_comm.lock().unwrap().engine_is_running = false;
     
 }
 

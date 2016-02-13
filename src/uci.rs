@@ -17,19 +17,7 @@ use std::process;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine() -> Result<(),String> {
-
-    // Prepare to create log file
-    let mut options = fs::OpenOptions::new();
-    options.write(true).append(true);
-    let path = path::Path::new("mc_log.txt");
-
-    let log_file = match fs::File::create(path) {
-        Ok(file) => file,
-        Err(err) => panic!(format!("Error creating log file at {:?} : {}", path, err)),
-    };
-    let mut writer = Arc::new(Mutex::new(io::BufWriter::new(log_file)));
-    to_log("Opened log file", &mut writer);
+pub fn connect_engine(mut writer : Arc<Mutex<io::BufWriter<fs::File>>>) -> Result<(),String> {
 
     // Do the standard handshake with the GUI
     to_log("Received uci command from GUI", &mut writer);
@@ -40,8 +28,6 @@ pub fn connect_engine() -> Result<(),String> {
     
     let mut board = None;
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
-    //let stop_signal = Arc::new(Mutex::new(Box::new(false)));
-    //let best_move = Arc::new(Mutex::new(None));
 
     // Listen to commands from GUI forever
     loop {
@@ -55,13 +41,7 @@ pub fn connect_engine() -> Result<(),String> {
             "isready" => uci_send("readyok", &mut writer),
             "quit" => { to_log("Quitting...", &mut writer); process::exit(0); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => board = Some(try!(parse_position(&input, &mut writer))), /*{
-                    Ok(b) => Some(b),
-                    Err(err) => {
-                        to_log(&err, &mut writer);
-                        panic!(err);
-                    },
-                };*/
+            "position" => board = Some(try!(parse_position(&input, &mut writer))), 
             
             "stop" => {
                 let mut engine_comm = engine_comm.lock().unwrap();
@@ -79,7 +59,7 @@ pub fn connect_engine() -> Result<(),String> {
                 let board = try!(board.clone().ok_or("Received go command without receiving a position first. Exiting..."));
                 let time_restriction = try!(parse_go(&input, writer.clone()));
                 
-                start_engine(&board, writer.clone(), time_restriction);
+                start_engine(board.clone(), writer.clone(), time_restriction, engine_comm.clone());
             },
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), &mut writer);
@@ -94,7 +74,7 @@ pub enum TimeRestriction {
     Depth(u8),
     Nodes(u64),
     Mate(u16),
-    MoveTime(u64),
+    MoveTime(i64),
     Infinite,   
 }
 
@@ -112,17 +92,14 @@ impl EngineComm {
     }
 }
 
-fn start_engine (board : &Board, log_writer : Arc<Mutex<io::BufWriter<fs::File>>>,
-                 time_restriction : TimeRestriction) -> Arc<Mutex<EngineComm>> {
-    let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
+fn start_engine (board : Board, log_writer : Arc<Mutex<io::BufWriter<fs::File>>>,
+                 time_restriction : TimeRestriction, engine_comm : Arc<Mutex<EngineComm>>) {
     engine_comm.lock().unwrap().engine_is_running = true;
 
-    let (new_board, new_comm, new_logger) = (board.clone(), engine_comm.clone(), log_writer.clone());
     thread::spawn (move || {
-        ::search_moves(new_board, new_comm,
-                       time_restriction, new_logger);
+        ::search_moves(board, engine_comm,
+                       time_restriction, log_writer);
     });
-    engine_comm
 }
 
 fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
@@ -137,8 +114,11 @@ fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
         }
     }        
 
-    match input.split_whitespace().skip(1).next() {
+    match input.split_whitespace().nth(1) {
         Some("infinite") => return Ok(TimeRestriction::Infinite),
+        Some("movetime") => return Ok(TimeRestriction::MoveTime(
+            try!(parse_int(input.split_whitespace().nth(2))
+                 ) as i64)),
         None => { to_log("Received no restriction \"go\" command, assuming \"infinite\"",
                          &mut writer);
         },
@@ -152,12 +132,9 @@ fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
     
     loop {
         match tokens_it.next() {
-            Some("moves_to_go") => {
-                moves_to_go = Some(try!(parse_int(tokens_it.next())));
-            }
-            Some("btime") => {
-                black_time = Some(try!(parse_int(tokens_it.next())));
-            },
+            Some("moves_to_go") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
+            
+            Some("btime") => black_time = Some(try!(parse_int(tokens_it.next()))),
             Some("wtime") => {
                 white_time = Some(try!(parse_int(tokens_it.next())));
             },
@@ -315,8 +292,8 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
     let mut board = [[Piece(Empty, White); 8]; 8];
     let fen_split : Vec<&str> = fen.split(" ").collect();
-    if fen_split.len() != 6 {
-        return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of 6",
+    if fen_split.len() < 4 || fen_split.len() > 6 {
+        return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
                            fen, fen_split.len()));
     }
     let ranks : Vec<&str> = fen_split[0].split("/").collect();
@@ -378,10 +355,13 @@ pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
     };
 
     let (half_clock, move_num) : (u16, u16) =
-        match ((fen_split[4]).parse(), (fen_split[5]).parse()) {
-            (Ok(n1), Ok(n2)) => (n1, n2),
-            _ => return Err("Invalid halfmove clock or move num".to_string()),
-        };
+        if fen_split.len() > 4 {
+            (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
+             try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
+        }
+    else {
+        (0, 0)
+    };
     
     Ok(board::Board{ board: board, to_move: to_move, castling: castling_rights,
                      en_passant: en_passant, half_move_clock: half_clock,
