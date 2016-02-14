@@ -15,14 +15,16 @@ use std::fs;
 use std::path;
 use std::process;
 
+pub type SharableWriter = Option<Arc<Mutex<io::BufWriter<fs::File>>>>;
+
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine(mut writer : Arc<Mutex<io::BufWriter<fs::File>>>) -> Result<(),String> {
+pub fn connect_engine(mut writer : SharableWriter) -> Result<(),String> {
 
     // Do the standard handshake with the GUI
-    to_log("Received uci command from GUI", &mut writer);
-    uci_send("id name morten_chess", &mut writer);
-    uci_send("uciok", &mut writer);
+    to_log("Received uci command from GUI", &writer);
+    uci_send("id name morten_chess", &writer);
+    uci_send("uciok", &writer);
     
     // The engine would send any customizable options here. For now, there are none.
     
@@ -92,7 +94,7 @@ impl EngineComm {
     }
 }
 
-fn start_engine (board : Board, log_writer : Arc<Mutex<io::BufWriter<fs::File>>>,
+fn start_engine (board : Board, log_writer : SharableWriter,
                  time_restriction : TimeRestriction, engine_comm : Arc<Mutex<EngineComm>>) {
     engine_comm.lock().unwrap().engine_is_running = true;
 
@@ -102,7 +104,7 @@ fn start_engine (board : Board, log_writer : Arc<Mutex<io::BufWriter<fs::File>>>
     });
 }
 
-fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
+fn parse_go (input : &String, mut writer : SharableWriter)
              -> Result<TimeRestriction, String> {
 
     // Parses an optional string to return a u32
@@ -163,7 +165,7 @@ fn parse_go (input : &String, mut writer : Arc<Mutex<io::BufWriter<fs::File>>>)
 
 /// Sends the engine's evaluation to the GUI via uci, along with other data
 /// like node count, time taken, etc
-pub fn send_eval_to_gui (mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>, depth : u8,
+pub fn send_eval_to_gui (mut log_writer : SharableWriter, depth : u8,
                          ms_taken : i64, 
                          score : Score, moves : Vec<Move>, node_count : ::NodeCount) {
     let eng_score = match score {
@@ -197,47 +199,49 @@ pub fn send_eval_to_gui (mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>, d
 
 #[allow(unused_must_use)]
 /// Simple helper method to write a line to the log
-pub fn to_log (message : &str, log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>) {
-    let mut log_writer = log_writer.lock().unwrap();
+pub fn to_log (message : &str, log_writer : &SharableWriter) {
 
-    let time = format!("[{}:{}]", time::get_time().sec % 3600, time::get_time().nsec / 1000000);
-    log_writer.write(&format!("{} Log: {}\n", time, message).bytes().collect::<Vec<u8>>());
-    log_writer.flush();
+    match log_writer{
+        &Some(ref writer) => {
+            
+            let mut log_writer = writer.lock().unwrap();
+
+            let time = format!("[{}:{}]", time::get_time().sec % 3600, 
+                               time::get_time().nsec / 1000000);
+            log_writer.write(&format!("{} {}\n", time, message)
+                             .bytes().collect::<Vec<u8>>());
+            log_writer.flush();
+        },
+        &None => (),
+    }
 }
 
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it
-/// to the log file. Should always be used instead of a pure println!()
+/// to the log file, if it is present
 #[allow(unused_must_use)]
-pub fn uci_send (message : &str, log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>) {
-    let mut log_writer = log_writer.lock().unwrap();
+pub fn uci_send (message : &str, log_writer : &SharableWriter) {
 
-    let time = format!("[{}:{}]", time::get_time().sec % 3600, time::get_time().nsec / 1000000);
-    log_writer.write(&format!("{} Engine: {}\n", time, message)
-                     .bytes().collect::<Vec<u8>>());
-    log_writer.flush();
+    let log_message = format!("Engine: {}", message);
+    to_log(&log_message, log_writer);
     println!("{}", message);
 }
 
 /// Waits for input from the GUI, and writes the input to the log and returns it
 #[allow(unused_must_use)]
-fn get_engine_input(log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>) -> String {
+fn get_engine_input(log_writer : &SharableWriter) -> String {
 
     let reader = io::stdin();
     let mut input = "".to_string();
     reader.read_line(&mut input).unwrap();
     
-    let mut log_writer = log_writer.lock().unwrap();
+    to_log(&input, log_writer);
 
-    let time = format!("[{}:{}]", time::get_time().sec % 3600, time::get_time().nsec / 1000000);
-    log_writer.write(&format!("{} GUI: {}", time, input).bytes().collect::<Vec<u8>>());
-    log_writer.flush();
-    
     input
 }
 
 /// Turns the whole position string from the GU (Like "position startpos moves e2e4")
 /// into an internal board representation
-fn parse_position(input : &String, log_writer : &mut Arc<Mutex<io::BufWriter<fs::File>>>)
+fn parse_position(input : &String, log_writer : &SharableWriter)
                   -> Result<board::Board, String> {
     
     let words : Vec<&str> = input.split_whitespace().collect();

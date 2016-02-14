@@ -4,7 +4,6 @@ mod board;
 mod tests;
 mod move_gen;
 mod monte_carlo;
-mod bit_board;
 
 extern crate time;
 
@@ -45,7 +44,7 @@ fn main() {
                     Ok(file) => file,
                     Err(err) => panic!(format!("Error creating log file at {:?} : {}", path, err)),
                 };
-                let mut writer = Arc::new(Mutex::new(io::BufWriter::new(log_file)));
+                let mut writer = Some(Arc::new(Mutex::new(io::BufWriter::new(log_file))));
                 uci::to_log("Opened log file", &mut writer);
                 
                 match uci::connect_engine(writer.clone()) {
@@ -240,9 +239,11 @@ fn score_board (board : &board::Board) -> Score {
     Val(value)
 }
 
+type SharableWriter = Option<Arc<Mutex<io::BufWriter<fs::File>>>>;
+
 fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
-                 mut log_writer : Arc<Mutex<io::BufWriter<fs::File>>>) {
+                 log_writer : SharableWriter) {
     
     engine_comm.lock().unwrap().engine_is_running = true;
     
@@ -264,7 +265,7 @@ fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
             engine_comm.lock().unwrap().best_move = Some(moves[0]);
         }
         else {
-            uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
+            uci::to_log("Warning: find_best_move_ab didn't return any moves", &log_writer);
             engine_comm.lock().unwrap().best_move = None;
         }
 
@@ -287,7 +288,7 @@ fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
         }
     }
     uci::uci_send(&format!("bestmove {}", engine_comm.lock().unwrap().best_move.unwrap().to_alg()), 
-             &mut log_writer);
+             &log_writer);
     engine_comm.lock().unwrap().engine_is_running = false;
     
 }
