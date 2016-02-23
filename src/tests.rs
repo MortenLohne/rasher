@@ -4,6 +4,7 @@ use board::*;
 use move_gen;
 
 extern crate time;
+extern crate test;
 
 use uci;
 

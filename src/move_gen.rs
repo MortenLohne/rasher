@@ -23,90 +23,19 @@ pub fn all_legal_moves (board : &board::Board) -> Vec<Move> {
     moves
 }
 
+/// Adds all the legal moves for the piece in this position, to the input vector
+/// Takes in the king position for the moving player, and whether they are currently in check,
+/// to speed up the move generation
 #[inline]
 fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<board::Move>,
                          is_in_check : bool, king_pos : Square) { 
     let Piece(piece, color) = board.piece_at(square);
+    
     debug_assert!(color == board.to_move && piece != Empty);
     
-    let pos = square.0 as i8;
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
-    
     match piece {
-        King => {
-            // If the king and the two castling squares are not in check, castling is allowed
-            // There must be no pieces between the castling pieces
-
-            // Kingside castling
-            if (board.to_move == White && board.castling[0]) ||
-                (board.to_move == Black && board.castling[2]) {
-                    
-                    let mut can_castle_here = true;
-                    if is_attacked(board, square) {
-                        can_castle_here = false;
-                    }
-                    
-                    // Check that the two squares are empty and not in check
-                    for n in [1, 2].iter() {
-                        debug_assert!(file == 4, format!("Error: File is {}.", file));
-                        let square_checked = Square(square.0 + n);
-                        if is_attacked(board, square_checked) ||
-                            board.piece_at(square_checked) != Piece(Empty, White) {
-                                can_castle_here = false;
-                            }
-                    }
-                    if can_castle_here {
-                        moves.push(Move::new(square, Square(square.0 + 2)));
-                    }
-                    
-                    
-                }
-            // Queenside castling
-            if (board.to_move == White && board.castling[1]) ||
-                (board.to_move == Black && board.castling[3]) {
-                    let mut can_castle_here = true;
-                    if is_attacked(board, square) {
-                        can_castle_here = false;
-                    }
-                    // Check that the two squares are empty and not in check
-                    for n in [1, 2].iter() {
-                        debug_assert!(file == 4, format!("Error: File is {}.", file));
-                        let square_checked = Square(square.0 - n);
-                        if is_attacked(board, square_checked) ||
-                            board.piece_at(square_checked) != Piece(Empty, White) {
-                                can_castle_here = false;
-                            }
-                    }
-                    // Check that the knight-square is empty
-                    if board.piece_at(Square(square.0 - 3)) != Piece(Empty, White) {
-                        can_castle_here = false;
-                    }
-                    if can_castle_here {
-                        moves.push(Move::new(square, Square(square.0 - 2)));
-                    }
-                    
-                }
+        King => legal_moves_for_king(board, square, moves, is_in_check, king_pos),
         
-            for i in -1..2 {
-                for j in -1..2 {
-                    
-                    if file + i < 0 || file + i >= 8 ||
-                        rank + j < 0 || rank + j >= 8 ||
-                        (j == 0 && i == 0) {
-                        continue;
-                    }
-                    let new_pos = ((rank + j) * 8 + file + i) as u8;
-
-                    
-                    // Check that the square is not occupied by a friendly piece
-                    let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-                    if piece_to == Empty || color_to != board.to_move {
-                        add_if_legal_simple(board, Move::new(square, Square(new_pos)), moves);
-                    }
-                }
-            }
-        },
         Queen =>  {
             add_moves_diagonally (&board, square, moves, king_pos, is_in_check);
             add_straight_moves(&board, square, moves, king_pos, is_in_check);
@@ -117,101 +46,193 @@ fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<board
         Bishop => {
             add_moves_diagonally(&board, square, moves, king_pos, is_in_check);
         },
-        Knight => {
-            for &(i, j) in [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                           (1, -2), (1, 2), (2, -1), (2, 1)].iter() {
-                if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
-                    continue;
-                }
-                let new_pos = ((rank + j) * 8 + file + i) as u8;
-                
-                let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-                if piece_to == Empty || color_to != board.to_move {
-                    add_if_legal(board, Move::new (square, Square(new_pos)), moves,
-                                 king_pos, is_in_check);
-                }
-            }
-        },
-        Pawn => {
-            // Helper variables
-            let (start_rank, prom_rank, direction) =
-                if board.to_move == White { (6, 1, -1) } else { (1, 6, 1) };
-
-            // Checks if there are any pieces available for capture to the left,
-            // including en passant capture
-            if file > 0 {
-                let take_square = Square((pos + direction * 8) as u8 - 1);
-                let Piece(piece, color) = board.piece_at(take_square);
-                if piece != Empty && color != board.to_move {
-                    if rank == prom_rank {
-                        for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                            add_if_legal(board,
-                                         Move::new_prom(square, take_square,
-                                                        Piece(*piece_type, board.to_move)),
-                                         moves, king_pos, is_in_check);
-                        }
-                    }
-                    else {
-                        add_if_legal(board, Move::new(square, take_square), moves,
-                                     king_pos, is_in_check);
-                    }
-                }
-                if board.en_passant.is_some() && take_square == board.en_passant.unwrap() {
-                    add_if_legal_simple(board, Move::new(square, take_square), moves);
-                }
-            }
-            // Ditto, but to the right
-            if file < 7 {
-                let take_square = Square((pos + direction * 8) as u8 + 1);
-                let Piece(piece, color) = board.piece_at(take_square);
-                if piece != Empty && color != board.to_move {
-                    if rank == prom_rank {
-                        for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                            add_if_legal(board,
-                                         Move::new_prom(square, take_square,
-                                                        Piece(*piece_type, board.to_move)),
-                                         moves, king_pos, is_in_check);
-                        }
-                    }
-                    else {
-                        add_if_legal(board, Move::new(square, take_square), moves,
-                                     king_pos, is_in_check);
-                    }
-                }
-                if board.en_passant.is_some() && take_square == board.en_passant.unwrap() {
-                    add_if_legal_simple(board, Move::new(square, take_square), moves);
-                }
-            }
-
-            //Checks if the pawn can walk forward one or two squares, promote
-            let square_in_front = Square::from_ints(file as u8, (rank + direction) as u8);
-            
-            if board.piece_at(square_in_front).is_empty() {
-                if rank == prom_rank {
-                    for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                        add_if_legal(board,
-                                     Move::new_prom(square, square_in_front,
-                                                    Piece(*piece_type, board.to_move)),
-                                     moves, king_pos, is_in_check);
-                    }
-                }
-                else {
-                    add_if_legal(board, Move::new(square, square_in_front), moves, king_pos,
-                                 is_in_check);
-                }
-                if rank == start_rank {
-                    let square_2_in_front = Square::from_ints(file as u8,
-                                                              (rank + direction * 2) as u8);
-                    if board.piece_at(square_2_in_front).is_empty() {
-                        add_if_legal(board, Move::new(square, square_2_in_front), moves,
-                                     king_pos, is_in_check);
-                    }
-                }
-            }
-        },
+        Knight => legal_moves_for_knight(&board, square, moves, is_in_check, king_pos),
+        
+        Pawn => legal_moves_for_pawn(&board, square, moves, is_in_check, king_pos),
+        
         Empty => (),
     }
 }
+
+fn legal_moves_for_king(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+                        is_in_check : bool, king_pos : Square) {
+    let file = (square.0 & 0b0000_0111) as i8;
+    let rank = (square.0 >> 3) as i8;
+    // If the king and the two castling squares are not in check, castling is allowed
+    // There must be no pieces between the castling pieces
+
+    // Kingside castling
+    if (board.to_move == White && board.castling[0]) ||
+        (board.to_move == Black && board.castling[2]) {
+            
+            let mut can_castle_here = true;
+            if is_attacked(board, square) {
+                can_castle_here = false;
+            }
+            
+            // Check that the two squares are empty and not in check
+            for n in [1, 2].iter() {
+                debug_assert!(file == 4, format!("Error: File is {}.", file));
+                let square_checked = Square(square.0 + n);
+                if is_attacked(board, square_checked) ||
+                    board.piece_at(square_checked) != Piece(Empty, White) {
+                        can_castle_here = false;
+                    }
+            }
+            if can_castle_here {
+                moves.push(Move::new(square, Square(square.0 + 2)));
+            }
+            
+            
+        }
+    // Queenside castling
+    if (board.to_move == White && board.castling[1]) ||
+        (board.to_move == Black && board.castling[3]) {
+            let mut can_castle_here = true;
+            if is_attacked(board, square) {
+                can_castle_here = false;
+            }
+            // Check that the two squares are empty and not in check
+            for n in [1, 2].iter() {
+                debug_assert!(file == 4, format!("Error: File is {}.", file));
+                let square_checked = Square(square.0 - n);
+                if is_attacked(board, square_checked) ||
+                    board.piece_at(square_checked) != Piece(Empty, White) {
+                        can_castle_here = false;
+                    }
+            }
+            // Check that the knight-square is empty
+            if board.piece_at(Square(square.0 - 3)) != Piece(Empty, White) {
+                can_castle_here = false;
+            }
+            if can_castle_here {
+                moves.push(Move::new(square, Square(square.0 - 2)));
+            }
+            
+        }
+    
+    for i in -1..2 {
+        for j in -1..2 {
+            
+            if file + i < 0 || file + i >= 8 ||
+                rank + j < 0 || rank + j >= 8 ||
+                (j == 0 && i == 0) {
+                    continue;
+                }
+            let new_pos = ((rank + j) * 8 + file + i) as u8;
+
+            
+            // Check that the square is not occupied by a friendly piece
+            let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
+            if piece_to == Empty || color_to != board.to_move {
+                add_if_legal_simple(board, Move::new(square, Square(new_pos)), moves);
+            }
+        }
+    }
+}
+
+fn legal_moves_for_knight(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+                          is_in_check : bool, king_pos : Square) {
+    let file = (square.0 & 0b0000_0111) as i8;
+    let rank = (square.0 >> 3) as i8;
+    
+    for &(i, j) in [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                    (1, -2), (1, 2), (2, -1), (2, 1)].iter() {
+        if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
+            continue;
+        }
+        let new_pos = ((rank + j) * 8 + file + i) as u8;
+        
+        let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
+        if piece_to == Empty || color_to != board.to_move {
+            add_if_legal(board, Move::new (square, Square(new_pos)), moves,
+                         king_pos, is_in_check);
+        }
+    }
+}
+
+fn legal_moves_for_pawn(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+                          is_in_check : bool, king_pos : Square) {
+    // Helper variables
+    let file = (square.0 & 0b0000_0111) as i8;
+    let rank = (square.0 >> 3) as i8;
+    let pos = square.0 as i8;
+    let (start_rank, prom_rank, direction) =
+        if board.to_move == White { (6, 1, -1) } else { (1, 6, 1) };
+
+    // Checks if there are any pieces available for capture to the left,
+    // including en passant capture
+    if file > 0 {
+        let take_square = Square((pos + direction * 8) as u8 - 1);
+        let Piece(piece, color) = board.piece_at(take_square);
+        if piece != Empty && color != board.to_move {
+            if rank == prom_rank {
+                for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+                    add_if_legal(board,
+                                 Move::new_prom(square, take_square,
+                                                Piece(*piece_type, board.to_move)),
+                                 moves, king_pos, is_in_check);
+                }
+            }
+            else {
+                add_if_legal(board, Move::new(square, take_square), moves,
+                             king_pos, is_in_check);
+            }
+        }
+        if board.en_passant.is_some() && take_square == board.en_passant.unwrap() {
+            add_if_legal_simple(board, Move::new(square, take_square), moves);
+        }
+    }
+    // Ditto, but to the right
+    if file < 7 {
+        let take_square = Square((pos + direction * 8) as u8 + 1);
+        let Piece(piece, color) = board.piece_at(take_square);
+        if piece != Empty && color != board.to_move {
+            if rank == prom_rank {
+                for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+                    add_if_legal(board,
+                                 Move::new_prom(square, take_square,
+                                                Piece(*piece_type, board.to_move)),
+                                 moves, king_pos, is_in_check);
+                }
+            }
+            else {
+                add_if_legal(board, Move::new(square, take_square), moves,
+                             king_pos, is_in_check);
+            }
+        }
+        if board.en_passant.is_some() && take_square == board.en_passant.unwrap() {
+            add_if_legal_simple(board, Move::new(square, take_square), moves);
+        }
+    }
+
+    //Checks if the pawn can walk forward one or two squares, promote
+    let square_in_front = Square::from_ints(file as u8, (rank + direction) as u8);
+    
+    if board.piece_at(square_in_front).is_empty() {
+        if rank == prom_rank {
+            for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+                add_if_legal(board,
+                             Move::new_prom(square, square_in_front,
+                                            Piece(*piece_type, board.to_move)),
+                             moves, king_pos, is_in_check);
+            }
+        }
+        else {
+            add_if_legal(board, Move::new(square, square_in_front), moves, king_pos,
+                         is_in_check);
+        }
+        if rank == start_rank {
+            let square_2_in_front = Square::from_ints(file as u8,
+                                                      (rank + direction * 2) as u8);
+            if board.piece_at(square_2_in_front).is_empty() {
+                add_if_legal(board, Move::new(square, square_2_in_front), moves,
+                             king_pos, is_in_check);
+            }
+        }
+    }
+}
+
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
 /// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
