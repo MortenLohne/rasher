@@ -36,6 +36,7 @@ fn main() {
         match &input[..] {
             "uci\n" => {
                 // Prepare to create log file
+                /*
                 let mut options = fs::OpenOptions::new();
                 options.write(true).append(true);
                 let path = path::Path::new("mc_log.txt");
@@ -44,13 +45,14 @@ fn main() {
                     Ok(file) => file,
                     Err(err) => panic!(format!("Error creating log file at {:?} : {}", path, err)),
                 };
-                let mut writer = Some(Arc::new(Mutex::new(io::BufWriter::new(log_file))));
-                uci::to_log("Opened log file", &mut writer);
+                */
+                let mut log_writer = Arc::new(Mutex::new(None));
+                uci::to_log("Opened log file", &mut log_writer);
                 
-                match uci::connect_engine(writer.clone()) {
+                match uci::connect_engine(&log_writer) {
                     Ok(_) => (),
                     Err(e) => {
-                        uci::to_log(&e, &mut writer);
+                        uci::to_log(&e, &mut log_writer);
                         panic!(e);
                     },
                 }
@@ -239,11 +241,9 @@ fn score_board (board : &board::Board) -> Score {
     Val(value)
 }
 
-type SharableWriter = Option<Arc<Mutex<io::BufWriter<fs::File>>>>;
-
 fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
-                 log_writer : SharableWriter) {
+                 mut log_writer : uci::SharableWriter) {
     
     engine_comm.lock().unwrap().engine_is_running = true;
     
@@ -265,11 +265,11 @@ fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
             engine_comm.lock().unwrap().best_move = Some(moves[0]);
         }
         else {
-            uci::to_log("Warning: find_best_move_ab didn't return any moves", &log_writer);
+            uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
             engine_comm.lock().unwrap().best_move = None;
         }
 
-        uci::send_eval_to_gui(log_writer.clone(), depth,
+        uci::send_eval_to_gui(&log_writer, depth,
                          ms_taken, score, moves, node_count);
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => { 
@@ -288,7 +288,7 @@ fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
         }
     }
     uci::uci_send(&format!("bestmove {}", engine_comm.lock().unwrap().best_move.unwrap().to_alg()), 
-             &log_writer);
+             &mut log_writer);
     engine_comm.lock().unwrap().engine_is_running = false;
     
 }

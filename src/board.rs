@@ -1,12 +1,11 @@
 use self::PieceType::*;
 use self::Color::*;
 
+use std;
 use std::collections::HashMap;
 use std::fmt::Error;
 use std::fmt::Display;
 use std::fmt::Formatter;
-
-extern crate core;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
@@ -475,7 +474,7 @@ impl Board {
 }
 
 // Stores time information for the game, in milliseconds
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct TimeInfo {
     pub white_time : u32,
     pub black_time : u32,
@@ -526,7 +525,7 @@ lazy_static! {
 }
 
 fn rev_map<K, V> (in_map : HashMap<V, K>) -> HashMap<K, V>
-    where K: Eq + Clone + core::hash::Hash, V: Eq + Clone + core::hash::Hash {
+    where K: Eq + Clone + std::hash::Hash, V: Eq + Clone + std::hash::Hash {
     let mut new_map = HashMap::new();
     for (value, key) in in_map.iter() {
         new_map.insert(key.clone(), value.clone());

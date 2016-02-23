@@ -214,6 +214,7 @@ fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<board
 }
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
+/// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
 fn add_if_legal(board : &Board, c_move : Move, moves : &mut Vec<Move>, king_pos_c : Square,
                 is_in_check : bool) {
     if is_in_check || is_pinned_to_piece(board, c_move.from, king_pos_c) {
@@ -226,6 +227,9 @@ fn add_if_legal(board : &Board, c_move : Move, moves : &mut Vec<Move>, king_pos_
     }
 }
 
+/// Checks that the move does not put the player in check
+/// , and add the move to the vector
+/// This check is more expensive, but works for _all_ positions
 fn add_if_legal_simple (board : &Board, c_move : Move, moves : &mut Vec<Move>) {
     let mut test_board = board.do_move(c_move);
 

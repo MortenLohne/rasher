@@ -15,62 +15,65 @@ use std::fs;
 use std::path;
 use std::process;
 
-pub type SharableWriter = Option<Arc<Mutex<io::BufWriter<fs::File>>>>;
+pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine(mut writer : SharableWriter) -> Result<(),String> {
+pub fn connect_engine(log_writer : &SharableWriter) -> Result<(),String> {
+
+    open_log_file(log_writer);
 
     // Do the standard handshake with the GUI
-    to_log("Received uci command from GUI", &writer);
-    uci_send("id name morten_chess", &writer);
-    uci_send("uciok", &writer);
+    to_log("Received uci command from GUI", log_writer);
+    uci_send("id name morten_chess", log_writer);
     
-    // The engine would send any customizable options here. For now, there are none.
+    uci_send("option name Write Debug Log type check default true", log_writer);
+    
+    uci_send("uciok", log_writer);
     
     let mut board = None;
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
 
     // Listen to commands from GUI forever
     loop {
-        let input = get_engine_input(&mut writer);
+        let input = get_engine_input(log_writer);
         let tokens = input.split_whitespace().collect::<Vec<_>>();
         if tokens.len() == 0 {
-            to_log(&format!("Unrecognized input \"{}\"", input), &mut writer);
+            to_log(&format!("Unrecognized input \"{}\"", input), log_writer);
             continue;
         }
         match tokens[0] { // Parse the first word of the input
-            "isready" => uci_send("readyok", &mut writer),
-            "quit" => { to_log("Quitting...", &mut writer); process::exit(0); },
+            "isready" => uci_send("readyok", log_writer),
+            "quit" => { to_log("Quitting...", log_writer); process::exit(0); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => board = Some(try!(parse_position(&input, &mut writer))), 
-            
+            "position" => board = Some(try!(parse_position(&input, log_writer))), 
+            "setoption" => try!(parse_setoption(&input, log_writer)),
             "stop" => {
                 let mut engine_comm = engine_comm.lock().unwrap();
                 engine_comm.engine_should_stop = true;
                 let best_move : board::Move = match engine_comm.best_move.clone() {
                     Some(mv) => mv,
                     None => {
-                        to_log(&"Haven't found a move yet: ignoring stop command.", &mut writer);
+                        to_log(&"Haven't found a move yet: ignoring stop command.", log_writer);
                         continue;
                     },
                 };
-                uci_send(&format!("bestmove {}", best_move.to_alg()), &mut writer);
+                uci_send(&format!("bestmove {}", best_move.to_alg()), log_writer);
             },
             "go" => {
                 let board = try!(board.clone().ok_or("Received go command without receiving a position first. Exiting..."));
-                let time_restriction = try!(parse_go(&input, writer.clone()));
+                let time_restriction = try!(parse_go(&input, log_writer));
                 
-                start_engine(board.clone(), writer.clone(), time_restriction, engine_comm.clone());
+                start_engine(board, log_writer.clone(), time_restriction, engine_comm.clone());
             },
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
-                to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), &mut writer);
+                to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), log_writer);
             },
         }
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TimeRestriction {
     GameTime(TimeInfo),
     Depth(u8),
@@ -104,7 +107,51 @@ fn start_engine (board : Board, log_writer : SharableWriter,
     });
 }
 
-fn parse_go (input : &String, mut writer : SharableWriter)
+fn open_log_file (log_writer : &SharableWriter) {
+    println!("Creating log file");
+    let mut inner_writer = log_writer.lock().unwrap();
+    match *inner_writer {
+        Some(_) => (), // Log is already open, do nothing
+        None => match fs::File::create("mc_log.txt") {
+            Ok(log_file) => { 
+                println!("Created log file");
+                *inner_writer = Some(io::BufWriter::new(log_file));
+            },
+            Err(err) => panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
+        }
+    }
+}
+
+fn parse_setoption (input : &str, log_writer : &SharableWriter) -> Result<(), String> {
+    assert!(input.contains("name") && input.contains("value"));
+    let mut input_iter = input.split_whitespace();
+    assert!(input_iter.next() == Some("setoption") && input_iter.next() == Some("name"));
+    let option_name : String = input.split_whitespace()
+        .skip(2)
+        .take_while(|token| token != &"value")
+        .collect();
+    
+    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
+    match &option_name.to_lowercase()[..] {
+        "write debug log" => {
+            match &value.to_lowercase()[..] {
+                "true" => open_log_file(log_writer),
+                "false" => {
+                    let mut inner_writer = log_writer.lock().unwrap();
+                    *inner_writer = None;
+                },
+                _ => to_log(&format!("Unrecognized value {} in option {}, ignoring...", 
+                                     value, option_name), log_writer),
+            }
+        },
+        _ => to_log(&format!("Unrecognized option {} with value {}, ignoring...", 
+                             option_name, value), log_writer),
+    }
+    Ok(())
+    
+}
+
+pub fn parse_go (input : &str, log_writer : &SharableWriter)
              -> Result<TimeRestriction, String> {
 
     // Parses an optional string to return a u32
@@ -122,7 +169,7 @@ fn parse_go (input : &String, mut writer : SharableWriter)
             try!(parse_int(input.split_whitespace().nth(2))
                  ) as i64)),
         None => { to_log("Received no restriction \"go\" command, assuming \"infinite\"",
-                         &mut writer);
+                         log_writer);
         },
         Some(_) => (),
     }
@@ -150,11 +197,11 @@ fn parse_go (input : &String, mut writer : SharableWriter)
         return Err(String::from("Did not receive time left for white and black, nor other restrictions on \"go\" command."))
     }
     if white_inc == None {
-        to_log("Did not receive white increment times, assuming 0", &mut writer);
+        to_log("Did not receive white increment times, assuming 0", log_writer);
         white_inc = Some(0);
     }
     if black_inc == None {
-        to_log("Did not receive black increment times, assuming 0", &mut writer);
+        to_log("Did not receive black increment times, assuming 0", log_writer);
         black_inc = Some(0);
     }
     let time_info = TimeInfo {white_time: white_time.unwrap(), black_time: black_time.unwrap(),
@@ -165,7 +212,7 @@ fn parse_go (input : &String, mut writer : SharableWriter)
 
 /// Sends the engine's evaluation to the GUI via uci, along with other data
 /// like node count, time taken, etc
-pub fn send_eval_to_gui (mut log_writer : SharableWriter, depth : u8,
+pub fn send_eval_to_gui (log_writer : &SharableWriter, depth : u8,
                          ms_taken : i64, 
                          score : Score, moves : Vec<Move>, node_count : ::NodeCount) {
     let eng_score = match score {
@@ -194,31 +241,29 @@ pub fn send_eval_to_gui (mut log_writer : SharableWriter, depth : u8,
     for c_move in moves {
         inf_str.push_str(&format!("{} ", c_move.to_alg()));
     }
-    uci_send(&inf_str, &mut log_writer);
+    uci_send(&inf_str, log_writer);
 }
 
-#[allow(unused_must_use)]
 /// Simple helper method to write a line to the log
 pub fn to_log (message : &str, log_writer : &SharableWriter) {
 
-    match log_writer{
-        &Some(ref writer) => {
-            
-            let mut log_writer = writer.lock().unwrap();
+    let mut inner_writer = log_writer.lock().unwrap();
 
+    match *inner_writer {
+        Some(ref mut writer) => {
+            
             let time = format!("[{}:{}]", time::get_time().sec % 3600, 
                                time::get_time().nsec / 1000000);
-            log_writer.write(&format!("{} {}\n", time, message)
-                             .bytes().collect::<Vec<u8>>());
-            log_writer.flush();
+            writer.write(&format!("{} {}\n", time, message)
+                             .bytes().collect::<Vec<u8>>()).unwrap();
+            writer.flush().unwrap();
         },
-        &None => (),
+        None => (),
     }
 }
 
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it
 /// to the log file, if it is present
-#[allow(unused_must_use)]
 pub fn uci_send (message : &str, log_writer : &SharableWriter) {
 
     let log_message = format!("Engine: {}", message);
@@ -227,7 +272,6 @@ pub fn uci_send (message : &str, log_writer : &SharableWriter) {
 }
 
 /// Waits for input from the GUI, and writes the input to the log and returns it
-#[allow(unused_must_use)]
 fn get_engine_input(log_writer : &SharableWriter) -> String {
 
     let reader = io::stdin();

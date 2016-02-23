@@ -3,10 +3,10 @@ use board;
 use board::*;
 use move_gen;
 
-extern crate test;
 extern crate time;
 
 use uci;
+
 use std::sync::Mutex;
 
 #[allow(unused_imports)]
@@ -292,13 +292,35 @@ fn correct_move_gen_test1() {
     assert_eq!(legal_moves_after_plies(&board1, 3), 8_902);
     assert_eq!(legal_moves_after_plies(&board1, 4), 197_281);
     assert_eq!(legal_moves_after_plies(&board1, 5), 4_865_609);
+}
+
+#[test]
+#[ignore]
+fn correct_move_gen_test1_long() {
+    let board1 = board::START_BOARD.clone();
+    assert_eq!(legal_moves_after_plies(&board1, 1), 20);
+    assert_eq!(legal_moves_after_plies(&board1, 2), 400);
+    assert_eq!(legal_moves_after_plies(&board1, 3), 8_902);
+    assert_eq!(legal_moves_after_plies(&board1, 4), 197_281);
+    assert_eq!(legal_moves_after_plies(&board1, 5), 4_865_609);
     assert_eq!(legal_moves_after_plies(&board1, 6), 119_060_324);
-    //assert_eq!(legal_moves_after_plies(&board1, 7), 3_195_901_860); //~10 min
+    assert_eq!(legal_moves_after_plies(&board1, 7), 3_195_901_860); //~10 min
     //assert_eq!(legal_moves_after_plies(&board, 8), 84_998_978_956);
 }
 
 #[test]
 fn correct_move_gen_test2() {
+    let board2 = Board::from_fen(
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
+    assert_eq!(legal_moves_after_plies(&board2, 1), 48);
+    assert_eq!(legal_moves_after_plies(&board2, 2), 2_039);
+    assert_eq!(legal_moves_after_plies(&board2, 3), 97_862);
+    assert_eq!(legal_moves_after_plies(&board2, 4), 4_085_603);
+}
+
+#[test]
+#[ignore]
+fn correct_move_gen_test2_long() {
     let board2 = Board::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
     assert_eq!(legal_moves_after_plies(&board2, 1), 48);
@@ -317,6 +339,18 @@ fn correct_move_gen_test3() {
     assert_eq!(legal_moves_after_plies(&board3, 4), 43_238);
     assert_eq!(legal_moves_after_plies(&board3, 5), 674_624);
     assert_eq!(legal_moves_after_plies(&board3, 6), 11_030_083);
+}
+
+#[test]
+#[ignore]
+fn correct_move_gen_test3_long() {
+    let board3 = Board::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
+    assert_eq!(legal_moves_after_plies(&board3, 1), 14);
+    assert_eq!(legal_moves_after_plies(&board3, 2), 191);
+    assert_eq!(legal_moves_after_plies(&board3, 3), 2_812);
+    assert_eq!(legal_moves_after_plies(&board3, 4), 43_238);
+    assert_eq!(legal_moves_after_plies(&board3, 5), 674_624);
+    assert_eq!(legal_moves_after_plies(&board3, 6), 11_030_083);
     assert_eq!(legal_moves_after_plies(&board3, 7), 178_633_661);
 }
 
@@ -324,8 +358,21 @@ fn correct_move_gen_test3() {
 fn correct_move_gen_test4() {
     let board4 = Board::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
+    for (depth, nodes) in (1..6).zip(
+        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) 
+    {
+        assert_eq!(legal_moves_after_plies(&board4, depth), *nodes);
+    }
+}
+
+#[test]
+#[ignore]
+fn correct_move_gen_test4_long() {
+    let board4 = Board::from_fen(
+        "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..7).zip(
-        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) {
+        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) 
+    {
         assert_eq!(legal_moves_after_plies(&board4, depth), *nodes);
     }
 }
@@ -334,7 +381,8 @@ fn correct_move_gen_test4() {
 fn correct_move_gen_test5() {
     let board5 = Board::from_fen(
         "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq - 1 8").unwrap();
-    for (depth, nodes) in (1..).zip([42, 1352, 53_392].iter()) {
+    for (depth, nodes) in (1..).zip([42, 1352, 53_392].iter()) 
+    {
         assert_eq!(legal_moves_after_plies(&board5, depth), *nodes);
     }
 }
@@ -343,7 +391,18 @@ fn correct_move_gen_test5() {
 fn correct_move_gen_test6() {
     let board6 = Board::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
-    for (depth, nodes) in (1..6).zip(
+    for (depth, nodes) in (1..5).zip(
+        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
+        assert_eq!(legal_moves_after_plies(&board6, depth), *nodes);
+    }
+}
+
+#[test]
+#[ignore]
+fn correct_move_gen_test6_long() {
+    let board6 = Board::from_fen(
+        "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
+    for (depth, nodes) in (1..7).zip(
         [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
         assert_eq!(legal_moves_after_plies(&board6, depth), *nodes);
     }
@@ -401,3 +460,22 @@ fn eval_start_pos_bench (bencher : &mut test::Bencher) {
              (total_nodes.intern + total_nodes.leaf) as f32 / ms_taken as f32);
 }
 
+
+
+#[test]
+fn parse_go_test() {
+    use uci::TimeRestriction;
+    use std::sync;
+
+    let mut empty_logger = sync::Arc::new(sync::Mutex::new(None));
+
+    assert_eq!(uci::parse_go("go infinite", &mut empty_logger), Ok(TimeRestriction::Infinite));
+    assert_eq!(uci::parse_go("go movetime 5000", &mut empty_logger), 
+               Ok(TimeRestriction::MoveTime(5000)));
+    assert_eq!(uci::parse_go("go wtime 1000 btime 2500 winc 54 binc 22", &mut empty_logger), 
+           Ok(TimeRestriction::GameTime(TimeInfo {
+               white_time: 1000, black_time: 2500, 
+               white_inc: 54, black_inc: 22 , moves_to_go: None }
+                                        )));
+    
+}
