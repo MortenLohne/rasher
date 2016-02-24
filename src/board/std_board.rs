@@ -1,19 +1,18 @@
 use self::PieceType::*;
 use self::Color::*;
+use board::std_move::Move;
 
 use std;
 use std::collections::HashMap;
-use std::fmt::Error;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
     White,
     Black,
 }
-impl Display for Color {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
+impl fmt::Display for Color {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let _ = fmt.write_str( match self {
             &White => ("White"),
             &Black => ("Black"),
@@ -48,8 +47,8 @@ impl PieceType {
     }
 }
 
-impl Display for PieceType {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
+impl fmt::Display for PieceType {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let _ = fmt.write_str(match self {
             &Pawn => "Pawn",
             &Knight => "Knight",
@@ -67,8 +66,8 @@ impl Display for PieceType {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Piece (pub PieceType, pub Color);
 
-impl Display for Piece {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
+impl fmt::Display for Piece {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let _ = fmt.write_str(&format!("{}", PIECE_CHAR_MAP.get(self).unwrap()));
         Ok(())
     }
@@ -91,8 +90,8 @@ impl Piece {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Square(pub u8);
 
-impl Display for Square {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
+impl fmt::Display for Square {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let (file, rank) = self.file_rank();
         
         let _ = fmt.write_str(&format!("{}{}", (file + 'a' as u8) as char, (rank + '0' as u8) as char));
@@ -123,87 +122,7 @@ impl Square {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Move {
-    pub from : Square,
-    pub to : Square,
-    pub prom : Option<Piece>,
-}
-impl Move {
-    pub fn new(from : Square, to : Square) -> Move {
-        Move { from: from, to: to, prom: None }
-    }
-    pub fn new_prom(from : Square, to : Square, prom : Piece) -> Move {
-        Move { from: from, to: to, prom: Some(prom) }
-    }
-    pub fn to_alg(&self) -> String {
-        let (file_from, rank_from) = self.from.file_rank();
-        let (file_to, rank_to) = self.to.file_rank();
-        let mut s : String = "".to_string();
-        s.push_str(&format!("{}{}{}{}", (file_from + 'a' as u8) as char,
-                            (8 - rank_from + '0' as u8) as char,
-                            (file_to + 'a' as u8) as char, (8 - rank_to + '0' as u8) as char));
-        match self.prom {
-            Some(Piece(Queen, _)) => s.push('q'),
-            Some(Piece(Rook, _)) => s.push('r'),
-            Some(Piece(Knight, _)) => s.push('k'),
-            Some(Piece(Bishop, _)) => s.push('b'),
-            None => (),
-            _ => panic!("Illegal promotion move"),
-        }
-        s
-    }
-    
-    pub fn from_alg(alg : &str) -> Result<Self, String> {
-        if alg.len() == 5 || alg.len() == 6 {
-            if alg.chars().nth(2).unwrap() == '-' {
-                let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
-                let to = Square::from_alg(&alg[3..5]).unwrap_or(Square(0));
-                if alg.len() == 5 {
-                    Ok(Move::new(from, to))
-                }
-                else {
-                    Ok(Move::new_prom(from, to,
-                                      match alg.chars().nth(5) {
-                                          Some('Q') => Piece(Queen, White),
-                                          Some('q') => Piece(Queen, Black),
-                                          Some('R') => Piece(Rook, White),
-                                          Some('r') => Piece(Rook, Black),
-                                          Some('N') => Piece(Knight, White),
-                                          Some('n') => Piece(Knight, Black),
-                                          Some('B') => Piece(Bishop, White),
-                                          Some('b') => Piece(Bishop, Black),
-                                          _ => return Err("Bad promotion letter".to_string()),
-                                      } ))
-                }
-            }
-            else {
-                Err(format!("Move {} had incorrect 3rd character '{}', expected '-'",
-                            alg, alg.chars().nth(2).unwrap()))
-            }
-        }
-        else {
-            Err(format!("Move {} had incorrect length: Found {}, expected 5/6", alg, alg.len()))
-        }
-    }
-    pub fn from_short_alg(alg : &str) -> Result<Self, String> {
-        if alg.len() != 4 && alg.len() != 5 {
-            Err(format!("Wrong move length: Expected 4/5, found {}", alg.len()).to_string())
-        }
-        else {
-            let mut temp = alg.to_string();
-            temp.insert(2, '-');
-            Self::from_alg(&temp)
-        }
-    }
-}
 
-impl Display for Move {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
-        let _ = fmt.write_str(&format!("{}-{}", self.from, self.to));
-        Ok(())   
-    }
-}
 
 // use std::hash::{Hash, Hasher, SipHasher};
 
@@ -225,8 +144,8 @@ pub struct Board {
     }
 }*/
 
-impl Display for Board {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
+impl fmt::Display for Board {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         for rank in self.board.iter() {
             for piece in rank.iter() {
                 let _ = fmt.write_str(&format!("[{}]", piece));

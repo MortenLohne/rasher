@@ -1,18 +1,18 @@
-use board;
-use board::Board;
-use board::Piece;
-use board::Square;
-use board::Move;
-use board::PieceType;
-use board::PieceType::*;
-use board::Color::*;
 
-pub fn all_legal_moves (board : &board::Board) -> Vec<Move> {
+use board::std_board::Board;
+use board::std_board::Piece;
+use board::std_board::Square;
+use board::std_move::Move;
+use board::std_board::PieceType;
+use board::std_board::PieceType::*;
+use board::std_board::Color::*;
+
+pub fn all_legal_moves (board : &Board) -> Vec<Move> {
     let mut moves = Vec::new();
     let king_pos = king_pos(board);
     let is_in_check = is_attacked(board, king_pos);
     for i in 0..64 {
-        match board.piece_at(board::Square(i)) {
+        match board.piece_at(Square(i)) {
             Piece(Empty, White) => continue,
             Piece(_, color) if color == board.to_move => {
                 legal_moves_for_piece(board, Square(i), &mut moves, is_in_check, king_pos);
@@ -27,7 +27,7 @@ pub fn all_legal_moves (board : &board::Board) -> Vec<Move> {
 /// Takes in the king position for the moving player, and whether they are currently in check,
 /// to speed up the move generation
 #[inline]
-fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<Move>,
                          is_in_check : bool, king_pos : Square) { 
     let Piece(piece, color) = board.piece_at(square);
     
@@ -54,7 +54,33 @@ fn legal_moves_for_piece(board : &Board, square : Square, moves : &mut Vec<board
     }
 }
 
-fn legal_moves_for_king(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+fn add_crazyhouse_moves(board : &Board, square : Square, moves : &mut Vec<Move>) {
+    let mut available_pieces = vec![];
+    
+    available_pieces.push(Piece(Queen, White));
+    available_pieces.push(Piece(Queen, Black));
+
+    for (_, &color) in (0..2).zip([Black, White].iter()) {
+        available_pieces.push(Piece(Bishop, color));
+        available_pieces.push(Piece(Knight, color));
+        available_pieces.push(Piece(Rook, color));
+    }
+    for _ in 0..8 {
+        available_pieces.push(Piece(Pawn, White));
+        available_pieces.push(Piece(Pawn, Black));
+    }
+    let mut pieces_on_board = vec![];
+    for rank in board.board.iter() {
+        for piece in rank.iter() {
+            if piece.0 != Empty {
+                pieces_on_board.push(piece);
+            }
+        }
+    }
+
+}
+
+fn legal_moves_for_king(board : &Board, square : Square, moves : &mut Vec<Move>,
                         is_in_check : bool, king_pos : Square) {
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
@@ -131,7 +157,7 @@ fn legal_moves_for_king(board : &Board, square : Square, moves : &mut Vec<board:
     }
 }
 
-fn legal_moves_for_knight(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+fn legal_moves_for_knight(board : &Board, square : Square, moves : &mut Vec<Move>,
                           is_in_check : bool, king_pos : Square) {
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
@@ -151,7 +177,7 @@ fn legal_moves_for_knight(board : &Board, square : Square, moves : &mut Vec<boar
     }
 }
 
-fn legal_moves_for_pawn(board : &Board, square : Square, moves : &mut Vec<board::Move>,
+fn legal_moves_for_pawn(board : &Board, square : Square, moves : &mut Vec<Move>,
                           is_in_check : bool, king_pos : Square) {
     // Helper variables
     let file = (square.0 & 0b0000_0111) as i8;

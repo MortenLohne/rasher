@@ -1,19 +1,19 @@
 #[allow(unused_imports)]
-use board::PieceType::{Pawn, Knight, Bishop, Rook, Queen, King, Empty};
-use board::Color::{Black, White};
-use board::*;
-use board;
+use board::std_board::PieceType::*;
+use board::std_board::Color::*;
+use board::std_board::*;
+use board::std_board;
+use board::std_move::Move;
+use alpha_beta;
 use ::Score;
-use std::thread;
 
 extern crate time;
 
+use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
 use std::io::Write;
-use std::fs;
-use std::path;
-use std::process;
+use std::{fs, path, process};
 
 pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
 
@@ -51,7 +51,7 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(),String> {
             "stop" => {
                 let mut engine_comm = engine_comm.lock().unwrap();
                 engine_comm.engine_should_stop = true;
-                let best_move : board::Move = match engine_comm.best_move.clone() {
+                let best_move : Move = match engine_comm.best_move.clone() {
                     Some(mv) => mv,
                     None => {
                         to_log(&"Haven't found a move yet: ignoring stop command.", log_writer);
@@ -102,7 +102,7 @@ fn start_engine (board : Board, log_writer : SharableWriter,
     engine_comm.lock().unwrap().engine_is_running = true;
 
     thread::spawn (move || {
-        ::search_moves(board, engine_comm,
+        alpha_beta::search_moves(board, engine_comm,
                        time_restriction, log_writer);
     });
 }
@@ -286,7 +286,7 @@ fn get_engine_input(log_writer : &SharableWriter) -> String {
 /// Turns the whole position string from the GU (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position(input : &String, log_writer : &SharableWriter)
-                  -> Result<board::Board, String> {
+                  -> Result<std_board::Board, String> {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
@@ -296,7 +296,7 @@ fn parse_position(input : &String, log_writer : &SharableWriter)
         // moves_pos is the position on the input string where the token "moves" is expected
         let (mut board, moves_pos) =
             if words[1] == "startpos" {
-                (board::START_BOARD.clone(), 2)
+                (std_board::START_BOARD.clone(), 2)
             }
         else if words[1] == "fen" {
             let mut fen_string : String = "".to_string();
@@ -337,7 +337,7 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
     }
 }
     
-pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
+pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
     let mut board = [[Piece(Empty, White); 8]; 8];
     let fen_split : Vec<&str> = fen.split(" ").collect();
     if fen_split.len() < 4 || fen_split.len() > 6 {
@@ -352,7 +352,7 @@ pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
     for i in 0..8 {
         let mut cur_rank : Vec<Piece> = Vec::new();
         for c in ranks[i].chars() {
-            match board::CHAR_PIECE_MAP.get(&c) {
+            match std_board::CHAR_PIECE_MAP.get(&c) {
                 Some(piece) => cur_rank.push(*piece),
                 None => match c.to_digit(10) {
                     Some(mut i) => {
@@ -396,7 +396,7 @@ pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
     }
     let en_passant = if fen_split[3] == "-" { None }
     else {
-        match board::Square::from_alg(fen_split[3]) {
+        match std_board::Square::from_alg(fen_split[3]) {
             Some(square) => Some(square),
             None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
         }
@@ -411,7 +411,7 @@ pub fn parse_fen (fen : &str) -> Result<board::Board, String> {
         (0, 0)
     };
     
-    Ok(board::Board{ board: board, to_move: to_move, castling: castling_rights,
+    Ok(std_board::Board{ board: board, to_move: to_move, castling: castling_rights,
                      en_passant: en_passant, half_move_clock: half_clock,
                      move_num: move_num, moves: vec![]})
 }

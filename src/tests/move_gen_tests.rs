@@ -1,24 +1,27 @@
 #[allow(unused_imports)]
-use board;
-use board::*;
+use board::std_board;
+use board::std_board::*;
+use board::std_move::Move;
+
 use move_gen;
+use alpha_beta;
 
 extern crate time;
 extern crate test;
 
 use uci;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[allow(unused_imports)]
-use board::PieceType::*;
+use board::std_board::PieceType::*;
 #[allow(unused_imports)]
-use board::Color::{Black, White};
+use board::std_board::Color::{Black, White};
 #[allow(unused_imports)]
 use ::Score::{Val, MateB, MateW};
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
-/// Also assumes that board::START_BOARD is correct
+/// Also assumes that std_board::START_BOARD is correct
 #[test]
 fn test_piece_at () {
     let square = |str| Square::from_alg(str).unwrap();
@@ -174,7 +177,9 @@ fn basic_tactics_test() {
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &Board, best_move : Move) {
     let (score, tried_moves, node_count) =
-        ::find_best_move_ab(board, 4, &Mutex::new(uci::EngineComm::new()), uci::TimeRestriction::Infinite);
+        alpha_beta::search_moves(board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
+                                 uci::TimeRestriction::Depth(4),
+                                 Arc::new(Mutex::new(None)));
     assert!(tried_moves[0] == best_move,
             format!("Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
 expected {}, board:\n{}",
@@ -287,7 +292,7 @@ fn move_is_unavailable_prop(board : &Board, c_move : Move) {
 
 #[test]
 fn correct_move_gen_test1() {
-    let board1 = board::START_BOARD.clone();
+    let board1 = std_board::START_BOARD.clone();
     assert_eq!(legal_moves_after_plies(&board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&board1, 3), 8_902);
@@ -298,7 +303,7 @@ fn correct_move_gen_test1() {
 #[test]
 #[ignore]
 fn correct_move_gen_test1_long() {
-    let board1 = board::START_BOARD.clone();
+    let board1 = std_board::START_BOARD.clone();
     assert_eq!(legal_moves_after_plies(&board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&board1, 3), 8_902);
@@ -445,7 +450,9 @@ fn eval_start_pos_bench (bencher : &mut test::Bencher) {
                 return;
             }
         }
-        let (_, _, node_counter) = ::find_best_move_ab (&board, 5, &Mutex::new(uci::EngineComm::new()), uci::TimeRestriction::Infinite);
+        let (_, _, node_counter) = alpha_beta::search_moves(
+            board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
+            uci::TimeRestriction::Depth(5), Arc::new(Mutex::new(None)));
         total_nodes.intern += node_counter.intern;
         total_nodes.leaf += node_counter.leaf;
     });
@@ -459,24 +466,4 @@ fn eval_start_pos_bench (bencher : &mut test::Bencher) {
     let ms_taken = (time::get_time() - start_time).num_milliseconds();
     println!("{} nodes/s",
              (total_nodes.intern + total_nodes.leaf) as f32 / ms_taken as f32);
-}
-
-
-
-#[test]
-fn parse_go_test() {
-    use uci::TimeRestriction;
-    use std::sync;
-
-    let mut empty_logger = sync::Arc::new(sync::Mutex::new(None));
-
-    assert_eq!(uci::parse_go("go infinite", &mut empty_logger), Ok(TimeRestriction::Infinite));
-    assert_eq!(uci::parse_go("go movetime 5000", &mut empty_logger), 
-               Ok(TimeRestriction::MoveTime(5000)));
-    assert_eq!(uci::parse_go("go wtime 1000 btime 2500 winc 54 binc 22", &mut empty_logger), 
-           Ok(TimeRestriction::GameTime(TimeInfo {
-               white_time: 1000, black_time: 2500, 
-               white_inc: 54, black_inc: 22 , moves_to_go: None }
-                                        )));
-    
 }
