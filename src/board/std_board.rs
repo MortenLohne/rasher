@@ -11,6 +11,17 @@ pub enum Color {
     White,
     Black,
 }
+impl std::ops::Not for Color {
+    type Output = Color;
+
+    fn not(self) -> Self {
+        match self {
+            White => Black,
+            Black => White,
+        }
+    }
+} 
+
 impl fmt::Display for Color {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let _ = fmt.write_str( match self {
@@ -93,8 +104,11 @@ pub struct Square(pub u8);
 impl fmt::Display for Square {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let (file, rank) = self.file_rank();
+        let actual_rank = ((rank as i8 - 8).abs() as u8 + ('0' as u8)) as char;
         
-        let _ = fmt.write_str(&format!("{}{}", (file + 'a' as u8) as char, (rank + '0' as u8) as char));
+        let _ = fmt.write_str(&format!("{}{}",
+                                       (file + 'a' as u8) as char,
+                                       actual_rank));
         Ok(())   
     }
 }
@@ -130,9 +144,8 @@ impl Square {
 pub struct Board {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,
-    pub castling : [bool; 4],
-    pub en_passant : Option<Square>,
-    pub half_move_clock : u16,
+    pub castling_en_passant : u8,
+    pub half_move_clock : u8,
     pub move_num : u16,
     pub moves : Vec<Move>,
     //pub hash : Option<Hasher>,
@@ -146,12 +159,15 @@ pub struct Board {
 
 impl fmt::Display for Board {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.write_str("\n").unwrap();
         for rank in self.board.iter() {
             for piece in rank.iter() {
                 let _ = fmt.write_str(&format!("[{}]", piece));
             }
             let _ = fmt.write_str("\n");
         }
+        fmt.write_str(&format!("To move: {}, flags: {:b}\n", self.to_move,
+                              self.castling_en_passant)).unwrap();
         for c_move in &self.moves {
             let _ = fmt.write_str(&format!("[{}],", &c_move));
         }
@@ -159,6 +175,12 @@ impl fmt::Display for Board {
     }
 }
 impl Board {
+
+    pub fn new(pieces: [[Piece; 8]; 8]) -> Self {
+        Board { board: pieces, to_move: White, castling_en_passant: 0,
+                half_move_clock: 0, move_num: 0, moves: vec![] }
+    }
+    
     #[inline]
     pub fn piece_at(&self, square : Square) -> Piece {
         let Square(i) = square;
@@ -192,9 +214,61 @@ impl Board {
         }
         None
     }
+    pub fn disable_castling(&mut self, color: Color) {
+        println!("Disabled castling for {}", color);
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
+        }
+    }
+    pub fn disable_castling_queenside(&mut self, color: Color) {
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1101,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0111,
+        }
+    }
+    pub fn disable_castling_kingside(&mut self, color: Color) {
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1110,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_1011,
+        }
+    }
+    
+    pub fn can_castle_kingside(&self, color: Color) -> bool {
+        match color {
+            White => self.castling_en_passant & 0b0000_0001 > 0,
+            Black => self.castling_en_passant & 0b0000_0100 > 0,
+        }
+    }
+    pub fn can_castle_queenside(&self, color: Color) -> bool {
+        match color {
+            White => self.castling_en_passant & 0b0000_0010 > 0,
+            Black => self.castling_en_passant & 0b0000_1000 > 0,
+        }
+    }
+    
+    pub fn en_passant_square(&self) -> Option<Square> {
+        if self.castling_en_passant & 0b0111_0000 > 0 {
+            let rank = if self.to_move == Black { 2 } else { 5 };
+            let file = self.castling_en_passant >> 4;
+            debug_assert!(file < 8);
+
+            Some(Square::from_ints(file, rank))
+        }
+        else { None }
+    }
+
+    pub fn set_en_passant_square(&mut self, square: Option<Square>) {
+        match square {
+            Some(Square(byte)) => self.castling_en_passant = self.castling_en_passant & (byte << 4),
+            None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
+        }
+    }
+
     
     // Creates a new board from a given FEN string
     pub fn from_fen (fen : &str) -> Result<Board, String> {
+        /*
         let mut board = [[Piece(Empty, White); 8]; 8];
         let fen_split : Vec<&str> = fen.split(" ").collect();
         if fen_split.len() != 6 {
@@ -259,7 +333,7 @@ impl Board {
             }
         };
 
-        let (half_clock, move_num) : (u16, u16) =
+        let (half_clock, move_num) : (u8, u16) =
             match ((fen_split[4]).parse(), (fen_split[5]).parse()) {
                 (Ok(n1), Ok(n2)) => (n1, n2),
                 _ => return Err("Invalid halfmove clock or move num".to_string()),
@@ -268,35 +342,41 @@ impl Board {
         Ok(Board{ board: board, to_move: to_move, castling: castling_rights,
                          en_passant: en_passant, half_move_clock: half_clock,
                          move_num: move_num, moves: vec![]})
+         */
+        ::uci::parse_fen(fen)
     }
-    pub fn do_move(&self, c_move : Move) -> Board {
-        let mut new_board = self.clone();
-        new_board.moves.push(c_move);
-        // Increment or reset the half-move clock
-        match (new_board.piece_at(c_move.from).0, new_board.piece_at(c_move.to).0) {
-            (Pawn, _) => new_board.half_move_clock = 0,
-            (_, Empty) => new_board.half_move_clock += 1,
-            (_, _) => new_board.half_move_clock = 0,
-        }
 
-        // Destruct into helper variables
+    pub fn do_move(&mut self, c_move : Move) {
+        println!("Doing move {}", c_move);
+        
+        // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
-        let color = new_board.to_move;
+        let color = self.to_move;
+        let piece_moved = self.piece_at(c_move.from).0;
         
-        // Do special stuff if castling
-        // This method just does the move, it does not keep track of
-        // en passant squares or castling ability. It will castle regardless of whether
-        // it is legal to do so
-        if new_board.piece_at(c_move.from).0 == King &&
+        // Increment or reset the half-move clock
+        match (piece_moved, self.piece_at(c_move.to).0) {
+            (Pawn, _) => self.half_move_clock = 0,
+            (_, Empty) => self.half_move_clock += 1,
+            (_, _) => self.half_move_clock = 0,
+        }
+
+        self.moves.push(c_move);
+        self.move_num += 1;
+        
+        
+        // Perform castling
+        // It will castle regardless of whether it is legal to do so
+        if piece_moved == King &&
             (file_from as i8 - file_to as i8).abs() == 2 {
 
                 // Simple helper closure that moves a piece, emptying the square it came from
                 // Checks nothing, not even if the square has a piece. Use carefully.
                 let mut do_simple_move = |f_from, r_from, f_to, r_to| {
-                    new_board.board[r_to as usize][f_to as usize]
-                        = new_board.board[r_from as usize][f_from as usize];
-                    new_board.board[r_from as usize][f_from as usize] = Piece(Empty, White);
+                    self.board[r_to as usize][f_to as usize]
+                        = self.board[r_from as usize][f_from as usize];
+                    self.board[r_from as usize][f_from as usize] = Piece(Empty, White);
                 };
                 // Assume castling is legal, and move the king and rook to where they should go
                 match (color, file_to) {
@@ -317,13 +397,13 @@ impl Board {
                 }
             }
         // If a pawn takes towards an empty square, assume it is doing a legal en passant capture
-        else if new_board.piece_at(c_move.from).0 == Pawn && file_from != file_to &&
-            new_board.piece_at(c_move.to) == Piece(Empty, White) {
-                new_board.board[rank_to as usize][file_to as usize]
-                    = new_board.board[rank_from as usize][file_from as usize];
+        else if piece_moved == Pawn && file_from != file_to &&
+            c_move.capture == Empty {
+                self.board[rank_to as usize][file_to as usize]
+                    = self.board[rank_from as usize][file_from as usize];
 
-                new_board.board[rank_from as usize][file_to as usize] = Piece(Empty, White);
-                new_board.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
+                self.board[rank_from as usize][file_to as usize] = Piece(Empty, White);
+                self.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
                 
                 
             }
@@ -331,64 +411,77 @@ impl Board {
         else {
             // Does the move, depending on whether the move promotes or not
             match c_move.prom {
-                Some(piece) => new_board.board[rank_to as usize][file_to as usize] = piece,
-                None => new_board.board[rank_to as usize][file_to as usize]
-                    = new_board.board[rank_from as usize][file_from as usize],
+                Some(piece) => self.board[rank_to as usize][file_to as usize] = piece,
+                None => self.board[rank_to as usize][file_to as usize]
+                    = self.board[rank_from as usize][file_from as usize],
                 
             }
-            new_board.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
+            self.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
         }
             
         // Remove any en passant square. If it was available to this player,
         // it has already been used. Any new en passant square is added below.
 
-       new_board.en_passant = None;
+       self.set_en_passant_square(None);
 
         // If the pawn went two squares forward, add the square behind it as en passant square
-        if new_board.piece_at(c_move.to).0 == Pawn &&
-            (rank_from as i8 - rank_to as i8).abs() == 2 {
-                new_board.en_passant = Some(Square::from_ints(file_from,
-                                                         (rank_from + rank_to) / 2));
-            }
-
-        // Remove castling rights on king/rook moves
-        // Does not check when rooks are captured, it is assumed that the
-        // function looking for moves checks that rooks are present
-        if new_board.piece_at(c_move.to).0 == King {
-            if color == White {
-                new_board.castling[0] = false;
-                new_board.castling[1] = false;
-            }
-            else {
-                new_board.castling[2] = false;
-                new_board.castling[3] = false;
-            }
+        if self.piece_at(c_move.to).0 == Pawn &&
+            (rank_from as i8 - rank_to as i8).abs() == 2
+        {
+            self.set_en_passant_square(
+                Some(Square::from_ints(file_from, (rank_from + rank_to) / 2)));
         }
-        // If a rook was moved, check if it came from a corner
-        if new_board.piece_at(c_move.to).0 == Rook {
-            match c_move.from {
-                Square(0) => new_board.castling[3] = false,
-                Square(7) => new_board.castling[2] = false,
-                Square(56) => new_board.castling[1] = false,
-                Square(63) => new_board.castling[0] = false,
+
+        // Remove castling rights if necessary
+        if self.castling_en_passant & 0b0000_1111 > 0 {
+            // Remove castling rights on king/rook moves
+            // Does not check when rooks are captured, it is assumed that the
+            // function looking for moves checks that rooks are present
+            if piece_moved == King {
+                println!("{} moved king to {}", color, c_move.from);
+                self.disable_castling(color);
+            }
+            // If a rook was moved, check if it came from a corner
+            if piece_moved == Rook {
+                match c_move.from {
+                    Square(0) => self.disable_castling_queenside(Black),
+                    Square(7) => self.disable_castling_kingside(Black),
+                    Square(56) => self.disable_castling_queenside(White),
+                    Square(63) => self.disable_castling_kingside(White),
+                    _ => (),
+                }
+            }
+            // For any piece, check if it goes into the corner
+            match c_move.to {
+                Square(0) => self.disable_castling_queenside(Black),
+                Square(7) => self.disable_castling_kingside(Black),
+                Square(56) => self.disable_castling_queenside(White),
+                Square(63) => self.disable_castling_kingside(White),
                 _ => (),
             }
         }
-        // If any piece is moved, check if it goes into the corner
-        match c_move.to {
-            Square(0) => new_board.castling[3] = false,
-            Square(7) => new_board.castling[2] = false,
-            Square(56) => new_board.castling[1] = false,
-            Square(63) => new_board.castling[0] = false,
-            _ => (),
-        }
         
-        if new_board.to_move == White {
-            new_board.to_move = Black
-        }
-        else { new_board.to_move = White };
+        self.to_move = !self.to_move;
+    }
+    pub fn undo_move(&mut self, c_move : Move) {
+        println!("Undoing move {}", c_move);
         
-        new_board
+        let (file_from, rank_from) = c_move.from.file_rank();
+        let (file_to, rank_to) = c_move.to.file_rank();
+        self.board[rank_from as usize][file_from as usize] = 
+            self.board[rank_to as usize][file_to as usize];
+        if c_move.capture != Empty {
+            self.board[rank_to as usize][file_to as usize] = Piece(c_move.capture, self.to_move);
+        }
+        else {
+            self.board[rank_to as usize][file_to as usize] = Piece(Empty, White);
+        }
+        self.castling_en_passant = c_move.old_castling_en_passant;
+        self.half_move_clock = c_move.old_half_move_clock;
+        self.move_num -= 1;
+        self.moves.pop();
+
+        self.to_move = !self.to_move;
     }
 }
 
@@ -400,8 +493,6 @@ pub struct TimeInfo {
     pub white_inc : u32,
     pub black_inc : u32,
     pub moves_to_go : Option<u16>, // Number of moves to the next time control
-
-    
 }
 
 lazy_static! {
@@ -417,7 +508,7 @@ lazy_static! {
             let Piece(p_type, _) = board[0][i];
             board[7][i] = Piece(p_type, White);
         }
-        Board {board : board, to_move : White, castling : [true; 4], en_passant : None,
+        Board {board : board, to_move : White, castling_en_passant : 0b0000_1111,
                half_move_clock : 0, move_num : 0 , moves : vec![]}
     };
     
@@ -436,6 +527,7 @@ lazy_static! {
         map.insert(Piece(Pawn, White), 'P');
         map.insert(Piece(Pawn, Black), 'p');
         map.insert(Piece(Empty, White), ' ');
+        map.insert(Piece(Empty, Black), '.');
         map
     };
     pub static ref CHAR_PIECE_MAP : HashMap<char, Piece> = {

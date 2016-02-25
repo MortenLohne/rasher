@@ -9,13 +9,28 @@ pub struct Move {
     pub from : Square,
     pub to : Square,
     pub prom : Option<Piece>,
+    pub capture : PieceType,
+    pub old_castling_en_passant : u8,
+    pub old_half_move_clock : u8,
 }
+
 impl Move {
-    pub fn new(from : Square, to : Square) -> Move {
-        Move { from: from, to: to, prom: None }
+    pub fn new(board: &Board, from : Square, to : Square) -> Move {
+        let capture = board.piece_at(to).0;
+        let old_castling_en_passant = board.castling_en_passant;
+
+        Move { from: from, to: to, prom: None, capture: capture, 
+               old_castling_en_passant: old_castling_en_passant, 
+               old_half_move_clock: board.half_move_clock }
     }
-    pub fn new_prom(from : Square, to : Square, prom : Piece) -> Move {
-        Move { from: from, to: to, prom: Some(prom) }
+        
+    pub fn new_prom(board: &Board, from : Square, to : Square, prom : Piece) -> Move {
+        let capture = board.piece_at(to).0;
+        let old_castling_en_passant = board.castling_en_passant;
+
+        Move { from: from, to: to, prom: Some(prom), capture: capture, 
+               old_castling_en_passant: old_castling_en_passant, 
+               old_half_move_clock: board.half_move_clock }
     }
     pub fn to_alg(&self) -> String {
         let (file_from, rank_from) = self.from.file_rank();
@@ -41,22 +56,25 @@ impl Move {
                 let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
                 let to = Square::from_alg(&alg[3..5]).unwrap_or(Square(0));
                 if alg.len() == 5 {
-                    Ok(Move::new(from, to))
+                    Ok(Move { from: from, to: to, prom: None, capture: Empty, 
+                              old_castling_en_passant: 0, old_half_move_clock: 0 })
                 }
                 else {
-                    Ok(Move::new_prom(from, to,
-                                      match alg.chars().nth(5) {
-                                          Some('Q') => Piece(Queen, White),
-                                          Some('q') => Piece(Queen, Black),
-                                          Some('R') => Piece(Rook, White),
-                                          Some('r') => Piece(Rook, Black),
-                                          Some('N') => Piece(Knight, White),
-                                          Some('n') => Piece(Knight, Black),
-                                          Some('B') => Piece(Bishop, White),
-                                          Some('b') => Piece(Bishop, Black),
-                                          _ => return Err("Bad promotion letter".to_string()),
-                                      } ))
-                }
+                    Ok(Move { from: from, to: to, prom: Some(
+                              match alg.chars().nth(5) {
+                                  Some('Q') => Piece(Queen, White),
+                                  Some('q') => Piece(Queen, Black),
+                                  Some('R') => Piece(Rook, White),
+                                  Some('r') => Piece(Rook, Black),
+                                  Some('N') => Piece(Knight, White),
+                                  Some('n') => Piece(Knight, Black),
+                                  Some('B') => Piece(Bishop, White),
+                                  Some('b') => Piece(Bishop, Black),
+                                  _ => return Err("Bad promotion letter".to_string()),
+                              }), 
+                              capture: Empty, 
+                              old_castling_en_passant: 0, old_half_move_clock: 0 })
+                    }
             }
             else {
                 Err(format!("Move {} had incorrect 3rd character '{}', expected '-'",

@@ -12,7 +12,7 @@ use board::std_board::Color::*;
 extern crate time;
 use std::sync::{Arc, Mutex};
 
-pub fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
+pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
                  mut log_writer : uci::SharableWriter) 
                      -> (Score, Vec<Move>, NodeCount) {
@@ -24,6 +24,7 @@ pub fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
         uci::TimeRestriction::Mate(d) => d as u8,
         _ => 128,
     };;
+    debug_assert!(max_depth > 1);
     
     let start_time = time::get_time();
     
@@ -31,7 +32,7 @@ pub fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
 
     for depth in 1..max_depth {
         let (score, moves, node_count) =
-            find_best_move_ab(&board, depth, &*engine_comm, time_restriction);
+            find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction);
         best_score = Some(score); 
         best_moves = Some(moves.clone()); 
         best_node_count = Some(node_count.clone());
@@ -73,11 +74,11 @@ pub fn search_moves (board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
 }
 
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab (board : &Board, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
+fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
                       time_restriction : uci::TimeRestriction )
                       -> (Score, Vec<Move>, NodeCount) {
 
-    fn find_best_move_ab_rec (board: &Board, depth : u8, mut alpha : Score, mut beta : Score,
+    fn find_best_move_ab_rec (board: &mut Board, depth : u8, mut alpha : Score, mut beta : Score,
                               engine_comm : &Mutex<uci::EngineComm>,
                               time_restriction : uci::TimeRestriction,
                               node_counter : &mut NodeCount)
@@ -85,7 +86,7 @@ fn find_best_move_ab (board : &Board, depth : u8, engine_comm : &Mutex<uci::Engi
         use uci::TimeRestriction::*;
         {
             let mut engine_comm = engine_comm.lock().unwrap();
-        
+            
             if engine_comm.engine_should_stop {
                 engine_comm.engine_is_running = true;
                 panic!()
@@ -144,10 +145,14 @@ fn find_best_move_ab (board : &Board, depth : u8, engine_comm : &Mutex<uci::Engi
                     break;
                 }
             else {
-                let tried_board = board.do_move(c_move);
+                let mut old_board = board.clone();
+                board.do_move(c_move);
                 let (tried_score, tried_line) =
-                    find_best_move_ab_rec( &tried_board, depth - 1, alpha, beta,
+                    
+                    find_best_move_ab_rec( board, depth - 1, alpha, beta,
                                             engine_comm, time_restriction, node_counter);
+                board.undo_move(c_move);
+                debug_assert!(&mut old_board == board);
                 
                 if color == White && tried_score > alpha {
                     alpha = tried_score;

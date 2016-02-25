@@ -324,7 +324,7 @@ fn parse_position(input : &String, log_writer : &SharableWriter)
                             return Err(format!("{}", err));
                         },
                     };
-                    board = board.do_move(c_move);
+                    board.do_move(c_move);
                 }
             }
         
@@ -338,7 +338,9 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 }
     
 pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
-    let mut board = [[Piece(Empty, White); 8]; 8];
+    let mut board = START_BOARD.clone();
+    board.board = [[Piece(Empty, White); 8]; 8];
+    
     let fen_split : Vec<&str> = fen.split(" ").collect();
     if fen_split.len() < 4 || fen_split.len() > 6 {
         return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
@@ -371,18 +373,21 @@ pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
         }
         else {
             for j in 0..8 {
-                board[i][j] = *cur_rank.get(j).unwrap();
+                board.board[i][j] = *cur_rank.get(j).unwrap();
             }
         }
     }
     if fen_split[1].len() != 1 {
         return Err("Invalid FEN string: Error in side to move-field".to_string());
     }
+
+    // Check side to move
     let char_to_move = fen_split[1].chars().collect::<Vec<_>>()[0];
-    let to_move = if char_to_move == 'w' { White }
-    else if char_to_move == 'b' { Black }
+    if char_to_move == 'w' { board.to_move = White }
+    else if char_to_move == 'b' { board.to_move = Black }
     else { return Err("Invalid FEN string: Error in side to move-field".to_string()) };
 
+    // Check castling rights field
     let mut castling_rights = [false; 4];
     for c in fen_split[2].chars() {
         match c {
@@ -394,15 +399,20 @@ pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
             _ => return Err("Invalid FEN string: Error in castling field.".to_string()),
         }
     }
-    let en_passant = if fen_split[3] == "-" { None }
-    else {
+    if !castling_rights[0] { board.disable_castling_kingside(White) }
+    if !castling_rights[1] { board.disable_castling_queenside(White) }
+    if !castling_rights[2] { board.disable_castling_kingside(Black) }
+    if !castling_rights[3] { board.disable_castling_queenside(Black) }
+
+    // Check en passant field
+    if fen_split[3] != "-" {
         match std_board::Square::from_alg(fen_split[3]) {
-            Some(square) => Some(square),
+            Some(square) => board.set_en_passant_square(Some(square)),
             None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
         }
     };
 
-    let (half_clock, move_num) : (u16, u16) =
+    let (half_clock, move_num) : (u8, u16) =
         if fen_split.len() > 4 {
             (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
              try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
@@ -410,8 +420,9 @@ pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
     else {
         (0, 0)
     };
+
+    board.half_move_clock = half_clock;
+    board.move_num = move_num;
     
-    Ok(std_board::Board{ board: board, to_move: to_move, castling: castling_rights,
-                     en_passant: en_passant, half_move_clock: half_clock,
-                     move_num: move_num, moves: vec![]})
+    Ok(board)
 }
