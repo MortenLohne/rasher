@@ -178,9 +178,9 @@ fn basic_tactics_test() {
 fn basic_tactics_prop(board : &Board, best_move : Move) {
     let (score, tried_moves, node_count) =
         alpha_beta::search_moves(board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
-                                 uci::TimeRestriction::Depth(4),
+                                 uci::TimeRestriction::Depth(5),
                                  Arc::new(Mutex::new(None)));
-    assert!(tried_moves[0] == best_move,
+    assert!(tried_moves[0].simple_eq(best_move),
             format!("Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
 expected {}, board:\n{}",
                     tried_moves[0], score, node_count.intern, node_count.leaf,
@@ -196,11 +196,12 @@ fn en_passant_test () {
     board1.do_move(move1);
 
     // Check that en passant is the best move, and do it
+    //move_is_available_prop(&mut board1, move2);
     basic_tactics_prop(&board1, move2);
     board1.do_move(move2);
 
     // The board that's expected
-    let mut board_expected1 = Board::from_fen("7k/8/P7/8/8/8/8/7K b - - 0 1").unwrap();
+    let mut board_expected1 = Board::from_fen("7k/8/P7/8/8/8/8/7K b - - 0 3").unwrap();
     // Add the same moves, to ensure complete equality
     board_expected1.moves.push(move1);
     board_expected1.moves.push(move2);
@@ -283,14 +284,18 @@ fn castling_test () {
 
 #[allow(dead_code)]
 fn move_is_available_prop(board : &mut Board, c_move : Move) {
-    assert!(move_gen::all_legal_moves(board).contains(&c_move), "{} should be legal here, board:\n{}",
-            c_move.to_alg(), board);
+    let all_moves = move_gen::all_legal_moves(board);
+    assert!(all_moves.iter().find(|mv|c_move.simple_eq(**mv)).is_some(),
+            "{} should be legal here, board:{}Legal moves: {:?}",
+            c_move.to_alg(), board, all_moves);
 }
 
 #[allow(dead_code)]
 fn move_is_unavailable_prop(board : &mut Board, c_move : Move) {
-    assert!(!move_gen::all_legal_moves(board).contains(&c_move), "{} should not be legal here, board:\n{}",
-            c_move.to_alg(), board);
+    let all_moves = move_gen::all_legal_moves(board);
+    assert!(!all_moves.iter().find(|mv|c_move.simple_eq(**mv)).is_some(),
+            "{} should not be legal here, board:{}Legal moves: {:?}",
+            c_move.to_alg(), board, all_moves);
 }
 
 #[test]
@@ -323,6 +328,13 @@ fn correct_move_gen_test2() {
     let mut board2 = Board::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
     assert_eq!(legal_moves_after_plies(&mut board2, 1), 48);
+    
+    let mut temp_board = board2.clone();
+    let mv = Move::new(&temp_board, Square(48), Square(32));
+    temp_board.do_move(mv);
+    assert!(temp_board.en_passant_square().unwrap() == Square(40),
+            "Error: En passant square was: {:?}", temp_board.en_passant_square());
+    
     assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
     assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
     assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_603);
@@ -428,12 +440,10 @@ fn correct_move_gen_test7() {
 #[test]
 fn correct_move_gen_test8() {
     let mut board = Board::from_fen(
-        "rnbqkbnr/ppp1pppp/8/3p4/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 0 1").unwrap();
+        "rnbqkbnr/pp2pppp/8/2pp4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1").unwrap();
     println!("{}", board);
-    assert_eq!(legal_moves_after_plies(&mut board, 1), 20);
-    assert_eq!(legal_moves_after_plies(&mut board, 2), 400);
-    assert_eq!(legal_moves_after_plies(&mut board, 3), 8_902);
-    assert_eq!(legal_moves_after_plies(&mut board, 4), 197_281);
+    assert_eq!(legal_moves_after_plies(&mut board, 1), 30);
+    assert_eq!(legal_moves_after_plies(&mut board, 2), 895);
 }
 
 /// Checks that the engine finds the total number of legal moves after n plies.
@@ -451,8 +461,8 @@ fn legal_moves_after_plies(board : &mut Board, n : u8) -> u64 {
             board.undo_move(c_move);
 
             debug_assert!(&mut old_board == board,
-                          format!("Board was not the same after ungoing move:\nOld:{}New:{}",
-                                  old_board, board));
+                          format!("Board was not the same after undoing move {}:\nOld:{}New:{}",
+                                  c_move, old_board, board));
         }
         total_moves
     }
@@ -466,7 +476,7 @@ static mut BENCHES_RUN : u32 = 0;
 fn eval_start_pos_bench (bencher : &mut test::Bencher) {
     let start_time = time::get_time();
     let board = START_BOARD.clone();
-    let mut total_nodes = ::NodeCount{ intern: 0, leaf: 0 };
+    let mut total_nodes = ::NodeCount{ intern: 0, leaf: 0, total: 0 };
     bencher.iter(|| {
         unsafe {
             if BENCHES_RUN > 5 {
@@ -475,9 +485,10 @@ fn eval_start_pos_bench (bencher : &mut test::Bencher) {
         }
         let (_, _, node_counter) = alpha_beta::search_moves(
             board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
-            uci::TimeRestriction::Depth(5), Arc::new(Mutex::new(None)));
+            uci::TimeRestriction::Depth(6), Arc::new(Mutex::new(None)));
         total_nodes.intern += node_counter.intern;
         total_nodes.leaf += node_counter.leaf;
+        total_nodes.total += node_counter.total;
     });
     
     unsafe {

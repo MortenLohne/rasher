@@ -43,10 +43,20 @@ fn main() {
                     },
                 }
             }, 
+            
+            "mem usage\n" => {
+                use std::mem;
+                println!("Standard board: {}", mem::size_of::<Board>());
+                println!("Standard move: {}", mem::size_of::<board::std_move::Move>());
+                println!("Standard piece: {}", mem::size_of::<board::std_board::Piece>());
+                println!("Board score: {}", mem::size_of::<Score>());
+                
+            },
             //"play_self\n" => play_game(&board::START_BOARD.clone()),
             //"play\n" => play_human(),
             s => println!("Unrecognized command \"{}\".", s),
         }
+        input.clear();
     }
     
     
@@ -153,8 +163,9 @@ but it was not mate or staltemate! Board:\n{}",
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeCount {
-    intern : u64,
-    leaf : u64,
+    intern: u64,
+    leaf: u64,
+    total: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -198,28 +209,41 @@ impl PartialOrd for Score {
         }
     }
 }
-
+#[inline(never)]
 fn score_board (board : &Board) -> Score {
-    let center_proximity = |file, rank| {
-        (3.5f32).powi(2) - ((3.5 - file as f32).powi(2) + (3.5 - rank as f32).powi(2)).sqrt()
-    };
+    const POS_VALS : [[u8; 8]; 8] = 
+        [[0, 0, 0, 0, 0, 0, 0, 0],
+         [0, 1, 1, 1, 1, 1, 1, 0],
+         [0, 1, 2, 2, 2, 2, 1, 0],
+         [0, 1, 2, 3, 3, 2, 1, 0],
+         [0, 1, 2, 3, 3, 2, 1, 0],
+         [0, 1, 2, 2, 2, 2, 1, 0],
+         [0, 1, 1, 1, 1, 1, 1, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0]];
+    /*let center_proximity = |file, rank| {
+    (3.5f32).powi(2) - ((3.5 - file as f32).powi(2) + (3.5 - rank as f32).powi(2)).sqrt()
+    };*/
     let mut value = 0.0;
     for rank in 0..8 {
         for file in 0..8 {
             let piece_val = board.board[rank][file].value();
-            let pos_val = center_proximity(file, rank) *
+            let pos_val = POS_VALS[rank][file] as f32 *
                 match board.board[rank][file] {
-                    Piece(Bishop, White) => 0.1,
-                    Piece(Bishop, Black) => -0.1,
-                    Piece(Knight, White) => 0.2,
-                    Piece(Knight, Black) => -0.2,
-                    Piece(Queen, White) => 0.2,
-                    Piece(Queen, Black) => -0.2,
-                    Piece(Pawn, White) => 0.05,
-                    Piece(Pawn, Black) => -0.05,
+                    Piece(Bishop, White) => 0.15,
+                    Piece(Bishop, Black) => -0.15,
+                    Piece(Knight, White) => 0.3,
+                    Piece(Knight, Black) => -0.3,
+                    Piece(Queen, White) => 0.3,
+                    Piece(Queen, Black) => -0.3,
+                    Piece(Pawn, White) => 0.00,
+                    Piece(Pawn, Black) => -0.00,
                     _ => 0.0,
                 };
-            value += piece_val + pos_val;
+            let pawn_val = match board.board[rank][file] {
+                Piece(Pawn, _) => (rank as f32 - 3.5) * -0.1,
+                _ => 0.0,
+            };
+            value += piece_val + pos_val + pawn_val;
             //println!("Value at {} is {}, {}, total: {}",
             //         Square::from_ints(file as u8, rank as u8), piece_val, pos_val, value);
         }

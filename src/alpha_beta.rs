@@ -30,7 +30,7 @@ pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>
     
     let (mut best_score, mut best_moves, mut best_node_count) = (None, None, None);
 
-    for depth in 1..max_depth {
+    for depth in 1..(max_depth + 1) {
         let (score, moves, node_count) =
             find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction);
         best_score = Some(score); 
@@ -84,28 +84,32 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
                               node_counter : &mut NodeCount)
                               -> (Score, Vec<Move>) {
         use uci::TimeRestriction::*;
-        {
+
+        if node_counter.total % 1024 == 0 {
             let mut engine_comm = engine_comm.lock().unwrap();
             
             if engine_comm.engine_should_stop {
-                engine_comm.engine_is_running = true;
-                panic!()
+                engine_comm.engine_is_running = false;
+                //return (::score_board(&board), vec![]);
+                panic!();
             }
         } 
         if depth == 0 {
             node_counter.leaf += 1;
+            node_counter.total += 1;
             return (::score_board(&board), vec![]);
         }
         else {
             node_counter.intern += 1;
+            node_counter.total += 1;
         }
 
         match time_restriction {
             GameTime(_) => (),
             Depth(_) => (),
-            Nodes(n) => if node_counter.leaf + node_counter.intern > n {
-                engine_comm.lock().unwrap().engine_is_running = true;
-                panic!();
+            Nodes(n) => if node_counter.total > n {
+                engine_comm.lock().unwrap().engine_is_running = false;
+                //return (::score_board(&board), vec![]);
             },
             Mate(_) => (),
             MoveTime(_) => (), //TODO: Might want to check the clock here, and not just on every depth increase
@@ -145,14 +149,12 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
                     break;
                 }
             else {
-                let mut old_board = board.clone();
                 board.do_move(c_move);
                 let (tried_score, tried_line) =
                     
                     find_best_move_ab_rec( board, depth - 1, alpha, beta,
                                             engine_comm, time_restriction, node_counter);
                 board.undo_move(c_move);
-                debug_assert!(&mut old_board == board);
                 
                 if color == White && tried_score > alpha {
                     alpha = tried_score;
@@ -179,7 +181,7 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
          best_line)
             
     };
-    let mut node_counter = NodeCount { intern: 0, leaf: 0 };
+    let mut node_counter = NodeCount { intern: 0, leaf: 0, total: 0 };
     let (score, mut moves) =
         find_best_move_ab_rec(board, depth, MateB(0), MateW(0),
                               engine_comm, time_restriction, &mut node_counter);

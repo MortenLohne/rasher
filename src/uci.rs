@@ -151,6 +151,47 @@ fn parse_setoption (input : &str, log_writer : &SharableWriter) -> Result<(), St
     
 }
 
+enum ChessVariant {
+    Standard,
+    Crazyhouse,
+}
+
+struct EngineOptions {
+    variant: ChessVariant,
+    threads: u32,
+    hash_memory: u32, // In megabytes
+}
+
+impl EngineOptions {
+    fn new() -> EngineOptions {
+        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 64 }
+    }
+}
+
+// Parse "setoption" strings from the GUI. Some options (# of cores etc) can only
+// be changed during engine initialization, these should be set here
+fn parse_setoption_init (input: &str, options: &mut EngineOptions, log_writer : &SharableWriter)
+                             -> Result<(), String> {
+    assert!(input.contains("name") && input.contains("value"));
+    let mut input_iter = input.split_whitespace();
+    assert!(input_iter.next() == Some("setoption") && input_iter.next() == Some("name"));
+    let option_name : String = input.split_whitespace()
+        .skip(2)
+        .take_while(|token| token != &"value")
+        .collect();
+
+    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
+    match &option_name.to_lowercase()[..] {
+        "variant" => match &value.to_lowercase()[..] {
+            "standard" => options.variant = ChessVariant::Standard,
+            "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
+            _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
+        },
+        s => try!(parse_setoption(s, log_writer)),
+    }
+    Ok(())
+}
+
 pub fn parse_go (input : &str, log_writer : &SharableWriter)
              -> Result<TimeRestriction, String> {
 
@@ -168,6 +209,9 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
         Some("movetime") => return Ok(TimeRestriction::MoveTime(
             try!(parse_int(input.split_whitespace().nth(2))
                  ) as i64)),
+        Some("depth") => return Ok(TimeRestriction::Depth(
+            try!(parse_int(input.split_whitespace().nth(2))
+                 ) as u8)),
         None => { to_log("Received no restriction \"go\" command, assuming \"infinite\"",
                          log_writer);
         },

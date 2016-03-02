@@ -4,7 +4,7 @@ use board::std_board::*;
 
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Move {
     pub from : Square,
     pub to : Square,
@@ -12,6 +12,20 @@ pub struct Move {
     pub capture : PieceType,
     pub old_castling_en_passant : u8,
     pub old_half_move_clock : u8,
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.write_str(&format!("{}", self.to_alg())).unwrap();
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Move {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.write_str(&format!("{}", self.to_alg())).unwrap();
+        Ok(())
+    }
 }
 
 impl Move {
@@ -23,7 +37,11 @@ impl Move {
                old_castling_en_passant: old_castling_en_passant, 
                old_half_move_clock: board.half_move_clock }
     }
-        
+
+    pub fn simple_eq(&self, other: Move) -> bool {
+        self.from == other.from && self.to == other.to
+    }
+    
     pub fn new_prom(board: &Board, from : Square, to : Square, prom : Piece) -> Move {
         let capture = board.piece_at(to).0;
         let old_castling_en_passant = board.castling_en_passant;
@@ -94,12 +112,5 @@ impl Move {
             temp.insert(2, '-');
             Self::from_alg(&temp)
         }
-    }
-}
-
-impl fmt::Display for Move {
-    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let _ = fmt.write_str(&format!("{}-{}", self.from, self.to));
-        Ok(())   
     }
 }

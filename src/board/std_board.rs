@@ -215,7 +215,6 @@ impl Board {
         None
     }
     pub fn disable_castling(&mut self, color: Color) {
-        println!("Disabled castling for {}", color);
         match color {
             White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
             Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
@@ -248,9 +247,9 @@ impl Board {
     }
     
     pub fn en_passant_square(&self) -> Option<Square> {
-        if self.castling_en_passant & 0b0111_0000 > 0 {
-            let rank = if self.to_move == Black { 2 } else { 5 };
-            let file = self.castling_en_passant >> 4;
+        if self.castling_en_passant & 0b1111_0000 != 0 {
+            let rank = if self.to_move == Black { 5 } else { 2 };
+            let file = (self.castling_en_passant & 0b0111_1111) >> 4;
             debug_assert!(file < 8);
 
             Some(Square::from_ints(file, rank))
@@ -259,8 +258,16 @@ impl Board {
     }
 
     pub fn set_en_passant_square(&mut self, square: Option<Square>) {
+        
         match square {
-            Some(Square(byte)) => self.castling_en_passant = self.castling_en_passant & (byte << 4),
+            Some(square) => {
+                let (mut byte, _) = square.file_rank();
+                byte = byte | 0b1000_0000;
+                //println!("byte << 4 was {:b}, byte={:b}", byte << 4, byte);
+                self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
+                //println!("Bitmap set to {:b}", self.castling_en_passant);
+                //panic!();
+            },
             None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
         }
     }
@@ -268,87 +275,10 @@ impl Board {
     
     // Creates a new board from a given FEN string
     pub fn from_fen (fen : &str) -> Result<Board, String> {
-        /*
-        let mut board = [[Piece(Empty, White); 8]; 8];
-        let fen_split : Vec<&str> = fen.split(" ").collect();
-        if fen_split.len() != 6 {
-            return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of 6",
-                               fen, fen_split.len()));
-        }
-        let ranks : Vec<&str> = fen_split[0].split("/").collect();
-        if ranks.len() != 8 {
-            return Err(format!("Invalid FEN string \"{}\": Had {} ranks instead of 8",
-                               fen, ranks.len()));
-        }
-        for i in 0..8 {
-            let mut cur_rank : Vec<Piece> = Vec::new();
-            for c in ranks[i].chars() {
-                match CHAR_PIECE_MAP.get(&c) {
-                    Some(piece) => cur_rank.push(*piece),
-                    None => match c.to_digit(10) {
-                        Some(mut i) => {
-                            while i > 0 {
-                                cur_rank.push(Piece(Empty, White));
-                                i -= 1;
-                            }
-                        },
-                        None => return Err(format!("Invalid FEN string: Illegal character {}", c)),
-                    },
-                }   
-            }
-            if cur_rank.len() != 8 {
-                return Err(format!("Invalid FEN string: Specified {} pieces on rank {}.",
-                                   cur_rank.len(), i))
-            }
-            else {
-                for j in 0..8 {
-                    board[i][j] = *cur_rank.get(j).unwrap();
-                }
-            }
-        }
-        if fen_split[1].len() != 1 {
-            return Err("Invalid FEN string: Error in side to move-field".to_string());
-        }
-        let char_to_move = fen_split[1].chars().collect::<Vec<_>>()[0];
-        let to_move = if char_to_move == 'w' { White }
-        else if char_to_move == 'b' { Black }
-        else { return Err("Invalid FEN string: Error in side to move-field".to_string()) };
-
-        let mut castling_rights = [false; 4];
-        for c in fen_split[2].chars() {
-            match c {
-                '-' => break,
-                'K' => castling_rights[0] = true,
-                'Q' => castling_rights[1] = true,
-                'k' => castling_rights[2] = true,
-                'q' => castling_rights[3] = true,
-                _ => return Err("Invalid FEN string: Error in castling field.".to_string()),
-            }
-        }
-        let en_passant = if fen_split[3] == "-" { None }
-        else {
-            match Square::from_alg(fen_split[3]) {
-                Some(square) => Some(square),
-                None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
-            }
-        };
-
-        let (half_clock, move_num) : (u8, u16) =
-            match ((fen_split[4]).parse(), (fen_split[5]).parse()) {
-                (Ok(n1), Ok(n2)) => (n1, n2),
-                _ => return Err("Invalid halfmove clock or move num".to_string()),
-            };
-        
-        Ok(Board{ board: board, to_move: to_move, castling: castling_rights,
-                         en_passant: en_passant, half_move_clock: half_clock,
-                         move_num: move_num, moves: vec![]})
-         */
         ::uci::parse_fen(fen)
     }
 
     pub fn do_move(&mut self, c_move : Move) {
-        println!("Doing move {}", c_move);
-        
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
@@ -425,11 +355,12 @@ impl Board {
        self.set_en_passant_square(None);
 
         // If the pawn went two squares forward, add the square behind it as en passant square
-        if self.piece_at(c_move.to).0 == Pawn &&
+        if piece_moved == Pawn &&
             (rank_from as i8 - rank_to as i8).abs() == 2
         {
             self.set_en_passant_square(
                 Some(Square::from_ints(file_from, (rank_from + rank_to) / 2)));
+            debug_assert!(self.en_passant_square().is_some(), "Failed to set en passant square");
         }
 
         // Remove castling rights if necessary
@@ -438,7 +369,6 @@ impl Board {
             // Does not check when rooks are captured, it is assumed that the
             // function looking for moves checks that rooks are present
             if piece_moved == King {
-                println!("{} moved king to {}", color, c_move.from);
                 self.disable_castling(color);
             }
             // If a rook was moved, check if it came from a corner
@@ -464,17 +394,70 @@ impl Board {
         self.to_move = !self.to_move;
     }
     pub fn undo_move(&mut self, c_move : Move) {
-        println!("Undoing move {}", c_move);
         
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
-        self.board[rank_from as usize][file_from as usize] = 
-            self.board[rank_to as usize][file_to as usize];
-        if c_move.capture != Empty {
-            self.board[rank_to as usize][file_to as usize] = Piece(c_move.capture, self.to_move);
+        let piece_moved = self.piece_at(c_move.to).0;
+        let color = !self.to_move;
+
+        if piece_moved == King &&
+            (file_from as i8 - file_to as i8).abs() == 2
+        {
+            // Simple helper closure that moves a piece, emptying the square it came from
+            // Checks nothing, not even if the square has a piece. Use carefully.
+            let mut do_simple_move = |f_from, r_from, f_to, r_to| {
+                self.board[r_to as usize][f_to as usize]
+                    = self.board[r_from as usize][f_from as usize];
+                self.board[r_from as usize][f_from as usize] = Piece(Empty, White);
+            };
+            // Assume castling is legal, and move the king and rook to where they should go
+            match (color, file_to) {
+                (White, 2) => { do_simple_move(2, 7, 4, 7);
+                                do_simple_move(3, 7, 0, 7);
+                },
+                (White, 6) => { do_simple_move(6, 7, 4, 7);
+                                do_simple_move(5, 7, 7, 7);
+                },
+                (Black, 2) => { do_simple_move(2, 0, 4, 0);
+                                do_simple_move(3, 0, 0, 0);
+                },
+                (Black, 6) => { do_simple_move(6, 0, 4, 0);
+                                do_simple_move(5, 0, 7, 0);
+                },
+                (_, _) => panic!(format!(
+                    "Error: Tried to castle to the {}th file. ", file_to)),
+            }
+            
+        }
+        // Undo en passant capture
+        else if piece_moved == Pawn && file_from != file_to && c_move.capture == Empty {
+            self.board[rank_from as usize][file_from as usize] =
+                self.board[rank_to as usize][file_to as usize];
+            self.board[rank_to as usize][file_to as usize] =Piece(Empty, White);
+            
+            match color {
+                Black => self.board[rank_to as usize - 1][file_to as usize] = Piece(Pawn, White),
+                White => self.board[rank_to as usize + 1][file_to as usize] = Piece(Pawn, Black),
+            }
         }
         else {
-            self.board[rank_to as usize][file_to as usize] = Piece(Empty, White);
+            if c_move.prom.is_some() {
+                self.board[rank_from as usize][file_from as usize] = 
+                    Piece(Pawn, color);
+            }
+            else {
+                self.board[rank_from as usize][file_from as usize] =
+                    self.board[rank_to as usize][file_to as usize];
+            }
+            
+            if c_move.capture != Empty
+            {
+                self.board[rank_to as usize][file_to as usize] =
+                    Piece(c_move.capture, self.to_move);
+            }
+            else {
+                self.board[rank_to as usize][file_to as usize] = Piece(Empty, White);
+            }
         }
         self.castling_en_passant = c_move.old_castling_en_passant;
         self.half_move_clock = c_move.old_half_move_clock;

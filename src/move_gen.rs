@@ -7,8 +7,8 @@ use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 use board::std_board::Color::*;
 
+#[inline(never)]
 pub fn all_legal_moves (board : &mut Board) -> Vec<Move> {
-    println!("Finding all legal moves on board: {}", board);
     let mut moves = Vec::new();
     let king_pos = king_pos(board);
     let is_in_check = is_attacked(board, king_pos);
@@ -27,18 +27,14 @@ pub fn all_legal_moves (board : &mut Board) -> Vec<Move> {
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Takes in the king position for the moving player, and whether they are currently in check,
 /// to speed up the move generation
-#[inline]
 fn legal_moves_for_piece(board : &mut Board, square : Square, moves : &mut Vec<Move>,
                          is_in_check : bool, king_pos : Square) { 
     let Piece(piece, color) = board.piece_at(square);
     
     debug_assert!(color == board.to_move && piece != Empty);
-
-    println!("Finding legal moves for the {} {} on {}", board.to_move,
-             board.piece_at(square).0, square);
     
     match piece {
-        King => legal_moves_for_king(board, square, moves, is_in_check, king_pos),
+        King => legal_moves_for_king(board, square, moves),
         
         Queen =>  {
             add_moves_diagonally (board, square, moves, king_pos, is_in_check);
@@ -84,8 +80,7 @@ fn add_crazyhouse_moves(board : &mut Board, square : Square, moves : &mut Vec<Mo
 
 }
 
-fn legal_moves_for_king(board : &mut Board, square : Square, moves : &mut Vec<Move>,
-                        is_in_check : bool, king_pos : Square) {
+fn legal_moves_for_king(board : &mut Board, square : Square, moves : &mut Vec<Move>) {
     
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
@@ -157,8 +152,6 @@ fn legal_moves_for_king(board : &mut Board, square : Square, moves : &mut Vec<Mo
             let c_move = Move::new(board, square, Square(new_pos));
 
             if piece_to == Empty || color_to != board.to_move {
-                println!("King can move to {}, onto a {} {}, on: {}",
-                         Square(new_pos), color_to, piece_to, board);
                 add_if_legal_simple(board, c_move,  moves);
             }
         }
