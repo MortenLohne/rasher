@@ -117,7 +117,7 @@ fn open_log_file (log_writer : &SharableWriter) {
                 println!("Created log file");
                 *inner_writer = Some(io::BufWriter::new(log_file));
             },
-            Err(err) => panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
+            Err(err) => (), //panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
         }
     }
 }
