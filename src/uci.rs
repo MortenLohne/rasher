@@ -16,6 +16,7 @@ use std::io::Write;
 use std::{fs, path, process};
 
 pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
+type Board = ChessBoard;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"

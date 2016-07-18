@@ -3,7 +3,6 @@ use ::Score;
 use ::Score::*;
 
 use uci;
-use move_gen;
 
 use board::std_board::*;
 use board::std_move::Move;
@@ -74,11 +73,11 @@ pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>
 }
 
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
+fn find_best_move_ab<B> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
                       time_restriction : uci::TimeRestriction )
                       -> (Score, Vec<Move>, NodeCount) {
 
-    fn find_best_move_ab_rec (board: &mut Board, depth : u8, mut alpha : Score, mut beta : Score,
+    fn find_best_move_ab_rec<B> (board: &mut B, depth : u8, mut alpha : Score, mut beta : Score,
                               engine_comm : &Mutex<uci::EngineComm>,
                               time_restriction : uci::TimeRestriction,
                               node_counter : &mut NodeCount)
@@ -97,7 +96,7 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
         if depth == 0 {
             node_counter.leaf += 1;
             node_counter.total += 1;
-            return (::score_board(&board), vec![]);
+            return (board.score_board(), vec![]);
         }
         else {
             node_counter.intern += 1;
@@ -125,11 +124,12 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
         let mut best_move = None;
         let mut best_line = vec![];
         
-        let legal_moves = move_gen::all_legal_moves(board);
+        let legal_moves = board.all_legal_moves();
         
         // Check if the player is checkmated or in stalemate
         if legal_moves.len() == 0 {
-            if move_gen::is_attacked(board, board.king_pos()) {
+            return (board.is_mate_or_stalemate(), vec![])
+            /*if move_gen::is_attacked(board, board.king_pos()) {
                 if color == White {
                     return (MateB(0), vec![]);
                 }
@@ -139,7 +139,7 @@ fn find_best_move_ab (board : &mut Board, depth : u8, engine_comm : &Mutex<uci::
             }
             else {
                 return (Draw(0), vec![]);
-            }
+            }*/
         }
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR

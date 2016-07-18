@@ -2,7 +2,6 @@
 mod uci;
 mod board;
 mod tests;
-mod move_gen;
 mod monte_carlo;
 mod alpha_beta;
 
@@ -34,7 +33,6 @@ fn main() {
         match &input[..] {
             "uci\n" => {
                 let mut log_writer = Arc::new(Mutex::new(None));
-
                 match uci::connect_engine(&log_writer) {
                     Ok(_) => (),
                     Err(e) => {
@@ -175,6 +173,7 @@ pub enum Score {
     MateW(u8),
     MateB(u8),
 }
+
 impl Display for Score {
     fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
         let _ = match self {
@@ -209,45 +208,3 @@ impl PartialOrd for Score {
         }
     }
 }
-#[inline(never)]
-fn score_board (board : &Board) -> Score {
-    const POS_VALS : [[u8; 8]; 8] = 
-        [[0, 0, 0, 0, 0, 0, 0, 0],
-         [0, 1, 1, 1, 1, 1, 1, 0],
-         [0, 1, 2, 2, 2, 2, 1, 0],
-         [0, 1, 2, 3, 3, 2, 1, 0],
-         [0, 1, 2, 3, 3, 2, 1, 0],
-         [0, 1, 2, 2, 2, 2, 1, 0],
-         [0, 1, 1, 1, 1, 1, 1, 0],
-         [0, 0, 0, 0, 0, 0, 0, 0]];
-    /*let center_proximity = |file, rank| {
-    (3.5f32).powi(2) - ((3.5 - file as f32).powi(2) + (3.5 - rank as f32).powi(2)).sqrt()
-    };*/
-    let mut value = 0.0;
-    for rank in 0..8 {
-        for file in 0..8 {
-            let piece_val = board.board[rank][file].value();
-            let pos_val = POS_VALS[rank][file] as f32 *
-                match board.board[rank][file] {
-                    Piece(Bishop, White) => 0.15,
-                    Piece(Bishop, Black) => -0.15,
-                    Piece(Knight, White) => 0.3,
-                    Piece(Knight, Black) => -0.3,
-                    Piece(Queen, White) => 0.3,
-                    Piece(Queen, Black) => -0.3,
-                    Piece(Pawn, White) => 0.00,
-                    Piece(Pawn, Black) => -0.00,
-                    _ => 0.0,
-                };
-            let pawn_val = match board.board[rank][file] {
-                Piece(Pawn, _) => (rank as f32 - 3.5) * -0.1,
-                _ => 0.0,
-            };
-            value += piece_val + pos_val + pawn_val;
-            //println!("Value at {} is {}, {}, total: {}",
-            //         Square::from_ints(file as u8, rank as u8), piece_val, pos_val, value);
-        }
-    }
-    Val(value)
-}
-

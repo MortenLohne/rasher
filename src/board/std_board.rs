@@ -1,6 +1,8 @@
 use self::PieceType::*;
 use self::Color::*;
-use board::std_move::Move;
+use board::std_move;
+
+use board::std_move_gen::move_gen;
 
 use std;
 use std::collections::HashMap;
@@ -141,13 +143,13 @@ impl Square {
 // use std::hash::{Hash, Hasher, SipHasher};
 
 #[derive(Clone, Eq, Debug, PartialEq)]
-pub struct Board {
+pub struct ChessBoard {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,
     pub castling_en_passant : u8,
     pub half_move_clock : u8,
     pub move_num : u16,
-    pub moves : Vec<Move>,
+    pub moves : Vec<std_move::Move>,
     //pub hash : Option<Hasher>,
 }
 
@@ -157,128 +159,77 @@ pub struct Board {
     }
 }*/
 
-impl fmt::Display for Board {
-    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt.write_str("\n").unwrap();
-        for rank in self.board.iter() {
-            for piece in rank.iter() {
-                let _ = fmt.write_str(&format!("[{}]", piece));
-            }
-            let _ = fmt.write_str("\n");
-        }
-        fmt.write_str(&format!("To move: {}, flags: {:b}\n", self.to_move,
-                              self.castling_en_passant)).unwrap();
-        for c_move in &self.moves {
-            let _ = fmt.write_str(&format!("[{}],", &c_move));
-        }
-        Ok(())   
-    }
-}
-impl Board {
+use ::Score;
 
-    pub fn new(pieces: [[Piece; 8]; 8]) -> Self {
-        Board { board: pieces, to_move: White, castling_en_passant: 0,
-                half_move_clock: 0, move_num: 0, moves: vec![] }
-    }
-    
-    #[inline]
-    pub fn piece_at(&self, square : Square) -> Piece {
-        let Square(i) = square;
-        debug_assert!(i < 64, format!("Tried to find piece at pos {}!", i));
-        self.board[i as usize >> 3][i as usize & 0b0000_0111]
-    }
-    /// Returns a clone of the board, viewed from the other side.
-    /// This screws up everything related to pawn movement, castling, etc,
-    /// and should only be used to print the board as seen from the black side
-    #[allow(dead_code)]
-    pub fn upside_down(&self) -> Board {
-        let mut new_board = self.clone();
-        for i in 0..8 {
-            new_board.board[i] = self.board[7-i].clone();
-            for j in 0..8 {
-                new_board.board[i][j] = self.board[7-i][7-j];
-            }
-        }
-        new_board
-    }
+impl ::board::Board for ChessBoard {
 
-    pub fn king_pos(&self) -> Square {
-        self.pos_of(Piece(King, self.to_move)).unwrap()
-    }
+    type Move = std_move::Move;
     
-    pub fn pos_of(&self, piece : Piece) -> Option<Square> {
-        for i in 0..64 {
-            if self.piece_at(Square(i)) == piece {
-                return Some(Square(i));
-            }
-        }
-        None
-    }
-    pub fn disable_castling(&mut self, color: Color) {
-        match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
-        }
-    }
-    pub fn disable_castling_queenside(&mut self, color: Color) {
-        match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1101,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0111,
-        }
-    }
-    pub fn disable_castling_kingside(&mut self, color: Color) {
-        match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1110,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_1011,
-        }
-    }
-    
-    pub fn can_castle_kingside(&self, color: Color) -> bool {
-        match color {
-            White => self.castling_en_passant & 0b0000_0001 > 0,
-            Black => self.castling_en_passant & 0b0000_0100 > 0,
-        }
-    }
-    pub fn can_castle_queenside(&self, color: Color) -> bool {
-        match color {
-            White => self.castling_en_passant & 0b0000_0010 > 0,
-            Black => self.castling_en_passant & 0b0000_1000 > 0,
-        }
-    }
-    
-    pub fn en_passant_square(&self) -> Option<Square> {
-        if self.castling_en_passant & 0b1111_0000 != 0 {
-            let rank = if self.to_move == Black { 5 } else { 2 };
-            let file = (self.castling_en_passant & 0b0111_1111) >> 4;
-            debug_assert!(file < 8);
-
-            Some(Square::from_ints(file, rank))
-        }
-        else { None }
-    }
-
-    pub fn set_en_passant_square(&mut self, square: Option<Square>) {
-        
-        match square {
-            Some(square) => {
-                let (mut byte, _) = square.file_rank();
-                byte = byte | 0b1000_0000;
-                //println!("byte << 4 was {:b}, byte={:b}", byte << 4, byte);
-                self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
-                //println!("Bitmap set to {:b}", self.castling_en_passant);
-                //panic!();
-            },
-            None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
-        }
-    }
-
-    
-    // Creates a new board from a given FEN string
-    pub fn from_fen (fen : &str) -> Result<Board, String> {
+    pub fn from_fen (fen : &str) -> Result<Self, String> {
         ::uci::parse_fen(fen)
     }
 
-    pub fn do_move(&mut self, c_move : Move) {
+    pub fn all_legal_moves(&mut self) -> Vec<std_move::Move> {
+        move_gen::all_legal_moves(self)
+    }
+    
+    pub fn is_mate_or_stalemate(&self) -> Score {
+        if move_gen::is_attacked(self, self.king_pos()) {
+            if self.color == White {
+                Score::MateB(0)
+            }
+            else {
+                Score::MateW(0)
+            }
+        }
+        else {
+            Score::Draw(0)
+        }
+    }
+    
+    #[inline(never)]
+    fn score_board (&self) -> Score {
+        const POS_VALS : [[u8; 8]; 8] = 
+            [[0, 0, 0, 0, 0, 0, 0, 0],
+             [0, 1, 1, 1, 1, 1, 1, 0],
+             [0, 1, 2, 2, 2, 2, 1, 0],
+             [0, 1, 2, 3, 3, 2, 1, 0],
+             [0, 1, 2, 3, 3, 2, 1, 0],
+             [0, 1, 2, 2, 2, 2, 1, 0],
+             [0, 1, 1, 1, 1, 1, 1, 0],
+             [0, 0, 0, 0, 0, 0, 0, 0]];
+        /*let center_proximity = |file, rank| {
+        (3.5f32).powi(2) - ((3.5 - file as f32).powi(2) + (3.5 - rank as f32).powi(2)).sqrt()
+    };*/
+        let mut value = 0.0;
+        for rank in 0..8 {
+            for file in 0..8 {
+                let piece_val = self.board[rank][file].value();
+                let pos_val = POS_VALS[rank][file] as f32 *
+                    match self.board[rank][file] {
+                        Piece(Bishop, White) => 0.15,
+                        Piece(Bishop, Black) => -0.15,
+                        Piece(Knight, White) => 0.3,
+                        Piece(Knight, Black) => -0.3,
+                        Piece(Queen, White) => 0.3,
+                        Piece(Queen, Black) => -0.3,
+                        Piece(Pawn, White) => 0.00,
+                        Piece(Pawn, Black) => -0.00,
+                        _ => 0.0,
+                    };
+                let pawn_val = match self.board[rank][file] {
+                    Piece(Pawn, _) => (rank as f32 - 3.5) * -0.1,
+                    _ => 0.0,
+                };
+                value += piece_val + pos_val + pawn_val;
+                //println!("Value at {} is {}, {}, total: {}",
+                //         Square::from_ints(file as u8, rank as u8), piece_val, pos_val, value);
+            }
+        }
+        Score::Val(value)
+    }
+
+    pub fn do_move(&mut self, c_move : Self::Move) {
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
@@ -393,7 +344,7 @@ impl Board {
         
         self.to_move = !self.to_move;
     }
-    pub fn undo_move(&mut self, c_move : Move) {
+    pub fn undo_move(&mut self, c_move : Self::Move) {
         
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
@@ -466,6 +417,125 @@ impl Board {
 
         self.to_move = !self.to_move;
     }
+    
+}
+
+impl fmt::Display for ChessBoard {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.write_str("\n").unwrap();
+        for rank in self.board.iter() {
+            for piece in rank.iter() {
+                let _ = fmt.write_str(&format!("[{}]", piece));
+            }
+            let _ = fmt.write_str("\n");
+        }
+        fmt.write_str(&format!("To move: {}, flags: {:b}\n", self.to_move,
+                              self.castling_en_passant)).unwrap();
+        for c_move in &self.moves {
+            let _ = fmt.write_str(&format!("[{}],", &c_move));
+        }
+        Ok(())   
+    }
+}
+impl ChessBoard {
+
+    pub fn new(pieces: [[Piece; 8]; 8]) -> Self {
+        ChessBoard { board: pieces, to_move: White, castling_en_passant: 0,
+                half_move_clock: 0, move_num: 0, moves: vec![] }
+    }
+    
+    #[inline]
+    pub fn piece_at(&self, square : Square) -> Piece {
+        let Square(i) = square;
+        debug_assert!(i < 64, format!("Tried to find piece at pos {}!", i));
+        self.board[i as usize >> 3][i as usize & 0b0000_0111]
+    }
+    /// Returns a clone of the board, viewed from the other side.
+    /// This screws up everything related to pawn movement, castling, etc,
+    /// and should only be used to print the board as seen from the black side
+    #[allow(dead_code)]
+    pub fn upside_down(&self) -> Self {
+        let mut new_board = self.clone();
+        for i in 0..8 {
+            new_board.board[i] = self.board[7-i].clone();
+            for j in 0..8 {
+                new_board.board[i][j] = self.board[7-i][7-j];
+            }
+        }
+        new_board
+    }
+
+    pub fn king_pos(&self) -> Square {
+        self.pos_of(Piece(King, self.to_move)).unwrap()
+    }
+    
+    pub fn pos_of(&self, piece : Piece) -> Option<Square> {
+        for i in 0..64 {
+            if self.piece_at(Square(i)) == piece {
+                return Some(Square(i));
+            }
+        }
+        None
+    }
+    pub fn disable_castling(&mut self, color: Color) {
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
+        }
+    }
+    pub fn disable_castling_queenside(&mut self, color: Color) {
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1101,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0111,
+        }
+    }
+    pub fn disable_castling_kingside(&mut self, color: Color) {
+        match color {
+            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1110,
+            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_1011,
+        }
+    }
+    
+    pub fn can_castle_kingside(&self, color: Color) -> bool {
+        match color {
+            White => self.castling_en_passant & 0b0000_0001 > 0,
+            Black => self.castling_en_passant & 0b0000_0100 > 0,
+        }
+    }
+    pub fn can_castle_queenside(&self, color: Color) -> bool {
+        match color {
+            White => self.castling_en_passant & 0b0000_0010 > 0,
+            Black => self.castling_en_passant & 0b0000_1000 > 0,
+        }
+    }
+    
+    pub fn en_passant_square(&self) -> Option<Square> {
+        if self.castling_en_passant & 0b1111_0000 != 0 {
+            let rank = if self.to_move == Black { 5 } else { 2 };
+            let file = (self.castling_en_passant & 0b0111_1111) >> 4;
+            debug_assert!(file < 8);
+
+            Some(Square::from_ints(file, rank))
+        }
+        else { None }
+    }
+
+    pub fn set_en_passant_square(&mut self, square: Option<Square>) {
+        
+        match square {
+            Some(square) => {
+                let (mut byte, _) = square.file_rank();
+                byte = byte | 0b1000_0000;
+                //println!("byte << 4 was {:b}, byte={:b}", byte << 4, byte);
+                self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
+                //println!("Bitmap set to {:b}", self.castling_en_passant);
+                //panic!();
+            },
+            None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
+        }
+    }
+
+   
 }
 
 // Stores time information for the game, in milliseconds
@@ -479,7 +549,7 @@ pub struct TimeInfo {
 }
 
 lazy_static! {
-    pub static ref START_BOARD: Board = {
+    pub static ref START_BOARD: ChessBoard = {
         
         let mut board = [[Piece(Empty, White); 8]; 8];
         board[0] = [Piece(Rook, Black), Piece(Knight, Black), Piece(Bishop, Black),
@@ -491,7 +561,7 @@ lazy_static! {
             let Piece(p_type, _) = board[0][i];
             board[7][i] = Piece(p_type, White);
         }
-        Board {board : board, to_move : White, castling_en_passant : 0b0000_1111,
+        ChessBoard {board : board, to_move : White, castling_en_passant : 0b0000_1111,
                half_move_clock : 0, move_num : 0 , moves : vec![]}
     };
     

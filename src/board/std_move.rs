@@ -4,6 +4,8 @@ use board::std_board::*;
 
 use std::fmt;
 
+type Board = ChessBoard;
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Move {
     pub from : Square,
