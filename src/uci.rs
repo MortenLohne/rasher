@@ -16,6 +16,7 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::io::Write;
 use std::{fs, process};
+use std::str::FromStr;
 
 pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
 
@@ -31,7 +32,7 @@ pub trait UciMove : Sized {
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine(log_writer : &SharableWriter) -> Result<(),String> {
+pub fn connect_engine(log_writer : &SharableWriter) -> Result<(), String> {
 
     open_log_file(log_writer);
 
@@ -40,6 +41,9 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(),String> {
     uci_send("id name morten_chess", log_writer);
     
     uci_send("option name Write Debug Log type check default true", log_writer);
+    uci_send("option name Variant type string", log_writer);
+    uci_send("option name Hash type spin default 64 min 16 max 32768", log_writer);
+    uci_send("option name Threads type spin default 2 min 1 max 16", log_writer);
     
     uci_send("uciok", log_writer);
     
@@ -136,35 +140,6 @@ fn open_log_file (log_writer : &SharableWriter) {
     }
 }
 
-fn parse_setoption (input : &str, log_writer : &SharableWriter) -> Result<(), String> {
-    assert!(input.contains("name") && input.contains("value"));
-    let mut input_iter = input.split_whitespace();
-    assert!(input_iter.next() == Some("setoption") && input_iter.next() == Some("name"));
-    let option_name : String = input.split_whitespace()
-        .skip(2)
-        .take_while(|token| token != &"value")
-        .collect();
-    
-    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
-    match &option_name.to_lowercase()[..] {
-        "write debug log" => {
-            match &value.to_lowercase()[..] {
-                "true" => open_log_file(log_writer),
-                "false" => {
-                    let mut inner_writer = log_writer.lock().unwrap();
-                    *inner_writer = None;
-                },
-                _ => to_log(&format!("Unrecognized value {} in option {}, ignoring...", 
-                                     value, option_name), log_writer),
-            }
-        },
-        _ => to_log(&format!("Unrecognized option {} with value {}, ignoring...", 
-                             option_name, value), log_writer),
-    }
-    Ok(())
-    
-}
-
 enum ChessVariant {
     Standard,
     Crazyhouse,
@@ -187,24 +162,72 @@ impl EngineOptions {
 // be changed during engine initialization, these should be set here
 fn parse_setoption_init (input: &str, options: &mut EngineOptions, log_writer : &SharableWriter)
                              -> Result<(), String> {
-    assert!(input.contains("name") && input.contains("value"));
-    let mut input_iter = input.split_whitespace();
-    assert!(input_iter.next() == Some("setoption") && input_iter.next() == Some("name"));
-    let option_name : String = input.split_whitespace()
-        .skip(2)
-        .take_while(|token| token != &"value")
-        .collect();
 
-    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
+    let (option_name, value) = try!(parse_setoption_data(input));
+
     match &option_name.to_lowercase()[..] {
-        "variant" => match &value.to_lowercase()[..] {
+        "Variant" => match &value.to_lowercase()[..] {
             "standard" => options.variant = ChessVariant::Standard,
             "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
+        "Threads" => {
+            let threads = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
+            options.threads = threads;
+        }
+
+        "Hash" => {
+            let hash = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
+            options.hash_memory = hash;
+        }
+        // If no init-only option matches, try the other ones
         s => try!(parse_setoption(s, log_writer)),
     }
     Ok(())
+}
+
+// Parse "setoption" strings from the GUI. Most options (# of cores etc) can only
+// be changed during engine initialization.
+// A few, like debug logs, can be toggled while the engine is running
+fn parse_setoption (input : &str, log_writer : &SharableWriter) -> Result<(), String> {
+    
+    let (option_name, value) = try!(parse_setoption_data(input));
+
+    match &option_name.to_lowercase()[..] {
+        "write debug log" => {
+            match &value.to_lowercase()[..] {
+                "true" => open_log_file(log_writer),
+                "false" => {
+                    let mut inner_writer = log_writer.lock().unwrap();
+                    *inner_writer = None;
+                },
+                _ => to_log(&format!("Unrecognized value {} in option {}, ignoring...", 
+                                     value, option_name), log_writer),
+            }
+        },
+        _ => to_log(&format!("Unrecognized option {} with value {}, ignoring...", 
+                             option_name, value), log_writer),
+    }
+    Ok(())
+}
+
+///Helper method for parsing a setoption string into the option's name and value
+fn parse_setoption_data(input : &str) -> Result<(String, String), String> {
+    if !(input.contains("name") && input.contains("value")) {
+        return Err("Setoption string did not include name and value".to_string());
+    }
+    let mut input_iter = input.split_whitespace();
+    if input_iter.next() != Some("setoption") || input_iter.next() != Some("name") {
+        return Err("Setoption string did not start with \"setoption name\"".to_string())
+    }
+    let option_name : String = input.split_whitespace()
+        .skip(2)
+        .take_while(|token| token != &"value")
+        .collect();
+    
+    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
+    
+    Ok((option_name, value))    
 }
 
 pub fn parse_go (input : &str, log_writer : &SharableWriter)

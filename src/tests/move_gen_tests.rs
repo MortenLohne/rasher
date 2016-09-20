@@ -5,13 +5,14 @@ use board::std_move::ChessMove;
 use board::game_move::Move;
 use board::board::Board;
 
+use uci;
+#[allow(unused_imports)]
+use uci::UciBoard;
+
 use alpha_beta;
 use super::super::board::std_move_gen::move_gen;
 
 extern crate time;
-
-use uci;
-use uci::UciBoard;
 
 use std::sync::{Arc, Mutex};
 
