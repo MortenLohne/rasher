@@ -4,17 +4,17 @@ use ::Score::*;
 
 use uci;
 
-use board::std_board::*;
-use board::std_move::Move;
-use board::std_board::Color::*;
+use board::board::Board;
+use board::game_move::Move;
+use board::board::Color::*;
 
 extern crate time;
 use std::sync::{Arc, Mutex};
 
-pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>>,
+pub fn search_moves<B: Board> (mut board : B, engine_comm : Arc<Mutex<uci::EngineComm>>,
                  time_restriction : uci::TimeRestriction,
                  mut log_writer : uci::SharableWriter) 
-                     -> (Score, Vec<Move>, NodeCount) {
+                     -> (Score, Vec<B::Move>, NodeCount) {
     
     engine_comm.lock().unwrap().engine_is_running = true;
     
@@ -39,7 +39,7 @@ pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>
         let ms_taken = (time::get_time() - start_time).num_milliseconds();
 
         if moves.len() > 0 {
-            engine_comm.lock().unwrap().best_move = Some(moves[0]);
+            engine_comm.lock().unwrap().best_move = Some(moves[0].to_alg());
         }
         else {
             uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
@@ -50,9 +50,9 @@ pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>
                          ms_taken, score, moves, node_count);
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => { 
-                if (board.to_move == Black && 
+                if (board.to_move() == Black && 
                     ms_taken as u32 > info.black_inc / 5 + info.black_time / 50) ||
-                    (board.to_move == White && 
+                    (board.to_move() == White && 
                      ms_taken as u32 > info.white_inc / 5 + info.white_time / 50)
                 {
                     break;
@@ -64,24 +64,29 @@ pub fn search_moves (mut board : Board, engine_comm : Arc<Mutex<uci::EngineComm>
             _ => (),
         }
     }
-    uci::uci_send(&format!("bestmove {}", engine_comm.lock().unwrap().best_move.unwrap().to_alg()), 
-             &mut log_writer);
-    engine_comm.lock().unwrap().engine_is_running = false;
-
+    {
+        let mut engine_comm = engine_comm.lock().unwrap();
+        uci::uci_send(&format!("bestmove {}", engine_comm.best_move.clone().unwrap()), 
+                      &mut log_writer);
+        engine_comm.engine_is_running = false;
+        
+    }
     (best_score.unwrap(), best_moves.unwrap(), best_node_count.unwrap())
     
 }
 
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab<B> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
-                      time_restriction : uci::TimeRestriction )
-                      -> (Score, Vec<Move>, NodeCount) {
+fn find_best_move_ab<B: Board> (board : &mut B, depth : u8, 
+                                engine_comm : &Mutex<uci::EngineComm>,
+                                time_restriction : uci::TimeRestriction )
+                                -> (Score, Vec<B::Move>, NodeCount) {
 
-    fn find_best_move_ab_rec<B> (board: &mut B, depth : u8, mut alpha : Score, mut beta : Score,
-                              engine_comm : &Mutex<uci::EngineComm>,
-                              time_restriction : uci::TimeRestriction,
-                              node_counter : &mut NodeCount)
-                              -> (Score, Vec<Move>) {
+    fn find_best_move_ab_rec<B: Board> (board: &mut B, depth : u8, 
+                                        mut alpha : Score, mut beta : Score,
+                                        engine_comm : &Mutex<uci::EngineComm>,
+                                        time_restriction : uci::TimeRestriction,
+                                        node_counter : &mut NodeCount)
+                                        -> (Score, Vec<B::Move>) {
         use uci::TimeRestriction::*;
 
         if node_counter.total % 1024 == 0 {
@@ -108,6 +113,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::E
             Depth(_) => (),
             Nodes(n) => if node_counter.total > n {
                 engine_comm.lock().unwrap().engine_is_running = false;
+                // TODO: Actually stop here
                 //return (::score_board(&board), vec![]);
             },
             Mate(_) => (),
@@ -115,12 +121,13 @@ fn find_best_move_ab<B> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::E
             Infinite => (),
         };
         
-        if board.half_move_clock > 50 {
+        /*if board.half_move_clock > 50 {
             return (Draw(0), vec![]);
-        }
+        }*/
+        // TODO: Add this back, preferably by adding is_game_over() to the trait
         
         // Helpful alias
-        let color = board.to_move;
+        let color = board.to_move();
         let mut best_move = None;
         let mut best_line = vec![];
         
@@ -149,12 +156,12 @@ fn find_best_move_ab<B> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::E
                     break;
                 }
             else {
-                board.do_move(c_move);
+                let undo_move : <B as Board>::UndoMove = board.do_move(c_move.clone());
                 let (tried_score, tried_line) =
                     
                     find_best_move_ab_rec( board, depth - 1, alpha, beta,
                                             engine_comm, time_restriction, node_counter);
-                board.undo_move(c_move);
+                board.undo_move(undo_move);
                 
                 if color == White && tried_score > alpha {
                     alpha = tried_score;

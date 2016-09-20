@@ -1,9 +1,11 @@
 #[allow(unused_imports)]
 use board::std_board::PieceType::*;
-use board::std_board::Color::*;
+use board::board::Color::*;
 use board::std_board::*;
 use board::std_board;
-use board::std_move::Move;
+use board::std_move::ChessMove;
+use board::board::Board;
+use board::game_move;
 use alpha_beta;
 use ::Score;
 
@@ -13,10 +15,19 @@ use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
 use std::io::Write;
-use std::{fs, path, process};
+use std::{fs, process};
 
 pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
-type Board = ChessBoard;
+
+pub trait UciBoard : Sized {
+    fn from_fen(&str) -> Result<Self, String>;
+    fn to_fen(&self) -> String;
+}
+
+pub trait UciMove : Sized {
+    fn from_alg(&str) -> Result<Self, String>;
+    fn to_alg(&self) -> String;
+}
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
@@ -52,14 +63,15 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(),String> {
             "stop" => {
                 let mut engine_comm = engine_comm.lock().unwrap();
                 engine_comm.engine_should_stop = true;
-                let best_move : Move = match engine_comm.best_move.clone() {
+                let best_move : String = match engine_comm.best_move.clone() {
                     Some(mv) => mv,
                     None => {
-                        to_log(&"Haven't found a move yet: ignoring stop command.", log_writer);
-                        continue;
+                        to_log(&"Haven't found a move yet: stopping without .", log_writer);
+                        "null".to_string()
                     },
                 };
-                uci_send(&format!("bestmove {}", best_move.to_alg()), log_writer);
+                uci_send(&format!("bestmove {}", best_move), log_writer);
+                return Ok(())
             },
             "go" => {
                 let board = try!(board.clone().ok_or("Received go command without receiving a position first. Exiting..."));
@@ -89,7 +101,7 @@ pub enum TimeRestriction {
 pub struct EngineComm {
     pub engine_should_stop : bool,
     pub engine_is_running : bool,
-    pub best_move : Option<Move>,
+    pub best_move : Option<String>,
 }
 
 impl EngineComm {
@@ -98,12 +110,13 @@ impl EngineComm {
     }
 }
 
-fn start_engine (board : Board, log_writer : SharableWriter,
-                 time_restriction : TimeRestriction, engine_comm : Arc<Mutex<EngineComm>>) {
+fn start_engine<B: 'static + Board> (board : B, log_writer : SharableWriter,
+                           time_restriction : TimeRestriction, 
+                           engine_comm : Arc<Mutex<EngineComm>>) {
     engine_comm.lock().unwrap().engine_is_running = true;
-
+    let cloned_board = board.clone();
     thread::spawn (move || {
-        alpha_beta::search_moves(board, engine_comm,
+        alpha_beta::search_moves(cloned_board, engine_comm,
                        time_restriction, log_writer);
     });
 }
@@ -118,7 +131,7 @@ fn open_log_file (log_writer : &SharableWriter) {
                 println!("Created log file");
                 *inner_writer = Some(io::BufWriter::new(log_file));
             },
-            Err(err) => (), //panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
+            Err(_) => (), //panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
         }
     }
 }
@@ -157,6 +170,7 @@ enum ChessVariant {
     Crazyhouse,
 }
 
+// Options set in the UCI engine
 struct EngineOptions {
     variant: ChessVariant,
     threads: u32,
@@ -257,9 +271,9 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
 
 /// Sends the engine's evaluation to the GUI via uci, along with other data
 /// like node count, time taken, etc
-pub fn send_eval_to_gui (log_writer : &SharableWriter, depth : u8,
+pub fn send_eval_to_gui<M: game_move::Move> (log_writer : &SharableWriter, depth : u8,
                          ms_taken : i64, 
-                         score : Score, moves : Vec<Move>, node_count : ::NodeCount) {
+                         score : Score, moves : Vec<M>, node_count : ::NodeCount) {
     let eng_score = match score {
         Score::Val(f) => "cp ".to_string() + &((100.0 * f) as i16).to_string(),
         Score::MateW(n) => "mate ".to_string() + &(n as i16 / 2).to_string(),
@@ -331,7 +345,7 @@ fn get_engine_input(log_writer : &SharableWriter) -> String {
 /// Turns the whole position string from the GU (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position(input : &String, log_writer : &SharableWriter)
-                  -> Result<std_board::Board, String> {
+                  -> Result<std_board::ChessBoard, String> {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
@@ -362,7 +376,7 @@ fn parse_position(input : &String, log_writer : &SharableWriter)
         if words.len() > moves_pos  {
             if words[moves_pos] == "moves" {
                 for c_move_str in words.iter().skip(moves_pos + 1) {
-                    let c_move = match Move::from_short_alg(c_move_str) {
+                    let c_move = match ChessMove::from_short_alg(c_move_str) {
                         Ok(m) => m,
                         Err(err) => {
                             to_log(&err, log_writer);
@@ -382,7 +396,7 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
     }
 }
     
-pub fn parse_fen (fen : &str) -> Result<std_board::Board, String> {
+pub fn parse_fen (fen : &str) -> Result<std_board::ChessBoard, String> {
     let mut board = START_BOARD.clone();
     board.board = [[Piece(Empty, White); 8]; 8];
     

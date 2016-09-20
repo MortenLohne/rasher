@@ -1,4 +1,3 @@
-#![feature(test)]
 mod uci;
 mod board;
 mod tests;
@@ -8,10 +7,6 @@ mod alpha_beta;
 extern crate time;
 
 use Score::*;
-use board::std_board::*;
-
-use board::std_board::PieceType::*;
-use board::std_board::Color::*;
 
 use std::sync::{Arc, Mutex};
 use std::io;
@@ -44,8 +39,8 @@ fn main() {
             
             "mem usage\n" => {
                 use std::mem;
-                println!("Standard board: {}", mem::size_of::<Board>());
-                println!("Standard move: {}", mem::size_of::<board::std_move::Move>());
+                println!("Standard board: {}", mem::size_of::<board::std_board::ChessBoard>());
+                println!("Standard move: {}", mem::size_of::<board::std_move::ChessMove>());
                 println!("Standard piece: {}", mem::size_of::<board::std_board::Piece>());
                 println!("Board score: {}", mem::size_of::<Score>());
                 
@@ -105,7 +100,7 @@ fn play_human() {
             let legal_moves = move_gen::all_legal_moves(&board);
             // Loop until user enters a valid move
             loop {
-                match Move::from_alg(&input_str) {
+                match ChessMove::from_alg(&input_str) {
                     Ok(val) => {
                         let mut is_legal = false;
                         for c_move in legal_moves.iter() {
@@ -128,7 +123,7 @@ fn play_human() {
                     
             }
 
-            let c_move = Move::from_alg(&input_str).unwrap();
+            let c_move = ChessMove::from_alg(&input_str).unwrap();
             println!("Doing move");
             board = board.do_move(c_move);
             

@@ -1,7 +1,7 @@
-use board::std_move::Move;
+use board::std_move::ChessMove;
 use board::std_board::*;
 
 enum CrazyHouseMove {
-    NormalMove(Move),
+    NormalMove(ChessMove),
     CrazyMove(PieceType, Square),
 }

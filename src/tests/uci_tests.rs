@@ -1,8 +1,10 @@
-use board::std_board::*;
-use uci;
+
+
 
 #[test]
 fn parse_go_test() {
+    use board::std_board::*;
+    use uci;
     use uci::TimeRestriction;
     use std::sync;
 

@@ -1,39 +1,13 @@
 use self::PieceType::*;
-use self::Color::*;
 use board::std_move;
-
+use board::board::Board;
 use board::std_move_gen::move_gen;
+use board::board::Color;
+use board::board::Color::*;
 
 use std;
 use std::collections::HashMap;
 use std::fmt;
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Color {
-    White,
-    Black,
-}
-impl std::ops::Not for Color {
-    type Output = Color;
-
-    fn not(self) -> Self {
-        match self {
-            White => Black,
-            Black => White,
-        }
-    }
-} 
-
-impl fmt::Display for Color {
-    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let _ = fmt.write_str( match self {
-            &White => ("White"),
-            &Black => ("Black"),
-        });
-        
-        Ok(())   
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PieceType {
@@ -149,7 +123,7 @@ pub struct ChessBoard {
     pub castling_en_passant : u8,
     pub half_move_clock : u8,
     pub move_num : u16,
-    pub moves : Vec<std_move::Move>,
+    pub moves : Vec<std_move::ChessMove>,
     //pub hash : Option<Hasher>,
 }
 
@@ -161,21 +135,32 @@ pub struct ChessBoard {
 
 use ::Score;
 
-impl ::board::Board for ChessBoard {
-
-    type Move = std_move::Move;
-    
-    pub fn from_fen (fen : &str) -> Result<Self, String> {
+impl ::uci::UciBoard for ChessBoard {
+    fn from_fen(fen : &str) -> Result<Self, String> {
         ::uci::parse_fen(fen)
     }
+    // TODO: Implement
+    fn to_fen(&self) -> String {
+        panic!()
+    }
+}
 
-    pub fn all_legal_moves(&mut self) -> Vec<std_move::Move> {
+impl Board for ChessBoard {
+
+    type Move = std_move::ChessMove;
+    type UndoMove = std_move::ChessMove;
+
+    fn to_move(&self) -> Color {
+        self.to_move
+    }
+
+    fn all_legal_moves(&mut self) -> Vec<Self::Move> {
         move_gen::all_legal_moves(self)
     }
     
-    pub fn is_mate_or_stalemate(&self) -> Score {
+    fn is_mate_or_stalemate(&self) -> Score {
         if move_gen::is_attacked(self, self.king_pos()) {
-            if self.color == White {
+            if self.to_move == White {
                 Score::MateB(0)
             }
             else {
@@ -229,7 +214,7 @@ impl ::board::Board for ChessBoard {
         Score::Val(value)
     }
 
-    pub fn do_move(&mut self, c_move : Self::Move) {
+    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
@@ -343,8 +328,9 @@ impl ::board::Board for ChessBoard {
         }
         
         self.to_move = !self.to_move;
+        c_move
     }
-    pub fn undo_move(&mut self, c_move : Self::Move) {
+    fn undo_move(&mut self, c_move : Self::UndoMove) {
         
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
@@ -438,13 +424,7 @@ impl fmt::Display for ChessBoard {
     }
 }
 impl ChessBoard {
-
-    pub fn new(pieces: [[Piece; 8]; 8]) -> Self {
-        ChessBoard { board: pieces, to_move: White, castling_en_passant: 0,
-                half_move_clock: 0, move_num: 0, moves: vec![] }
-    }
     
-    #[inline]
     pub fn piece_at(&self, square : Square) -> Piece {
         let Square(i) = square;
         debug_assert!(i < 64, format!("Tried to find piece at pos {}!", i));
