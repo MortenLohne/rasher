@@ -38,7 +38,7 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(), String> {
 
     // Do the standard handshake with the GUI
     to_log("Received uci command from GUI", log_writer);
-    uci_send("id name morten_chess", log_writer);
+    uci_send("id name rasher", log_writer);
     
     uci_send("option name Write Debug Log type check default true", log_writer);
     uci_send("option name Variant type string", log_writer);
