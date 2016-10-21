@@ -25,8 +25,9 @@ fn main() {
     loop {
         // println!("Enter input");
         reader.read_line(&mut input).unwrap();
+	input = input.trim().to_string();
         match &input[..] {
-            "uci\n" => {
+            "uci" => {
                 let mut log_writer = Arc::new(Mutex::new(None));
                 match uci::connect_engine(&log_writer) {
                     Ok(_) => (),
@@ -37,7 +38,7 @@ fn main() {
                 }
             }, 
             
-            "mem usage\n" => {
+            "mem usage" => {
                 use std::mem;
                 println!("Standard board: {}", mem::size_of::<board::std_board::ChessBoard>());
                 println!("Standard move: {}", mem::size_of::<board::std_move::ChessMove>());
@@ -45,8 +46,8 @@ fn main() {
                 println!("Board score: {}", mem::size_of::<Score>());
                 
             },
-            //"play_self\n" => play_game(&board::START_BOARD.clone()),
-            //"play\n" => play_human(),
+            //"play_self" => play_game(&board::START_BOARD.clone()),
+            //"play" => play_human(),
             s => println!("Unrecognized command \"{}\".", s),
         }
         input.clear();
