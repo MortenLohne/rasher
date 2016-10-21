@@ -250,9 +250,7 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
         Some("depth") => return Ok(TimeRestriction::Depth(
             try!(parse_int(input.split_whitespace().nth(2))
                  ) as u8)),
-        None => { to_log("Received no restriction \"go\" command, assuming \"infinite\"",
-                         log_writer);
-        },
+        None => return Ok(TimeRestriction::Infinite),
         Some(_) => (),
     }
     
