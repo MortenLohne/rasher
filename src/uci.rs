@@ -359,7 +359,7 @@ fn get_engine_input(log_writer : &SharableWriter) -> String {
     let reader = io::stdin();
     let mut input = "".to_string();
     reader.read_line(&mut input).unwrap();
-    
+    input = input.trim().to_string();
     to_log(&input, log_writer);
 
     input
