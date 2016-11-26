@@ -8,7 +8,9 @@ Any feedback is welcome.
 
 # Build
 
-Requires the Rust compiler and Cargo (Rust's package manager) installed, both included in the [Rust downloads.](https://www.rust-lang.org/en-US/downloads.html)
+Note: Pre-compiled Windows binaries are available for download in the [release section](https://github.com/MortenLohne/rasher/releases) on Github. They should be reasonably up to date.
+
+Building the project from source requires the Rust compiler and Cargo (Rust's package manager) installed, both included in the [Rust downloads.](https://www.rust-lang.org/en-US/downloads.html)
 
 To build and run:
 ```

@@ -30,16 +30,18 @@ impl fmt::Display for Color {
     }
 }
 
-pub trait Board : Sized + Send + Clone{
-    type Move : game_move::Move;
-    type UndoMove : Copy;
+pub trait Board : PartialEq + Clone + Send {
+    type Move : game_move::Move + PartialEq + Eq + Clone;
+    type UndoMove : PartialEq + Eq + Clone;
 
     fn to_move(&self) -> Color;
 
     fn do_move(&mut self, Self::Move) -> Self::UndoMove;
     fn undo_move(&mut self, Self::UndoMove);
 
-    fn all_legal_moves(&mut self) -> Vec<Self::Move>;
+    fn start_board() -> &'static Self;
+
+    fn all_legal_moves(&self) -> Vec<Self::Move>;
 
     /// Returns a score which is either mate or stalemate. ASSUMES all_legal_moves.len() == 0
     fn is_mate_or_stalemate(&self) -> ::Score;

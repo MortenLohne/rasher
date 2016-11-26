@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Morten Lohne"]
 
 [dependencies]
-lazy_static = "0.1.*"
-time = "0.1"
+lazy_static = "0.2.*"
+time = "0.1.*"

@@ -127,17 +127,151 @@ pub struct ChessBoard {
     //pub hash : Option<Hasher>,
 }
 
-/*impl Hash for Board {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        
+pub struct BoardIter {
+    current_x: u8,
+    current_y: u8,
+}
+
+impl BoardIter {
+    pub fn new() -> Self {
+        BoardIter { current_x: 0, current_y: 0 }
     }
-}*/
+}
+
+impl Iterator for BoardIter {
+    type Item = Square;
+    fn next(&mut self) -> Option<Square> {
+        if self.current_y >= 8 {
+            None
+        }
+        else if self.current_x == 7 {
+            self.current_x = 0;
+            self.current_y += 1;
+            Some(Square::from_ints(7, self.current_y - 1))
+        }
+        else {
+            self.current_x += 1;
+            Some(Square::from_ints(self.current_x - 1, self.current_y))
+        }
+    }
+}
+
+impl IntoIterator for ChessBoard {
+    type Item = Square;
+    type IntoIter = BoardIter;
+    fn into_iter(self) -> Self::IntoIter {
+        BoardIter::new()
+    }
+}
 
 use ::Score;
 
-impl ::uci::UciBoard for ChessBoard {
+// Parses the first token in a FEN string, which describes the positions
+/// of the pieces
+fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
+    let mut board = [[Piece(Empty, White); 8]; 8];
+    let ranks : Vec<&str> = fen_board.split("/").collect();
+    if ranks.len() != 8 {
+        return Err(format!("Invalid FEN board string \"{}\": Had {} ranks instead of 8",
+                           fen_board, ranks.len()));
+    }
+    for i in 0..8 {
+        let mut cur_rank : Vec<Piece> = Vec::new();
+        for c in ranks[i].chars() {
+            match CHAR_PIECE_MAP.get(&c) {
+                Some(piece) => cur_rank.push(*piece),
+                None => match c.to_digit(10) {
+                    Some(mut i) => {
+                        while i > 0 {
+                            cur_rank.push(Piece(Empty, White));
+                            i -= 1;
+                        }
+                    },
+                    None => return Err(format!("Invalid FEN string: Illegal character {}", c)),
+                },
+            }   
+        }
+        if cur_rank.len() != 8 {
+            return Err(format!("Invalid FEN string: Specified {} pieces on rank {}.",
+                               cur_rank.len(), i))
+        }
+        else {
+            for j in 0..8 {
+                board[i][j] = *cur_rank.get(j).unwrap();
+            }
+        }
+    }
+    Ok(board)
+}
+
+fn parse_fen_to_move (to_move : &str) -> Result<Color, String> {
+    let char_to_move = to_move.chars().collect::<Vec<_>>()[0];
+    if char_to_move == 'w' { Ok(White) }
+    else if char_to_move == 'b' { Ok(Black) }
+    else { Err("Invalid FEN string: Error in side to move-field".to_string()) }
+}
+
+fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Result<(), String> {
+    let mut castling_rights = [false; 4];
+    for c in castling_str.chars() {
+        match c {
+            '-' => break,
+            'K' => castling_rights[0] = true,
+            'Q' => castling_rights[1] = true,
+            'k' => castling_rights[2] = true,
+            'q' => castling_rights[3] = true,
+            _ => return Err("Invalid FEN string: Error in castling field.".to_string()),
+        }
+    }
+    if !castling_rights[0] { board.disable_castling_kingside(White) }
+    if !castling_rights[1] { board.disable_castling_queenside(White) }
+    if !castling_rights[2] { board.disable_castling_kingside(Black) }
+    if !castling_rights[3] { board.disable_castling_queenside(Black) }
+    Ok(())
+}
+
+impl ::uci::UciBoard for ChessBoard {    
     fn from_fen(fen : &str) -> Result<Self, String> {
-        ::uci::parse_fen(fen)
+        let fen_split : Vec<&str> = fen.split(" ").collect();
+        if fen_split.len() < 4 || fen_split.len() > 6 {
+            return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
+                               fen, fen_split.len()));
+        }
+
+        let mut board = START_BOARD.clone();
+        board.board = try!(parse_fen_board(fen_split[0]));
+        
+        if fen_split[1].len() != 1 {
+            return Err("Invalid FEN string: Error in side to move-field".to_string());
+        }
+
+        // Check side to move
+        board.to_move = try!(parse_fen_to_move(fen_split[1]));
+
+        // Check castling rights field
+        try!(parse_fen_castling_rights(fen_split[2], &mut board));
+
+        // Check en passant field
+        if fen_split[3] != "-" {
+            match Square::from_alg(fen_split[3]) {
+                Some(square) => board.set_en_passant_square(Some(square)),
+                None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
+            }
+        };
+
+        let (half_clock, move_num) : (u8, u16) =
+            if fen_split.len() > 4 {
+                (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
+                 try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
+            }
+        else {
+            (0, 0)
+        };
+
+        board.half_move_clock = half_clock;
+        board.move_num = move_num;
+    
+        Ok(board)
     }
     // TODO: Implement
     fn to_fen(&self) -> String {
@@ -154,7 +288,7 @@ impl Board for ChessBoard {
         self.to_move
     }
 
-    fn all_legal_moves(&mut self) -> Vec<Self::Move> {
+    fn all_legal_moves(&self) -> Vec<Self::Move> {
         move_gen::all_legal_moves(self)
     }
     
@@ -404,6 +538,9 @@ impl Board for ChessBoard {
         self.to_move = !self.to_move;
     }
     
+    fn start_board() -> &'static Self {
+        &START_BOARD
+    }
 }
 
 impl fmt::Display for ChessBoard {
@@ -446,7 +583,10 @@ impl ChessBoard {
     }
 
     pub fn king_pos(&self) -> Square {
-        self.pos_of(Piece(King, self.to_move)).unwrap()
+        match self.pos_of(Piece(King, self.to_move)) {
+            Some(square) => square,
+            None => panic!("Error: There is no king on the board:\n{}", self),
+        }
     }
     
     pub fn pos_of(&self, piece : Piece) -> Option<Square> {
@@ -529,7 +669,7 @@ pub struct TimeInfo {
 }
 
 lazy_static! {
-    pub static ref START_BOARD: ChessBoard = {
+    static ref START_BOARD: ChessBoard = {
         
         let mut board = [[Piece(Empty, White); 8]; 8];
         board[0] = [Piece(Rook, Black), Piece(Knight, Black), Piece(Bishop, Black),

@@ -54,17 +54,6 @@ impl ChessMove {
                old_castling_en_passant: old_castling_en_passant, 
                old_half_move_clock: board.half_move_clock }
     }
-    
-    pub fn from_short_alg(alg : &str) -> Result<Self, String> {
-        if alg.len() != 4 && alg.len() != 5 {
-            Err(format!("Wrong move length: Expected 4/5, found {}", alg.len()).to_string())
-        }
-        else {
-            let mut temp = alg.to_string();
-            temp.insert(2, '-');
-            Self::from_alg(&temp)
-        }
-    }
 }
 impl board::game_move::Move for ChessMove {
     fn to_alg(&self) -> String {
@@ -84,40 +73,44 @@ impl board::game_move::Move for ChessMove {
         }
         s
     }
-    
+
+    // Parse a ChessMove from short algebraic notation (e2e4, g2g1Q, etc)
     fn from_alg(alg : &str) -> Result<Self, String> {
-        if alg.len() == 5 || alg.len() == 6 {
-            if alg.chars().nth(2).unwrap() == '-' {
-                let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
-                let to = Square::from_alg(&alg[3..5]).unwrap_or(Square(0));
-                if alg.len() == 5 {
-                    Ok(ChessMove { from: from, to: to, prom: None, capture: Empty, 
-                              old_castling_en_passant: 0, old_half_move_clock: 0 })
-                }
-                else {
-                    Ok(ChessMove { from: from, to: to, prom: Some(
-                              match alg.chars().nth(5) {
-                                  Some('Q') => Piece(Queen, White),
-                                  Some('q') => Piece(Queen, Black),
-                                  Some('R') => Piece(Rook, White),
-                                  Some('r') => Piece(Rook, Black),
-                                  Some('N') => Piece(Knight, White),
-                                  Some('n') => Piece(Knight, Black),
-                                  Some('B') => Piece(Bishop, White),
-                                  Some('b') => Piece(Bishop, Black),
-                                  _ => return Err("Bad promotion letter".to_string()),
-                              }), 
-                              capture: Empty, 
-                              old_castling_en_passant: 0, old_half_move_clock: 0 })
-                    }
+        // Some GUIs send moves as "e2-e4" instead of "e2e4".
+        // In that case, remove the dash and try again
+        if alg.chars().nth(2) == Some('-') {
+            let mut fixed_alg = alg.to_string();
+            fixed_alg.remove(2);
+            Self::from_alg(&fixed_alg)
+        }
+        else if alg.len() == 4 || alg.len() == 5 {
+            let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
+            let to = Square::from_alg(&alg[2..4]).unwrap_or(Square(0));
+            if alg.len() == 4 {
+                Ok(ChessMove { from: from, to: to, prom: None, capture: Empty, 
+                               old_castling_en_passant: 0, old_half_move_clock: 0 })
             }
             else {
-                Err(format!("Move {} had incorrect 3rd character '{}', expected '-'",
-                            alg, alg.chars().nth(2).unwrap()))
+                Ok(ChessMove { from: from, to: to, prom: Some(
+                    match alg.chars().nth(4) {
+                        Some('Q') => Piece(Queen, White),
+                        Some('q') => Piece(Queen, Black),
+                        Some('R') => Piece(Rook, White),
+                        Some('r') => Piece(Rook, Black),
+                        Some('N') => Piece(Knight, White),
+                        Some('n') => Piece(Knight, Black),
+                        Some('B') => Piece(Bishop, White),
+                        Some('b') => Piece(Bishop, Black),
+                        Some(ch) => return Err(format!("Bad promotion letter {} in move {}", ch, alg)),
+                        None => return Err(format!("No promotion letter in move {}", alg)),
+                    }), 
+                               capture: Empty, 
+                               old_castling_en_passant: 0, old_half_move_clock: 0 })
             }
         }
+        
         else {
-            Err(format!("Move {} had incorrect length: Found {}, expected 5/6", alg, alg.len()))
+            Err(format!("Move {} had incorrect length: Found {}, expected 4/5", alg, alg.len()))
         }
     }
 }

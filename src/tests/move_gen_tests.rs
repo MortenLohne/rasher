@@ -29,7 +29,7 @@ use ::Score::{Val, MateB, MateW};
 fn test_piece_at () {
     let square = |str| Square::from_alg(str).unwrap();
     
-    let start_board = START_BOARD.clone();
+    let start_board = ChessBoard::start_board();
     println!("{}", start_board);
     let d1 = square("d1");
     let e1 = square("e1");
@@ -87,7 +87,7 @@ fn test_is_attacked() {
 
 #[test]
 fn basic_movement_test() {
-    let all_legal_moves = move_gen::all_legal_moves(&mut START_BOARD.clone());
+    let all_legal_moves = move_gen::all_legal_moves(&mut ChessBoard::start_board().clone());
     println!("All {} legal moves at start position: ", all_legal_moves.len());
     assert_eq!(all_legal_moves.len(), 20);
     for c_move in all_legal_moves {
@@ -142,8 +142,8 @@ fn respond_to_checks() {
     let mut board6 = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1").unwrap();
     assert!(move_gen::is_attacked(&board6, board6.king_pos()) == true,
             format!("Error: King should be under attack here:\n{}", board5));
-    move_is_available_prop(&mut board6, ChessMove::from_alg("h4-g4").unwrap());
-    move_is_unavailable_prop(&mut board6, ChessMove::from_alg("f4-g3").unwrap());
+    move_is_available_prop(&mut board6, ChessMove::from_alg("h4g4").unwrap());
+    move_is_unavailable_prop(&mut board6, ChessMove::from_alg("f4g3").unwrap());
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn basic_tactics_test() {
     basic_tactics_prop(&board4, best_move4);
 
     let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
-    let best_move5 = ChessMove::from_alg("b7-a8Q").unwrap();
+    let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
     basic_tactics_prop(&board5, best_move5);
 }
 
@@ -195,8 +195,8 @@ expected {}, board:\n{}",
 #[test]
 fn en_passant_test () {
     let mut board1 = ChessBoard::from_fen("7k/p7/8/1P6/8/8/8/7K b - - 0 1").unwrap();
-    let move1 = ChessMove::from_alg("a7-a5").unwrap();
-    let move2 = ChessMove::from_alg("b5-a6").unwrap();
+    let move1 = ChessMove::from_alg("a7a5").unwrap();
+    let move2 = ChessMove::from_alg("b5a6").unwrap();
     // Do a move that allows en passant
     board1.do_move(move1);
 
@@ -257,10 +257,18 @@ fn is_pinned_prop(board : &ChessBoard, pinee_pos : Square, pinner_pos : Square, 
 }
 
 #[test]
+fn king_in_check_test() {
+    let board = ChessBoard::from_fen("8/1k5p/P7/8/8/8/8/7K b - -").unwrap();
+    let moves = board.all_legal_moves();
+    assert_eq!(moves.len(), 8, "{} \nExpected 8 moves in position, found {}; {:?}",
+                                       board, moves.len(), moves);
+}
+
+#[test]
 fn castling_test () {
     // Checks that white kingside castle works
     let board1 = ChessBoard::from_fen("5k1r/6pp/4Q3/8/8/8/8/4K2R w K - 0 1").unwrap();
-    let move1 = ChessMove::from_alg("e1-g1").unwrap();
+    let move1 = ChessMove::from_alg("e1g1").unwrap();
     basic_tactics_prop(&board1, move1);
 
     // Checks that white can't castle while in check
@@ -270,21 +278,21 @@ fn castling_test () {
 
     // Checks that black queenside castling works in a tactic
     let board3 = ChessBoard::from_fen("r3k3/1R6/8/8/8/8/8/3K4 b q - 0 1").unwrap();
-    let move3 = ChessMove::from_alg("e8-c8").unwrap();
+    let move3 = ChessMove::from_alg("e8c8").unwrap();
     basic_tactics_prop(&board3, move3);
 
     // Positions with both castlings available
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    move_is_available_prop(&mut board4, ChessMove::from_alg("e1-c1").unwrap());
-    move_is_available_prop(&mut board4, ChessMove::from_alg("e1-g1").unwrap());
-    move_is_unavailable_prop(&mut board4, ChessMove::from_alg("e1-h1").unwrap());
+    move_is_available_prop(&mut board4, ChessMove::from_alg("e1c1").unwrap());
+    move_is_available_prop(&mut board4, ChessMove::from_alg("e1g1").unwrap());
+    move_is_unavailable_prop(&mut board4, ChessMove::from_alg("e1h1").unwrap());
 
     // Positions were castling is legal, but rook is attacked
     let mut board5 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
-    move_is_available_prop(&mut board5, ChessMove::from_alg("e1-g1").unwrap());
-    move_is_available_prop(&mut board5, ChessMove::from_alg("e1-f1").unwrap());
+    move_is_available_prop(&mut board5, ChessMove::from_alg("e1g1").unwrap());
+    move_is_available_prop(&mut board5, ChessMove::from_alg("e1f1").unwrap());
 }
 
 #[allow(dead_code)]
@@ -305,7 +313,7 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
 
 #[test]
 fn correct_move_gen_test1() {
-    let mut board1 = std_board::START_BOARD.clone();
+    let mut board1 = ChessBoard::start_board().clone();
     println!("{}", board1);
     assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
@@ -317,7 +325,7 @@ fn correct_move_gen_test1() {
 #[test]
 #[ignore]
 fn correct_move_gen_test1_long() {
-    let mut board1 = std_board::START_BOARD.clone();
+    let mut board1 =  ChessBoard::start_board().clone();
     assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);

@@ -20,16 +20,16 @@ use std::fmt::Formatter;
 extern crate lazy_static;
 
 fn main() {
-    let reader = io::stdin();
-    let mut input = "".to_string();
+    
     loop {
-        // println!("Enter input");
+        let reader = io::stdin();
+        let mut input = "".to_string();
         reader.read_line(&mut input).unwrap();
 	input = input.trim().to_string();
         match &input[..] {
             "uci" => {
                 let mut log_writer = Arc::new(Mutex::new(None));
-                match uci::connect_engine(&log_writer) {
+                match uci::choose_variant(&log_writer, &mut io::BufReader::new(reader)) {
                     Ok(_) => (),
                     Err(e) => {
                         uci::to_log(&e, &mut log_writer);

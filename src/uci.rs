@@ -1,11 +1,10 @@
-#[allow(unused_imports)]
-use board::std_board::PieceType::*;
-use board::board::Color::*;
-use board::std_board::*;
-use board::std_board;
-use board::std_move::ChessMove;
-use board::board::Board;
+use board::std_board::ChessBoard;
+use board::std_board::TimeInfo;
+
+use board::crazyhouse_board::CrazyhouseBoard;
+
 use board::game_move;
+use board::board;
 use alpha_beta;
 use ::Score;
 
@@ -15,6 +14,7 @@ use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
 use std::io::Write;
+use std::io::Read;
 use std::{fs, process};
 use std::str::FromStr;
 
@@ -30,16 +30,43 @@ pub trait UciMove : Sized {
     fn to_alg(&self) -> String;
 }
 
-/// Connects the engine to a GUI using UCI. 
-/// Assumes "uci has already been sent"
-pub fn connect_engine(log_writer : &SharableWriter) -> Result<(), String> {
+pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> Result<(), String> {
 
     open_log_file(log_writer);
 
     // Do the standard handshake with the GUI
     to_log("Received uci command from GUI", log_writer);
     uci_send("id name rasher", log_writer);
-    
+    uci_send("variants standard crazyhouse", log_writer);
+
+    let input : String = get_engine_input(log_writer, stdin);
+    let tokens = input.split_whitespace().collect::<Vec<_>>();
+    if tokens.len() < 1 {
+        to_log(&format!("Unrecognized variant string \"{}\", continuing normally", input), log_writer);
+        //continue; TODO: Go to connect_engine
+    }
+    if tokens[0] == "variant" {
+        match tokens[1] {
+            "standard" => connect_engine::<ChessBoard>(log_writer, stdin),
+            "crazyhouse" => connect_engine::<CrazyhouseBoard>(log_writer, stdin),
+            _ => Err(format!("Unrecognized chess variant {}.", tokens[1])),
+        }
+    }
+    else {
+        let mut input_with_newline = input.clone();
+        input_with_newline.push_str("\n");
+        connect_engine::<ChessBoard>(log_writer,
+                                     &mut io::Cursor::new(input_with_newline)
+                                     .chain(stdin))
+    }
+}
+
+/// Connects the engine to a GUI using UCI. 
+/// Assumes "uci has already been sent"
+pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRead)
+                             -> Result<(), String> 
+    where Board : 'static + board::Board + UciBoard {
+
     uci_send("option name Write Debug Log type check default true", log_writer);
     uci_send("option name Variant type string", log_writer);
     uci_send("option name Hash type spin default 64 min 16 max 32768", log_writer);
@@ -47,12 +74,13 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(), String> {
     
     uci_send("uciok", log_writer);
     
-    let mut board = None;
+    let mut board : Option<Board> = None;
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
-
+    let mut engine_options = EngineOptions::new();
+    
     // Listen to commands from GUI forever
     loop {
-        let input = get_engine_input(log_writer);
+        let input = get_engine_input(log_writer, stdin);
         let tokens = input.split_whitespace().collect::<Vec<_>>();
         if tokens.len() == 0 {
             to_log(&format!("Unrecognized input \"{}\"", input), log_writer);
@@ -62,8 +90,17 @@ pub fn connect_engine(log_writer : &SharableWriter) -> Result<(), String> {
             "isready" => uci_send("readyok", log_writer),
             "quit" => { to_log("Quitting...", log_writer); process::exit(0); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => board = Some(try!(parse_position(&input, log_writer))), 
-            "setoption" => try!(parse_setoption(&input, log_writer)),
+            "position" => board = Some(try!(parse_position::<Board>(&input, log_writer))),
+            "setoption" => { 
+                // If the board has not been sent, we are in init mode,
+                // which means init options can still be changed
+                if board == None { 
+                    try!(parse_setoption_init(&input, &mut engine_options, log_writer))
+                }
+                else {
+                    try!(parse_setoption(&input, log_writer))
+                }
+            },
             "stop" => {
                 let mut engine_comm = engine_comm.lock().unwrap();
                 engine_comm.engine_should_stop = true;
@@ -114,15 +151,26 @@ impl EngineComm {
     }
 }
 
-fn start_engine<B: 'static + Board> (board : B, log_writer : SharableWriter,
-                           time_restriction : TimeRestriction, 
-                           engine_comm : Arc<Mutex<EngineComm>>) {
+fn start_engine<B: 'static + board::Board> (board : B, log_writer : SharableWriter,
+                                            time_restriction : TimeRestriction, 
+                                            engine_comm : Arc<Mutex<EngineComm>>) {
     engine_comm.lock().unwrap().engine_is_running = true;
     let cloned_board = board.clone();
-    thread::spawn (move || {
-        alpha_beta::search_moves(cloned_board, engine_comm,
-                       time_restriction, log_writer);
-    });
+    
+    let thread_result = thread::Builder::new()
+        .name("alpha_beta_thread".to_string())
+        .spawn (move || {
+            alpha_beta::search_moves(cloned_board, engine_comm,
+                                     time_restriction, log_writer);
+        });
+    match thread_result {
+        Ok(handle) => match handle.join() {
+            Ok(_) => (),
+            Err(panic) => println!("Alpha_beta thread paniced by: \"{:?}\"", panic),
+        },
+        Err(err) => println!("Couldn't create alpha_beta thread, error: \"{}\"", err),
+    }
+    
 }
 
 fn open_log_file (log_writer : &SharableWriter) {
@@ -154,7 +202,7 @@ struct EngineOptions {
 
 impl EngineOptions {
     fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 64 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64 }
     }
 }
 
@@ -352,157 +400,70 @@ pub fn uci_send (message : &str, log_writer : &SharableWriter) {
 }
 
 /// Waits for input from the GUI, and writes the input to the log and returns it
-fn get_engine_input(log_writer : &SharableWriter) -> String {
+fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> String {
 
-    let reader = io::stdin();
     let mut input = "".to_string();
-    reader.read_line(&mut input).unwrap();
+    stdin.read_line(&mut input).unwrap();
     input = input.trim().to_string();
     to_log(&input, log_writer);
 
     input
 }
 
-/// Turns the whole position string from the GU (Like "position startpos moves e2e4")
+/// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
-fn parse_position(input : &String, log_writer : &SharableWriter)
-                  -> Result<std_board::ChessBoard, String> {
+fn parse_position<Board> (input : &String, log_writer : &SharableWriter) -> Result<Board, String>
+    where Board: 'static + board::Board + UciBoard{
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
-        Err(format!("Illegal position string: had length {}", words.len()))
+        return Err(format!("Illegal position string: had length {}", words.len()));
+    }
+    
+    // moves_pos is the position on the input string where the token "moves" is expected
+    let (mut board, moves_pos) =
+        if words[1] == "startpos" {
+            (Board::start_board().clone(), 2)
+        }
+    else if words[1] == "fen" {
+        let mut fen_string : String = "".to_string();
+        for token in words.iter().skip(2).take_while(|&s|*s != "moves") {
+            fen_string.push_str(token);
+            fen_string.push(' ');
+        }
+        fen_string = fen_string.trim().to_string();
+        match Board::from_fen(&fen_string) {
+            Ok(b) => (b, 8),
+            Err(err) => return Err(err),
+        }
     }
     else {
-        // moves_pos is the position on the input string where the token "moves" is expected
-        let (mut board, moves_pos) =
-            if words[1] == "startpos" {
-                (std_board::START_BOARD.clone(), 2)
-            }
-        else if words[1] == "fen" {
-            let mut fen_string : String = "".to_string();
-            for token in words.iter().skip(2).take(6) {
-                fen_string.push_str(token);
-                fen_string.push(' ');
-            }
-            fen_string = fen_string.trim().to_string();
-            match parse_fen(&fen_string) {
-                Ok(b) => (b, 8),
-                Err(err) => return Err(err),
-            }
-        }
-        else {
-            return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
-                               input, words[1], words.len()))
-        };
-        if words.len() > moves_pos  {
-            if words[moves_pos] == "moves" {
-                for c_move_str in words.iter().skip(moves_pos + 1) {
-                    let c_move = match ChessMove::from_short_alg(c_move_str) {
-                        Ok(m) => m,
-                        Err(err) => {
-                            to_log(&err, log_writer);
-                            return Err(format!("{}", err));
-                        },
-                    };
-                    board.do_move(c_move);
-                }
-            }
-        
-            else {
-                return Err(format!("Illegally formatted position string: 
-Expected words.len() to be {} if no moves are included, was {}", moves_pos, words.len()))
-            }
-        }
-        Ok(board)
-    }
-}
-    
-pub fn parse_fen (fen : &str) -> Result<std_board::ChessBoard, String> {
-    let mut board = START_BOARD.clone();
-    board.board = [[Piece(Empty, White); 8]; 8];
-    
-    let fen_split : Vec<&str> = fen.split(" ").collect();
-    if fen_split.len() < 4 || fen_split.len() > 6 {
-        return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
-                           fen, fen_split.len()));
-    }
-    let ranks : Vec<&str> = fen_split[0].split("/").collect();
-    if ranks.len() != 8 {
-        return Err(format!("Invalid FEN string \"{}\": Had {} ranks instead of 8",
-                           fen, ranks.len()));
-    }
-    for i in 0..8 {
-        let mut cur_rank : Vec<Piece> = Vec::new();
-        for c in ranks[i].chars() {
-            match std_board::CHAR_PIECE_MAP.get(&c) {
-                Some(piece) => cur_rank.push(*piece),
-                None => match c.to_digit(10) {
-                    Some(mut i) => {
-                        while i > 0 {
-                            cur_rank.push(Piece(Empty, White));
-                            i -= 1;
-                        }
+        return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
+                           input, words[1], words.len()))
+    };
+    use board::game_move::Move;
+    if words.len() > moves_pos  {
+        if words[moves_pos] == "moves" {
+            for c_move_str in words.iter().skip(moves_pos + 1) {
+                let c_move = match Board::Move::from_alg(c_move_str) {
+                    Ok(m) => m,
+                    Err(err) => {
+                        to_log(&err, log_writer);
+                        return Err(format!("{}", err));
                     },
-                    None => return Err(format!("Invalid FEN string: Illegal character {}", c)),
-                },
-            }   
-        }
-        if cur_rank.len() != 8 {
-            return Err(format!("Invalid FEN string: Specified {} pieces on rank {}.",
-                               cur_rank.len(), i))
-        }
-        else {
-            for j in 0..8 {
-                board.board[i][j] = *cur_rank.get(j).unwrap();
+                };
+                board.do_move(c_move);
             }
         }
-    }
-    if fen_split[1].len() != 1 {
-        return Err("Invalid FEN string: Error in side to move-field".to_string());
-    }
-
-    // Check side to move
-    let char_to_move = fen_split[1].chars().collect::<Vec<_>>()[0];
-    if char_to_move == 'w' { board.to_move = White }
-    else if char_to_move == 'b' { board.to_move = Black }
-    else { return Err("Invalid FEN string: Error in side to move-field".to_string()) };
-
-    // Check castling rights field
-    let mut castling_rights = [false; 4];
-    for c in fen_split[2].chars() {
-        match c {
-            '-' => break,
-            'K' => castling_rights[0] = true,
-            'Q' => castling_rights[1] = true,
-            'k' => castling_rights[2] = true,
-            'q' => castling_rights[3] = true,
-            _ => return Err("Invalid FEN string: Error in castling field.".to_string()),
+        
+        else {
+            return Err(format!("Illegally formatted position string: 
+Expected words.len() to be {} if no moves are included, was {}", moves_pos, words.len()))
         }
     }
-    if !castling_rights[0] { board.disable_castling_kingside(White) }
-    if !castling_rights[1] { board.disable_castling_queenside(White) }
-    if !castling_rights[2] { board.disable_castling_kingside(Black) }
-    if !castling_rights[3] { board.disable_castling_queenside(Black) }
-
-    // Check en passant field
-    if fen_split[3] != "-" {
-        match std_board::Square::from_alg(fen_split[3]) {
-            Some(square) => board.set_en_passant_square(Some(square)),
-            None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
-        }
-    };
-
-    let (half_clock, move_num) : (u8, u16) =
-        if fen_split.len() > 4 {
-            (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
-             try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
-        }
-    else {
-        (0, 0)
-    };
-
-    board.half_move_clock = half_clock;
-    board.move_num = move_num;
-    
     Ok(board)
 }
+    
+//pub fn parse_fen (fen : &str) -> Result<std_board::ChessBoard, String> {
+    
+//}
