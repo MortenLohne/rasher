@@ -5,7 +5,7 @@ use board::game_move::Move;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CrazyhouseMove {
     NormalMove(ChessMove),
-    CrazyMove(PieceType, Square),
+    CrazyMove(PieceType, Square, u8),
 }
 
 impl Move for CrazyhouseMove { 
@@ -24,7 +24,7 @@ impl Move for CrazyhouseMove {
             let square_str : String = input.chars().skip_while(|&c| c != '@').collect();
             let square = Square::from_alg(&square_str).ok_or(
                 format!("Failed to parse destination square for move {}", input));
-            square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq))
+            square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
         }
         else {
             ChessMove::from_alg(input).map(|mv| CrazyhouseMove::NormalMove(mv))
@@ -35,7 +35,7 @@ impl Move for CrazyhouseMove {
         use board::std_board::PieceType::*;
         match self {
             &CrazyhouseMove::NormalMove(mv) => mv.to_alg(),
-            &CrazyhouseMove::CrazyMove(piece, square) => match piece {
+            &CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
                 Knight => "N",
                 Bishop => "B",
                 Rook => "R",

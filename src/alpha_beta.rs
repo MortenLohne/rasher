@@ -156,12 +156,15 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
                     break;
                 }
             else {
+                let old_board = board.clone();
                 let undo_move : <B as Board>::UndoMove = board.do_move(c_move.clone());
                 let (tried_score, tried_line) =
                     
                     find_best_move_ab_rec( board, depth - 1, alpha, beta,
                                             engine_comm, time_restriction, node_counter);
                 board.undo_move(undo_move);
+                debug_assert_eq!(board, &old_board,
+                                 "Failed to restore board after move {:?}", c_move);
                 
                 if color == White && tried_score > alpha {
                     alpha = tried_score;

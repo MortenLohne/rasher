@@ -312,19 +312,18 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
 }
 
 #[test]
-fn correct_move_gen_test1() {
+fn starting_position_perf_test() {
     let mut board1 = ChessBoard::start_board().clone();
     println!("{}", board1);
     assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
     assert_eq!(legal_moves_after_plies(&mut board1, 4), 197_281);
-    //assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_609);
 }
 
 #[test]
 #[ignore]
-fn correct_move_gen_test1_long() {
+fn starting_position_perf_test_long() {
     let mut board1 =  ChessBoard::start_board().clone();
     assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
@@ -334,6 +333,15 @@ fn correct_move_gen_test1_long() {
     assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_324);
     assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_901_860); //~10 min
     //assert_eq!(legal_moves_after_plies(&mut board, 8), 84_998_978_956);
+}
+
+#[test]
+fn correct_move_gen_test1() {
+    let mut board = ChessBoard::from_fen(
+        "rnbqkbnr/pp2pppp/8/2pp4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1").unwrap();
+    println!("{}", board);
+    assert_eq!(legal_moves_after_plies(&mut board, 1), 30);
+    assert_eq!(legal_moves_after_plies(&mut board, 2), 895);
 }
 
 #[test]
@@ -448,15 +456,6 @@ fn correct_move_gen_test7() {
     let mut board7 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
     assert_eq!(legal_moves_after_plies(&mut board7, 3), 62_379);
-}
-
-#[test]
-fn correct_move_gen_test8() {
-    let mut board = ChessBoard::from_fen(
-        "rnbqkbnr/pp2pppp/8/2pp4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1").unwrap();
-    println!("{}", board);
-    assert_eq!(legal_moves_after_plies(&mut board, 1), 30);
-    assert_eq!(legal_moves_after_plies(&mut board, 2), 895);
 }
 
 /// Checks that the engine finds the total number of legal moves after n plies.

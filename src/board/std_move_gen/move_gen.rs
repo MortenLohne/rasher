@@ -164,7 +164,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     let pos = square.0 as i8;
     let (start_rank, prom_rank, direction) =
         if board.to_move == White { (6, 1, -1) } else { (1, 6, 1) };
-
+    debug_assert!(rank > 0 && rank < 7);;
     // Checks if there are any pieces available for capture to the left,
     // including en passant capture
     if file > 0 {

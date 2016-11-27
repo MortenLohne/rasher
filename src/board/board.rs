@@ -30,7 +30,7 @@ impl fmt::Display for Color {
     }
 }
 
-pub trait Board : PartialEq + Clone + Send {
+pub trait Board : PartialEq + Eq + Clone + Send + fmt::Debug {
     type Move : game_move::Move + PartialEq + Eq + Clone;
     type UndoMove : PartialEq + Eq + Clone;
 

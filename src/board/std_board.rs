@@ -9,7 +9,7 @@ use std;
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -208,7 +208,8 @@ fn parse_fen_to_move (to_move : &str) -> Result<Color, String> {
     let char_to_move = to_move.chars().collect::<Vec<_>>()[0];
     if char_to_move == 'w' { Ok(White) }
     else if char_to_move == 'b' { Ok(Black) }
-    else { Err("Invalid FEN string: Error in side to move-field".to_string()) }
+    else { Err(format!("Invalid FEN string: Found {} in side-to-move-field, expected 'w' or 'b'",
+                       to_move)) }
 }
 
 fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Result<(), String> {
@@ -552,8 +553,8 @@ impl fmt::Display for ChessBoard {
             }
             let _ = fmt.write_str("\n");
         }
-        fmt.write_str(&format!("To move: {}, flags: {:b}\n", self.to_move,
-                              self.castling_en_passant)).unwrap();
+        fmt.write_str(&format!("To move: {}, move_number: {}, flags: {:b}\n", self.to_move,
+                               self.move_num, self.castling_en_passant)).unwrap();
         for c_move in &self.moves {
             let _ = fmt.write_str(&format!("[{}],", &c_move));
         }
@@ -564,7 +565,7 @@ impl ChessBoard {
     
     pub fn piece_at(&self, square : Square) -> Piece {
         let Square(i) = square;
-        debug_assert!(i < 64, format!("Tried to find piece at pos {}!", i));
+        debug_assert!(i < 64, format!("Tried to find piece at pos {} on board{}!", i, self));
         self.board[i as usize >> 3][i as usize & 0b0000_0111]
     }
     /// Returns a clone of the board, viewed from the other side.
