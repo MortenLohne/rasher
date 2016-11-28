@@ -6,3 +6,4 @@ authors = ["Morten Lohne"]
 [dependencies]
 lazy_static = "0.2.*"
 time = "0.1.*"
+itertools = "0.5.*"
