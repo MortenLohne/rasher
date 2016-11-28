@@ -37,7 +37,15 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
     // Do the standard handshake with the GUI
     to_log("Received uci command from GUI", log_writer);
     uci_send("id name rasher", log_writer);
-    uci_send("variants standard crazyhouse", log_writer);
+
+    uci_send("option name Write Debug Log type check default true", log_writer);
+    uci_send("option name Variant type string", log_writer);
+    uci_send("option name Hash type spin default 64 min 16 max 32768", log_writer);
+    uci_send("option name Threads type spin default 2 min 1 max 16", log_writer);
+    
+    uci_send("uciok", log_writer);
+    
+    //uci_send("variants standard crazyhouse", log_writer);
 
     let input : String = get_engine_input(log_writer, stdin);
     let tokens = input.split_whitespace().collect::<Vec<_>>();
@@ -66,13 +74,6 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
 pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRead)
                              -> Result<(), String> 
     where Board : 'static + board::Board + UciBoard {
-
-    uci_send("option name Write Debug Log type check default true", log_writer);
-    uci_send("option name Variant type string", log_writer);
-    uci_send("option name Hash type spin default 64 min 16 max 32768", log_writer);
-    uci_send("option name Threads type spin default 2 min 1 max 16", log_writer);
-    
-    uci_send("uciok", log_writer);
     
     let mut board : Option<Board> = None;
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
@@ -102,20 +103,38 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                 }
             },
             "stop" => {
-                let mut engine_comm = engine_comm.lock().unwrap();
-                engine_comm.engine_should_stop = true;
-                let best_move : String = match engine_comm.best_move.clone() {
-                    Some(mv) => mv,
-                    None => {
-                        to_log(&"Haven't found a move yet: stopping without .", log_writer);
-                        "null".to_string()
-                    },
-                };
+                let best_move : String;
+                {
+                    let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));
+                    engine_comm.engine_should_stop = true;
+                    best_move = match engine_comm.best_move.clone() {
+                        Some(mv) => mv,
+                        None => {
+                            to_log(&"Haven't found a move yet: sending a bogus move", log_writer);
+                            "e2e4".to_string() // Send a bogus move
+                        },
+                    };
+                }
                 uci_send(&format!("bestmove {}", best_move), log_writer);
-                return Ok(())
             },
             "go" => {
-                let board = try!(board.clone().ok_or("Received go command without receiving a position first. Exiting..."));
+                loop {
+                    let engine_is_running = {
+                        let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));                          
+                        if !engine_comm.engine_is_running {
+                            engine_comm.engine_should_stop = false;
+                            break;
+                        }
+                        engine_comm.engine_is_running
+                    };
+                    if engine_is_running {
+                        to_log("Engine was already running, cannot start new. Trying again later", log_writer);
+                        thread::sleep(::std::time::Duration::from_millis(100));
+                        
+                    }
+                    
+                }
+                let board = try!(board.clone().ok_or("Received go without receiving a position first. Exiting..."));
                 let time_restriction = try!(parse_go(&input, log_writer));
                 
                 start_engine(board, log_writer.clone(), time_restriction, engine_comm.clone());
@@ -138,7 +157,6 @@ pub enum TimeRestriction {
 }
 
 /// Struct for communicating with the engine from another thread
-#[derive(PartialEq, Eq, Clone)]
 pub struct EngineComm {
     pub engine_should_stop : bool,
     pub engine_is_running : bool,
@@ -154,33 +172,37 @@ impl EngineComm {
 fn start_engine<B: 'static + board::Board> (board : B, log_writer : SharableWriter,
                                             time_restriction : TimeRestriction, 
                                             engine_comm : Arc<Mutex<EngineComm>>) {
-    engine_comm.lock().unwrap().engine_is_running = true;
+    {
+        engine_comm.lock().unwrap().engine_is_running = true;
+    }
     let cloned_board = board.clone();
+    let cloned_log_writer = log_writer.clone();
     
     let thread_result = thread::Builder::new()
         .name("alpha_beta_thread".to_string())
         .spawn (move || {
             alpha_beta::search_moves(cloned_board, engine_comm,
-                                     time_restriction, log_writer);
+                                     time_restriction, cloned_log_writer);
         });
     match thread_result {
-        Ok(handle) => match handle.join() {
-            Ok(_) => (),
-            Err(panic) => println!("Alpha_beta thread paniced by: \"{:?}\"", panic),
+        Ok(handle) => {
+            thread::spawn(move || match handle.join() {
+                Ok(_) => (),
+                Err(panic) =>
+                    to_log(&format!("Alpha_beta thread stopped by: \"{:?}\"", panic), &log_writer),
+            });
         },
         Err(err) => println!("Couldn't create alpha_beta thread, error: \"{}\"", err),
     }
     
 }
 
-fn open_log_file (log_writer : &SharableWriter) {
-    println!("Creating log file");
+pub fn open_log_file (log_writer : &SharableWriter) {
     let mut inner_writer = log_writer.lock().unwrap();
     match *inner_writer {
         Some(_) => (), // Log is already open, do nothing
         None => match fs::File::create("mc_log.txt") {
             Ok(log_file) => { 
-                println!("Created log file");
                 *inner_writer = Some(io::BufWriter::new(log_file));
             },
             Err(_) => (), //panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
@@ -405,7 +427,7 @@ fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> S
     let mut input = "".to_string();
     stdin.read_line(&mut input).unwrap();
     input = input.trim().to_string();
-    to_log(&input, log_writer);
+    to_log(&format!("GUI: {}", input), log_writer);
 
     input
 }

@@ -251,8 +251,8 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
 /// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
-fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>, king_pos_c : Square,
-                is_in_check : bool) {
+fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
+                king_pos_c : Square, is_in_check : bool) {
     if is_in_check || is_pinned_to_piece(board, c_move.from, king_pos_c) {
         add_if_legal_simple(board, c_move, moves);
     }
@@ -503,6 +503,6 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
     }
 }
 
-fn king_pos (board : &ChessBoard) -> Square {
+pub fn king_pos (board : &ChessBoard) -> Square {
     board.king_pos()
 }

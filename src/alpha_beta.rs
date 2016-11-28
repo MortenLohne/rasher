@@ -15,8 +15,9 @@ pub fn search_moves<B: Board> (mut board : B, engine_comm : Arc<Mutex<uci::Engin
                  time_restriction : uci::TimeRestriction,
                  mut log_writer : uci::SharableWriter) 
                      -> (Score, Vec<B::Move>, NodeCount) {
-    
-    engine_comm.lock().unwrap().engine_is_running = true;
+    {
+        engine_comm.lock().unwrap().engine_is_running = true;
+    }
     
     let max_depth : u8 = match time_restriction {
         uci::TimeRestriction::Depth(d) => d,
@@ -51,23 +52,27 @@ pub fn search_moves<B: Board> (mut board : B, engine_comm : Arc<Mutex<uci::Engin
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => { 
                 if (board.to_move() == Black && 
-                    ms_taken as u32 > info.black_inc / 5 + info.black_time / 50) ||
+                    ms_taken as u32 > info.black_inc / 5 + info.black_time / 100) ||
                     (board.to_move() == White && 
-                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 50)
+                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 100)
                 {
                     break;
                 }
                 
             },
-            uci::TimeRestriction::MoveTime(time) => if ms_taken > time / 2 { break },
+            uci::TimeRestriction::MoveTime(time) => if ms_taken > time / 4 { break },
                
             _ => (),
         }
     }
     {
+        println!("Unclocking best move");
         let mut engine_comm = engine_comm.lock().unwrap();
-        uci::uci_send(&format!("bestmove {}", engine_comm.best_move.clone().unwrap()), 
-                      &mut log_writer);
+        println!("Sending best move");
+        match engine_comm.best_move.clone() {
+            Some(mv) => uci::uci_send(&format!("bestmove {}", mv), &mut log_writer),
+            None => uci::uci_send(&format!("best score: {}", best_score.unwrap()), &mut log_writer),
+        }
         engine_comm.engine_is_running = false;
         
     }
@@ -89,14 +94,16 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
                                         -> (Score, Vec<B::Move>) {
         use uci::TimeRestriction::*;
 
-        if node_counter.total % 1024 == 0 {
-            let mut engine_comm = engine_comm.lock().unwrap();
-            
-            if engine_comm.engine_should_stop {
-                engine_comm.engine_is_running = false;
-                //return (::score_board(&board), vec![]);
-                panic!();
+        if node_counter.total % 8096 == 0 {
+            let should_stop : bool;
+            {
+                let mut engine_comm = engine_comm.lock().unwrap();
+                should_stop = engine_comm.engine_should_stop;
+                if should_stop {
+                    engine_comm.engine_is_running = false;
+                }
             }
+            if should_stop { panic!("Engine was told to stop") }
         } 
         if depth == 0 {
             node_counter.leaf += 1;

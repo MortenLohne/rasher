@@ -16,26 +16,36 @@ use std::cmp::*;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use board::board::Board;
+use board::std_board::ChessBoard;
+use board::crazyhouse_board::CrazyhouseBoard;
+
 #[macro_use]
 extern crate lazy_static;
-
+#[macro_use]
+extern crate itertools;
 fn main() {
     
     loop {
         let reader = io::stdin();
         let mut input = "".to_string();
         reader.read_line(&mut input).unwrap();
-	input = input.trim().to_string();
-        match &input[..] {
+	let tokens : Vec<&str> = input.split_whitespace().collect();
+        let mut log_writer = Arc::new(Mutex::new(None));
+        match tokens[0] {
             "uci" => {
-                let mut log_writer = Arc::new(Mutex::new(None));
                 match uci::choose_variant(&log_writer, &mut io::BufReader::new(reader)) {
                     Ok(_) => (),
                     Err(e) => {
-                        uci::to_log(&e, &mut log_writer);
+                        uci::to_log(&format!("Error: Engine failed with {}", e), &mut log_writer);
                         panic!(e);
                     },
                 }
+            },
+            "isready" => {
+                uci::open_log_file(&log_writer);
+                uci::to_log("received isready from GUI", &log_writer);
+                println!("readyok");
             }, 
             
             "mem usage" => {
@@ -47,10 +57,23 @@ fn main() {
                 
             },
             //"play_self" => play_game(&board::START_BOARD.clone()),
-            //"play" => play_human(),
-            s => println!("Unrecognized command \"{}\".", s),
+            "play" => {
+                if tokens.len() == 1 || tokens[1] == "standard" {
+                    let board = ChessBoard::start_board().clone();
+                    play_game(board, log_writer)
+                }
+                else {
+                    match tokens[1] {
+                        "crazyhouse" => {
+                            let board = CrazyhouseBoard::start_board().clone();
+                            play_game(board, log_writer)
+                        },
+                        s => println!("Unrecognized variant {}.", s),
+                    }
+                }
+            },
+            s => uci::to_log(&format!("Unrecognized command \"{}\".", s), &log_writer),
         }
-        input.clear();
     }
     
     
@@ -59,32 +82,34 @@ fn main() {
     //play_human();
 }
 
-/*
 #[allow(dead_code)]
-fn play_game(board : &Board) {
-    println!("Board:\n{}\nHalf move count: {}", board, (*board).half_move_clock);
+fn play_game<B> (mut board : B, log_writer : uci::SharableWriter) 
+    where B: board::board::Board + uci::UciBoard {
+    println!("Board:\n{:?}", board);
     println!("\n");
-    let engine_comm = Mutex::new(uci::EngineComm::new());
+    let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
     engine_comm.lock().unwrap().engine_is_running = true;
     
-    let (score, moves, _) = find_best_move_ab (&board, 5, &engine_comm, None);
+    let (score, moves, _) = alpha_beta::search_moves(
+        board.clone(), engine_comm.clone(), uci::TimeRestriction::MoveTime(5000), log_writer.clone());
     if moves.len() > 0 {
-        println!("Found move with score {}.", score);
-        play_game(&board.do_move(moves[0]));
+        println!("Found move with score {:?}.", score);
+        board.do_move(moves[0].clone());
+        play_game(board, log_writer);
     }
     else {
         match score {
-            Val(_) => panic!("Found no moves for {}, but it was not mate! Board:\n{}",
-                             board.to_move, board),
-            MateW(_) => println!("White won at move! Board:\n{}", board),
-            MateB(_) => println!("Black won! Board:\n{}", board),
-            Draw(0) => println!("The game was drawn! Board:\n{}", board),
-            Draw(n) => println!("Game was marked as drawn, but with {} moves left. Board:\n{}",
+            Val(_) => panic!("Found no moves for {}, but it was not mate! Board:\n{:?}",
+                             board.to_move(), board),
+            MateW(_) => println!("White won at move! Board:\n{:?}", board),
+            MateB(_) => println!("Black won! Board:\n{:?}", board),
+            Draw(0) => println!("The game was drawn! Board:\n{:?}", board),
+            Draw(n) => println!("Game was marked as drawn, but with {} moves left. Board:\n{:?}",
                                 n, board),
         }
     }
 }
-*/
+
 
 /*
 #[allow(dead_code)]

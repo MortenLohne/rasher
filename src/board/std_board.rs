@@ -21,7 +21,7 @@ pub enum PieceType {
 }
 
 impl PieceType {
-    fn value(&self) -> f32 {
+    pub fn value(&self) -> f32 {
         match *self {
             Pawn => 1.0,
             Knight => 3.0,
