@@ -1,6 +1,7 @@
 use board::board::Board;
 #[allow(unused_imports)]
 use uci::UciBoard;
+#[allow(unused_imports)]
 use board::crazyhouse_board::CrazyhouseBoard;
 
 #[test]

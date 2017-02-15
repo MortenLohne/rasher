@@ -1,7 +1,6 @@
 mod uci;
 mod board;
 mod tests;
-mod monte_carlo;
 mod alpha_beta;
 
 extern crate time;

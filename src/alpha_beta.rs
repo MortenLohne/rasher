@@ -94,6 +94,7 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
                                         -> (Score, Vec<B::Move>) {
         use uci::TimeRestriction::*;
 
+        // Check if the thread should stop
         if node_counter.total % 8096 == 0 {
             let should_stop : bool;
             {

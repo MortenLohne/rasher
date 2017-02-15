@@ -1,6 +1,4 @@
 
-
-
 #[test]
 fn parse_go_test() {
     use board::std_board::*;
