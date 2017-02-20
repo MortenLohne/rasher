@@ -38,6 +38,17 @@ pub enum GameResult {
     Draw,
 }
 
+impl ops::Not for GameResult {
+    type Output = Self;
+    fn not(self) -> Self {
+        match self {
+            GameResult::WhiteWin => GameResult::BlackWin,
+            GameResult::BlackWin => GameResult::WhiteWin,
+            GameResult::Draw => GameResult::Draw,
+        }
+    }
+}
+
 pub trait EvalBoard : PartialEq + Clone {
     type Move : game_move::Move + Clone;
     type UndoMove : Clone;
