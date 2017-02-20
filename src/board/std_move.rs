@@ -1,8 +1,7 @@
 use board::std_board::PieceType::*;
-use board::board::Color::*;
+use search_algorithms::board::Color::*;
 use board::std_board::*;
-use board::game_move::Move;
-use board;
+use search_algorithms::game_move::Move;
 
 use std::fmt;
 
@@ -53,7 +52,7 @@ impl ChessMove {
                old_half_move_clock: board.half_move_clock }
     }
 }
-impl board::game_move::Move for ChessMove {
+impl Move for ChessMove {
     fn to_alg(&self) -> String {
         let (file_from, rank_from) = self.from.file_rank();
         let (file_to, rank_to) = self.to.file_rank();

@@ -1,21 +1,19 @@
 mod uci;
 mod board;
 mod tests;
-mod alpha_beta;
+mod search_algorithms;
 
 extern crate time;
 
-use Score::*;
+use search_algorithms::alpha_beta::Score;
+use search_algorithms::alpha_beta::Score::*;
 
 use std::sync::{Arc, Mutex};
 use std::io;
 
-use std::fmt::Error;
-use std::cmp::*;
-use std::fmt::Display;
-use std::fmt::Formatter;
+use std::fmt;
 
-use board::board::Board;
+use search_algorithms::board::EvalBoard;
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
@@ -83,16 +81,16 @@ fn main() {
 
 #[allow(dead_code)]
 fn play_game<B> (mut board : B, log_writer : uci::SharableWriter) 
-    where B: board::board::Board + uci::UciBoard {
+    where B: EvalBoard + uci::UciBoard + fmt::Debug {
     println!("Board:\n{:?}", board);
     println!("\n");
     let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
     engine_comm.lock().unwrap().engine_is_running = true;
     
-    let (score, moves, _) = alpha_beta::search_moves(
+    let (score, moves, _) = search_algorithms::alpha_beta::search_moves(
         board.clone(), engine_comm.clone(), uci::TimeRestriction::MoveTime(5000), log_writer.clone());
     if moves.len() > 0 {
-        println!("Found move with score {:?}.", score);
+        println!("Found move with score {}.", score);
         board.do_move(moves[0].clone());
         play_game(board, log_writer);
     }
@@ -100,8 +98,8 @@ fn play_game<B> (mut board : B, log_writer : uci::SharableWriter)
         match score {
             Val(_) => panic!("Found no moves for {}, but it was not mate! Board:\n{:?}",
                              board.to_move(), board),
-            MateW(_) => println!("White won at move! Board:\n{:?}", board),
-            MateB(_) => println!("Black won! Board:\n{:?}", board),
+            WhiteWin(_) => println!("White won at move! Board:\n{:?}", board),
+            BlackWin(_) => println!("Black won! Board:\n{:?}", board),
             Draw(0) => println!("The game was drawn! Board:\n{:?}", board),
             Draw(n) => println!("Game was marked as drawn, but with {} moves left. Board:\n{:?}",
                                 n, board),
@@ -167,8 +165,8 @@ fn play_human() {
                     Val(_) => panic!("Found no moves for {}, 
 but it was not mate or staltemate! Board:\n{}",
                                      board.to_move, board),
-                    MateW(_) => { println!("White won at move! Board:\n{}", board); break },
-                    MateB(_) => { println!("Black won! Board:\n{}", board); break },
+                    WhiteWin(_) => { println!("White won at move! Board:\n{}", board); break },
+                    BlackWin(_) => { println!("Black won! Board:\n{}", board); break },
                     Draw(0) => { println!("The game was drawn! Board:\n{}", board); break },
                     Draw(n) => println!(
                         "Game was marked as drawn, but with {} moves left. Board:\n{}",  n, board),
@@ -184,47 +182,4 @@ pub struct NodeCount {
     intern: u64,
     leaf: u64,
     total: u64,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Score {
-    Val(f32),
-    Draw(u8),
-    MateW(u8),
-    MateB(u8),
-}
-
-impl Display for Score {
-    fn fmt(&self, fmt : &mut Formatter) -> Result<(), Error> {
-        let _ = match self {
-            &Val(f) => fmt.write_str(&format!("cp {}", f).to_string()),
-            &MateW(moves) => fmt.write_str(&format!("mate {}", moves)),
-            &MateB(moves) => fmt.write_str(&format!("mate -{}", moves)),
-            &Draw(_) => fmt.write_str("0.0 (forced draw)"),
-        };
-        Ok(())   
-    }
-}
-
-impl PartialOrd for Score {
-    fn partial_cmp (&self, other: &Score) -> Option<Ordering> {
-        match (self, other) {
-            (&MateW(n1), &MateW(n2)) => (&n2).partial_cmp(&n1),
-            (&MateW(_), _) => Some(Ordering::Greater),
-            
-            (&Val(_), &MateW(_)) => Some(Ordering::Less),
-            (&Val(_), &MateB(_)) => Some(Ordering::Greater),
-            (&Val(n1), &Val(n2)) => (&n1).partial_cmp(&n2),
-            (&Val(n1), &Draw(_)) => (&n1).partial_cmp(&0.0),
-
-            (&Draw(_), &Val(n1)) => (&0.0).partial_cmp(&n1),
-            (&Draw(_), &Draw(_)) => Some(Ordering::Equal),
-            (&Draw(_), &MateW(_)) => Some(Ordering::Less),
-            (&Draw(_), &MateB(_)) => Some(Ordering::Greater),
-            
-            (&MateB(n1), &MateB(n2)) => (&n1).partial_cmp(&n2),
-            (&MateB(_), _) => Some(Ordering::Less),
-            
-        }
-    }
 }

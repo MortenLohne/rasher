@@ -1,9 +1,10 @@
 use self::PieceType::*;
 use board::std_move;
-use board::board::Board;
+use search_algorithms::board;
+use search_algorithms::board::EvalBoard;
 use board::std_move_gen::move_gen;
-use board::board::Color;
-use board::board::Color::*;
+use search_algorithms::board::Color;
+use search_algorithms::board::Color::*;
 
 use std;
 use std::collections::HashMap;
@@ -164,7 +165,7 @@ impl IntoIterator for ChessBoard {
     }
 }
 
-use ::Score;
+
 
 // Parses the first token in a FEN string, which describes the positions
 /// of the pieces
@@ -280,11 +281,11 @@ impl ::uci::UciBoard for ChessBoard {
     }
 }
 
-impl Board for ChessBoard {
+impl EvalBoard for ChessBoard {
 
     type Move = std_move::ChessMove;
     type UndoMove = std_move::ChessMove;
-
+    
     fn to_move(&self) -> Color {
         self.to_move
     }
@@ -292,23 +293,28 @@ impl Board for ChessBoard {
     fn all_legal_moves(&self) -> Vec<Self::Move> {
         move_gen::all_legal_moves(self)
     }
-    
-    fn is_mate_or_stalemate(&self) -> Score {
-        if move_gen::is_attacked(self, self.king_pos()) {
-            if self.to_move == White {
-                Score::MateB(0)
+
+    fn game_result(&self) -> Option<board::GameResult> {
+        // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
+        if self.all_legal_moves().len() == 0 {
+            
+            if move_gen::is_attacked(self, self.king_pos()) {
+                if self.to_move == White {
+                    Some(board::GameResult::WhiteWin)
+                }
+                else {
+                    Some(board::GameResult::BlackWin)
+                }
             }
             else {
-                Score::MateW(0)
+                Some(board::GameResult::Draw)
             }
         }
-        else {
-            Score::Draw(0)
-        }
+        else { None }
     }
     
     #[inline(never)]
-    fn score_board (&self) -> Score {
+    fn eval_board (&self) -> f32 {
         const POS_VALS : [[u8; 8]; 8] = 
             [[0, 0, 0, 0, 0, 0, 0, 0],
              [0, 1, 1, 1, 1, 1, 1, 0],
@@ -346,7 +352,7 @@ impl Board for ChessBoard {
                 //         Square::from_ints(file as u8, rank as u8), piece_val, pos_val, value);
             }
         }
-        Score::Val(value)
+        value
     }
 
     fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {

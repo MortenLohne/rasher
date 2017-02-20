@@ -2,10 +2,11 @@ use board::std_board::PieceType;
 use board::std_board::ChessBoard;
 use board::std_board;
 use board::std_board::Piece;
-use board::board::Board;
-use board::board::Color;
-use board::board::Color::*;
+use search_algorithms::board::EvalBoard;
+use search_algorithms::board::Color;
+use search_algorithms::board::Color::*;
 use board::std_move_gen::move_gen;
+use search_algorithms::board;
 
 use itertools::Itertools;
 
@@ -41,34 +42,34 @@ impl PartialEq for CrazyhouseBoard {
     }
 }
 
-impl Board for CrazyhouseBoard {
+impl EvalBoard for CrazyhouseBoard {
 
     type Move = CrazyhouseMove;
     type UndoMove = CrazyhouseMove;    
-
+    
     fn to_move(&self) -> Color {
         self.base_board.to_move()
     }
 
+    fn game_result(&self) -> Option<board::GameResult> {
+        self.base_board.game_result()
+    }
+    
+    /*
     fn is_mate_or_stalemate(&self) -> ::Score {
         self.base_board.is_mate_or_stalemate()
     }
-
+     */
     fn start_board() -> &'static Self {
         &START_BOARD
     }
 
-    fn score_board(&self) -> ::Score {
+    fn eval_board(&self) -> f32 {
         // TODO: Make this take into account available pieces
-        let score = self.base_board.score_board();
-        match score {
-            ::Score::Val(n) => {
-                ::Score::Val(0.0 + n -
-                    self.black_available_pieces.iter().map(PieceType::value).sum::<f32>() +
-                    self.white_available_pieces.iter().map(PieceType::value).sum::<f32>())
-            },
-            v => v,
-        }  
+        let score = self.base_board.eval_board();
+        0.0 + score -
+            self.black_available_pieces.iter().map(PieceType::value).sum::<f32>() +
+            self.white_available_pieces.iter().map(PieceType::value).sum::<f32>()
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {

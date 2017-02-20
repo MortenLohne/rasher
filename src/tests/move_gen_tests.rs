@@ -2,14 +2,14 @@
 use board::std_board;
 use board::std_board::*;
 use board::std_move::ChessMove;
-use board::game_move::Move;
-use board::board::Board;
+use search_algorithms::game_move::Move;
+use search_algorithms::board::EvalBoard;
 
 use uci;
 #[allow(unused_imports)]
 use uci::UciBoard;
 
-use alpha_beta;
+use search_algorithms::alpha_beta;
 use super::super::board::std_move_gen::move_gen;
 
 extern crate time;
@@ -19,9 +19,9 @@ use std::sync::{Arc, Mutex};
 #[allow(unused_imports)]
 use board::std_board::PieceType::*;
 #[allow(unused_imports)]
-use board::board::Color::{Black, White};
+use search_algorithms::board::Color::{Black, White};
 #[allow(unused_imports)]
-use ::Score::{Val, MateB, MateW};
+use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
 /// Also assumes that std_board::START_BOARD is correct
@@ -55,11 +55,11 @@ fn test_square () {
 #[test]
 fn test_score () {
     assert!(Val(0.0) > Val(-1.0));
-    assert!(MateW(2) >= Val(100.0));
-    assert!(MateW(3) < MateW(2));
-    assert!(MateB(2) <= MateB(3));
-    assert!(MateB(3) <= MateB(3));
-    assert!(MateB(2) <= MateW(2));
+    assert!(WhiteWin(2) >= Val(100.0));
+    assert!(WhiteWin(3) < WhiteWin(2));
+    assert!(BlackWin(2) <= BlackWin(3));
+    assert!(BlackWin(3) <= BlackWin(3));
+    assert!(BlackWin(2) <= WhiteWin(2));
 }
 /*
 #[test]

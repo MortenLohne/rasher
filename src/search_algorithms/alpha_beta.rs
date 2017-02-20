@@ -1,20 +1,25 @@
 use ::NodeCount;
-use ::Score;
-use ::Score::*;
 
 use uci;
+use std::fmt;
+use std::cmp;
+use std::cmp::Ordering;
 
-use board::board::Board;
-use board::game_move::Move;
-use board::board::Color::*;
+use search_algorithms::board::GameResult;
+use search_algorithms::board::EvalBoard;
+use search_algorithms::game_move::Move;
+use search_algorithms::board::Color::*;
+use self::Score::*;
 
 extern crate time;
 use std::sync::{Arc, Mutex};
 
-pub fn search_moves<B: Board> (mut board : B, engine_comm : Arc<Mutex<uci::EngineComm>>,
-                 time_restriction : uci::TimeRestriction,
-                 mut log_writer : uci::SharableWriter) 
-                     -> (Score, Vec<B::Move>, NodeCount) {
+pub fn search_moves<B> (mut board : B, engine_comm : Arc<Mutex<uci::EngineComm>>,
+                         time_restriction : uci::TimeRestriction,
+                         mut log_writer : uci::SharableWriter) 
+                         -> (Score, Vec<B::Move>, NodeCount)
+    where B: EvalBoard + fmt::Debug
+{
     {
         engine_comm.lock().unwrap().engine_is_running = true;
     }
@@ -81,19 +86,22 @@ pub fn search_moves<B: Board> (mut board : B, engine_comm : Arc<Mutex<uci::Engin
 }
 
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab<B: Board> (board : &mut B, depth : u8, 
-                                engine_comm : &Mutex<uci::EngineComm>,
-                                time_restriction : uci::TimeRestriction )
-                                -> (Score, Vec<B::Move>, NodeCount) {
-
-    fn find_best_move_ab_rec<B: Board> (board: &mut B, depth : u8, 
-                                        mut alpha : Score, mut beta : Score,
-                                        engine_comm : &Mutex<uci::EngineComm>,
-                                        time_restriction : uci::TimeRestriction,
-                                        node_counter : &mut NodeCount)
-                                        -> (Score, Vec<B::Move>) {
+fn find_best_move_ab<B:> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
+                          time_restriction : uci::TimeRestriction )
+                          -> (Score, Vec<B::Move>, NodeCount)
+    where B: EvalBoard + fmt::Debug
+{
+    
+    fn find_best_move_ab_rec<B:> (board: &mut B, depth : u8,
+                                  mut alpha : Score, mut beta : Score,
+                                  engine_comm : &Mutex<uci::EngineComm>,
+                                  time_restriction : uci::TimeRestriction,
+                                  node_counter : &mut NodeCount)
+                                  -> (Score, Vec<B::Move>)
+        where B: EvalBoard + fmt::Debug
+    {
         use uci::TimeRestriction::*;
-
+        
         // Check if the thread should stop
         if node_counter.total % 8096 == 0 {
             let should_stop : bool;
@@ -105,11 +113,17 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
                 }
             }
             if should_stop { panic!("Engine was told to stop") }
-        } 
+        }
+        match board.game_result() {
+            Some(GameResult::WhiteWin) => return (BlackWin(0), vec![]),
+            Some(GameResult::BlackWin) => return (WhiteWin(0), vec![]),
+            Some(GameResult::Draw) => return (Draw(0), vec![]),
+            None => (),
+        }
         if depth == 0 {
             node_counter.leaf += 1;
             node_counter.total += 1;
-            return (board.score_board(), vec![]);
+            return (Val(board.eval_board()), vec![]);
         }
         else {
             node_counter.intern += 1;
@@ -141,21 +155,9 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
         
         let legal_moves = board.all_legal_moves();
         
-        // Check if the player is checkmated or in stalemate
-        if legal_moves.len() == 0 {
-            return (board.is_mate_or_stalemate(), vec![])
-            /*if move_gen::is_attacked(board, board.king_pos()) {
-                if color == White {
-                    return (MateB(0), vec![]);
-                }
-                else {
-                    return (MateW(0), vec![]);
-                }
-            }
-            else {
-                return (Draw(0), vec![]);
-            }*/
-        }
+        // If there is mate or stalemate on the board, we should already have returned
+        assert!(legal_moves.len() > 0);
+        
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR
             // Score is lower than the maximizer will ever allow
@@ -165,7 +167,7 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
                 }
             else {
                 let old_board = board.clone();
-                let undo_move : <B as Board>::UndoMove = board.do_move(c_move.clone());
+                let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
                 let (tried_score, tried_line) =
                     
                     find_best_move_ab_rec( board, depth - 1, alpha, beta,
@@ -192,8 +194,8 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
         }
         let score = if color == White { alpha } else { beta };
         (match score {
-            MateB(i) => MateB(i + 1),
-            MateW(i) => MateW(i + 1),
+            BlackWin(i) => BlackWin(i + 1),
+            WhiteWin(i) => WhiteWin(i + 1),
             Draw(i) => Draw(i + 1),
             Val(n) => Val(n), },
          best_line)
@@ -201,9 +203,58 @@ fn find_best_move_ab<B: Board> (board : &mut B, depth : u8,
     };
     let mut node_counter = NodeCount { intern: 0, leaf: 0, total: 0 };
     let (score, mut moves) =
-        find_best_move_ab_rec(board, depth, MateB(0), MateW(0),
+        find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0),
                               engine_comm, time_restriction, &mut node_counter);
     moves.reverse();
     // println!("Evaluated {} internal nodes and {} leaves", node_counter.intern, node_counter.leaf);
     (score, moves, node_counter)
 }   
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Score {
+    Val(f32),
+    Draw(u8),
+    WhiteWin(u8),
+    BlackWin(u8),
+}
+
+impl fmt::Display for Score {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            Score::Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
+            Score::WhiteWin(n) => write!(fmt, "mate {}", n as i16 / 2),
+            Score::BlackWin(n) => write!(fmt, "mate {}", n as i16 / -2),
+            Score::Draw(_) => write!(fmt, "0"),
+        }
+    }
+}
+
+impl PartialOrd for Score {
+    fn partial_cmp (&self, other: &Score) -> Option<cmp::Ordering> {
+        match (*self, *other) {
+            (WhiteWin(n1), WhiteWin(n2)) => Some((&n2).cmp(&n1)),
+            (WhiteWin(_), _) => Some(Ordering::Greater),
+            
+            (Val(_), WhiteWin(_)) => Some(Ordering::Less),
+            (Val(_), BlackWin(_)) => Some(Ordering::Greater),
+            (Val(n1), Val(n2)) => (&n1).partial_cmp(&n2),
+            (Val(n1), Draw(_)) => (&n1).partial_cmp(&0.0),
+
+            (Draw(_), Val(n1)) => (&0.0).partial_cmp(&n1),
+            (Draw(_), Draw(_)) => Some(Ordering::Equal),
+            (Draw(_), WhiteWin(_)) => Some(Ordering::Less),
+            (Draw(_), BlackWin(_)) => Some(Ordering::Greater),
+            
+            (BlackWin(n1), BlackWin(n2)) => Some(n1.cmp(&n2)),
+            (BlackWin(_), _) => Some(Ordering::Less),
+            
+        }
+    }
+}
+/*
+impl Ord for Score {
+    fn cmp (&self, other: &Score) -> cmp::Ordering {
+        
+    }
+}
+ */

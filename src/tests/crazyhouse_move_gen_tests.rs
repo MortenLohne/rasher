@@ -1,8 +1,10 @@
-use board::board::Board;
+use search_algorithms::board::EvalBoard;
 #[allow(unused_imports)]
 use uci::UciBoard;
 #[allow(unused_imports)]
 use board::crazyhouse_board::CrazyhouseBoard;
+
+use std::fmt;
 
 #[test]
 fn available_moves_at_start() {
@@ -50,7 +52,8 @@ fn crazyhouse_moves_test() {
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
 #[allow(dead_code)]
-fn legal_moves_after_plies<B: Board>(board : &mut B, n : u8) -> u64 {
+fn legal_moves_after_plies<B:>(board : &mut B, n : u8) -> u64
+    where B: EvalBoard + fmt::Debug + Clone {
     if n == 0 { 1 }
     else {
         let mut total_moves = 0;

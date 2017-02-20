@@ -3,13 +3,14 @@ use board::std_board::TimeInfo;
 
 use board::crazyhouse_board::CrazyhouseBoard;
 
-use board::game_move;
-use board::board;
-use alpha_beta;
-use ::Score;
+use search_algorithms::game_move;
+use search_algorithms::board;
+use search_algorithms::alpha_beta;
+use search_algorithms::alpha_beta::Score;
 
 extern crate time;
 
+use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
@@ -73,7 +74,7 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
 /// Assumes "uci has already been sent"
 pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRead)
                              -> Result<(), String> 
-    where Board : 'static + board::Board + UciBoard {
+    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug {
     
     let mut board : Option<Board> = None;
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
@@ -169,9 +170,11 @@ impl EngineComm {
     }
 }
 
-fn start_engine<B: 'static + board::Board> (board : B, log_writer : SharableWriter,
+fn start_engine<B: > (board : B, log_writer : SharableWriter,
                                             time_restriction : TimeRestriction, 
-                                            engine_comm : Arc<Mutex<EngineComm>>) {
+                      engine_comm : Arc<Mutex<EngineComm>>)
+    where B: 'static + board::EvalBoard + Send + fmt::Debug
+{
     {
         engine_comm.lock().unwrap().engine_is_running = true;
     }
@@ -319,7 +322,13 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
                  ) as i64)),
         Some("depth") => return Ok(TimeRestriction::Depth(
             try!(parse_int(input.split_whitespace().nth(2))
-                 ) as u8)),
+            ) as u8)),
+        Some("mate") => return Ok(TimeRestriction::Mate(
+            try!(parse_int(input.split_whitespace().nth(2))
+            ) as u16)),
+        Some("nodes") => return Ok(TimeRestriction::Nodes(
+            try!(parse_int(input.split_whitespace().nth(2))
+            ) as u64)),
         None => return Ok(TimeRestriction::Infinite),
         Some(_) => (),
     }
@@ -362,16 +371,12 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
 
 /// Sends the engine's evaluation to the GUI via uci, along with other data
 /// like node count, time taken, etc
-pub fn send_eval_to_gui<M: game_move::Move> (log_writer : &SharableWriter, depth : u8,
+pub fn send_eval_to_gui<M> (log_writer : &SharableWriter, depth : u8,
                          ms_taken : i64, 
-                         score : Score, moves : Vec<M>, node_count : ::NodeCount) {
-    let eng_score = match score {
-        Score::Val(f) => "cp ".to_string() + &((100.0 * f) as i16).to_string(),
-        Score::MateW(n) => "mate ".to_string() + &(n as i16 / 2).to_string(),
-        Score::MateB(n) => "mate ".to_string() + &(n as i16 / -2).to_string(),
-        Score::Draw(_) => "0 ".to_string(),
-        
-    };
+                              score : Score, moves : Vec<M>, node_count : ::NodeCount)
+    where M: game_move::Move
+{
+    let eng_score = score.to_string();
     
     let mut inf_str = "info ".to_string();
     inf_str.push_str(&format!("depth {} ", depth));
@@ -435,7 +440,7 @@ fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> S
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position<Board> (input : &String, log_writer : &SharableWriter) -> Result<Board, String>
-    where Board: 'static + board::Board + UciBoard{
+    where Board: 'static + board::EvalBoard + UciBoard{
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
@@ -463,7 +468,7 @@ fn parse_position<Board> (input : &String, log_writer : &SharableWriter) -> Resu
         return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
                            input, words[1], words.len()))
     };
-    use board::game_move::Move;
+    use search_algorithms::game_move::Move;
     if words.len() > moves_pos  {
         if words[moves_pos] == "moves" {
             for c_move_str in words.iter().skip(moves_pos + 1) {

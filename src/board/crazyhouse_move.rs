@@ -1,6 +1,6 @@
 use board::std_move::ChessMove;
 use board::std_board::*;
-use board::game_move::Move;
+use search_algorithms::game_move::Move;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CrazyhouseMove {
