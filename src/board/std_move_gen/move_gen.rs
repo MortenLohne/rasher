@@ -7,8 +7,13 @@ use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 
+
+
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
+    if board.half_move_clock > 100 { // Draw by 50-move rule
+        return vec![]
+    }
     let mut moves = Vec::new();
     let king_pos = king_pos(board);
     let is_in_check = is_attacked(board, king_pos);

@@ -117,7 +117,7 @@ impl Square {
 
 // use std::hash::{Hash, Hasher, SipHasher};
 
-#[derive(Clone, Eq, Debug, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct ChessBoard {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,
@@ -567,6 +567,13 @@ impl fmt::Display for ChessBoard {
         Ok(())   
     }
 }
+
+impl fmt::Debug for ChessBoard {
+    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt::Display::fmt(self, fmt)
+    }
+}
+
 impl ChessBoard {
     
     pub fn piece_at(&self, square : Square) -> Piece {

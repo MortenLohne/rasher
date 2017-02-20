@@ -358,7 +358,6 @@ fn correct_move_gen_test2() {
     
     assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
     assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
-    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_603);
 }
 
 #[test]
@@ -381,7 +380,6 @@ fn correct_move_gen_test3() {
     assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
     assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
     assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_624);
-    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_083);
 }
 
 #[test]
@@ -402,7 +400,7 @@ fn correct_move_gen_test4() {
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..6).zip(
-        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) 
+        [6, 264, 9_467, 422_333].iter()) 
     {
         assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
     }
@@ -435,7 +433,7 @@ fn correct_move_gen_test6() {
     let mut board6 = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
     for (depth, nodes) in (1..5).zip(
-        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
+        [46, 2_079, 89_890, 3_894_594].iter()) {
         assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
     }
 }

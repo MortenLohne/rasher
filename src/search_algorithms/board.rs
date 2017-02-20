@@ -2,6 +2,8 @@ use search_algorithms::game_move;
 use std::ops;
 use std::fmt;
 use self::Color::*;
+use rand;
+use rand::Rng;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
@@ -29,7 +31,7 @@ impl fmt::Display for Color {
         Ok(())   
     }
 }
-
+#[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum GameResult {
     WhiteWin,
     BlackWin,
@@ -55,4 +57,9 @@ pub trait EvalBoard : PartialEq + Clone {
     fn game_result(&self) -> Option<GameResult>;
     
     fn eval_board(&self) -> f32;
+
+    fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
+        let moves = self.all_legal_moves();
+        self.do_move(moves[rng.gen_range(0, moves.len())].clone());
+    }
 }

@@ -4,6 +4,8 @@ mod tests;
 mod search_algorithms;
 
 extern crate time;
+extern crate rand;
+extern crate ordered_float;
 
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
@@ -69,6 +71,33 @@ fn main() {
                     }
                 }
             },
+            "mcts" => {
+                let mut board = ChessBoard::start_board().clone();
+                let mut mc_tree = search_algorithms::mcts::MonteCarloTree::new_root(&mut board);
+                let mut searches = mc_tree.searches;
+                let start_time = time::get_time();
+                let mut rng = rand::weak_rng();
+                
+                while time::get_time() < start_time + time::Duration::seconds(600) {
+                    use std::ops::Add;
+                    mc_tree.select(&mut board, searches, &mut rng);
+                    searches += 1;
+                    let searches_of_children = mc_tree.children.iter()
+                        .map(Option::as_ref).map(Option::unwrap)
+                        .map(|n| n.searches)
+                        .fold(0, u64::add);
+                    debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
+                                  format!("{} searches overall, but sum of searches of children is {}.",
+                                          searches, searches_of_children));
+                    if searches % 1024 == 0 {
+                        mc_tree.print_score(&board);
+                    }
+                    
+                }
+                mc_tree.print_score(&board);
+                
+                
+            }
             s => uci::to_log(&format!("Unrecognized command \"{}\".", s), &log_writer),
         }
     }
