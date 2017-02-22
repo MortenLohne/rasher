@@ -296,14 +296,14 @@ impl EvalBoard for ChessBoard {
 
     fn game_result(&self) -> Option<board::GameResult> {
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
-        if self.all_legal_moves().len() == 0 {
-            
-            if move_gen::is_attacked(self, self.king_pos()) {
+        
+        if self.all_legal_moves().len() == 0 {            
+            if move_gen::is_attacked(self, self.king_pos(self.to_move())) {
                 if self.to_move == White {
-                    Some(board::GameResult::WhiteWin)
+                    Some(board::GameResult::BlackWin)
                 }
                 else {
-                    Some(board::GameResult::BlackWin)
+                    Some(board::GameResult::WhiteWin)
                 }
             }
             else {
@@ -596,8 +596,8 @@ impl ChessBoard {
         new_board
     }
 
-    pub fn king_pos(&self) -> Square {
-        match self.pos_of(Piece(King, self.to_move)) {
+    pub fn king_pos(&self, color: Color) -> Square {
+        match self.pos_of(Piece(King, color)) {
             Some(square) => square,
             None => panic!("Error: There is no king on the board:\n{}", self),
         }

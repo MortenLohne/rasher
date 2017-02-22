@@ -78,23 +78,25 @@ fn main() {
                 let start_time = time::get_time();
                 let mut rng = rand::weak_rng();
                 
-                while time::get_time() < start_time + time::Duration::seconds(600) {
-                    use std::ops::Add;
-                    mc_tree.select(&mut board, searches, &mut rng);
-                    searches += 1;
-                    let searches_of_children = mc_tree.children.iter()
-                        .map(Option::as_ref).map(Option::unwrap)
-                        .map(|n| n.searches)
-                        .fold(0, u64::add);
-                    debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
-                                  format!("{} searches overall, but sum of searches of children is {}.",
-                                          searches, searches_of_children));
-                    if searches % 1024 == 0 {
-                        mc_tree.print_score(&board);
+                while time::get_time() < start_time + time::Duration::seconds(10800) {
+                    for _ in 1..10 {
+                        use std::ops::Add;
+                        mc_tree.select(&mut board, searches, &mut rng);
+                        searches += 1;
+                        let searches_of_children = mc_tree.children.iter()
+                            .map(Option::as_ref).map(Option::unwrap)
+                            .map(|n| n.searches)
+                            .fold(0, u64::add);
+                        debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
+                                      format!("{} searches overall, but sum of searches of children is {}.",
+                                              searches, searches_of_children));
+                        if searches % 4096 == 0 {
+                            mc_tree.print_score(&board, &mut String::new());
+                        }
                     }
                     
                 }
-                mc_tree.print_score(&board);
+                mc_tree.print_score(&board, &mut String::new());
                 
                 
             }

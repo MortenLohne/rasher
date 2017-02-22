@@ -19,7 +19,7 @@ use board::std_board::PieceType::*;
 #[test]
 fn knight_fork_test() {
 // Basic knight fork
-    let board1 = ChessBoard::from_fen("r3k3/2p5/8/3N4/1K5P/8/8/8 w - - 0 1").unwrap();
+    let board1 = ChessBoard::from_fen("q3k3/2p5/8/3N4/1K5P/8/8/8 w - - 0 1").unwrap();
     let best_move1 = ChessMove::new( &board1, Square::from_alg("d5").unwrap(),
                                 Square::from_alg("c7").unwrap());
     basic_tactics_prop(&board1, best_move1);
@@ -67,7 +67,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
     
-    while time::get_time() < start_time + time::Duration::seconds(20) {
+    while time::get_time() < start_time + time::Duration::seconds(10) {
         for _ in 0..10 {
             use std::ops::Add;
             mc_tree.select(&mut board, searches, &mut rng);
@@ -84,7 +84,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     }
     let engine_move = &all_legal_moves[mc_tree.best_child().unwrap()];
     let score = mc_tree.children[mc_tree.best_child().unwrap()].clone().unwrap().score();
-    mc_tree.print_score(&board);
+    mc_tree.print_score(&board, &mut String::new());
     assert_eq!(engine_move, &best_move,
                "Best move was {:?} with score {}\nExpected move: {:?}, board:\n{:?}",
                engine_move, score, best_move, board);

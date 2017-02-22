@@ -62,7 +62,7 @@ pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
                                   searches, searches_of_children, mctree.is_fully_expanded));
             
         }
-        mctree.print_score(&board);
+        mctree.print_score(&board, &mut String::new());
         
         let best_move_index = mctree.best_child().unwrap();
         let best_move = board.all_legal_moves()[best_move_index].clone();
@@ -156,7 +156,7 @@ impl MonteCarloTree {
         }
     }
 
-    pub fn print_score<B: EvalBoard + fmt::Debug>(&self, board: &B) {
+    pub fn print_score<B: EvalBoard + fmt::Debug>(&self, board: &B, padding: &mut String) {
         for (node, go_move) in self.children.iter()
             .map(Option::as_ref)
             .filter(Option::is_some)
@@ -172,27 +172,30 @@ impl MonteCarloTree {
             let mut board_after_move = board.clone();
             board_after_move.do_move(go_move.clone());
             if let Some(best_reply_index) = node.best_child() {
-                    let best_reply = board_after_move.all_legal_moves()[best_reply_index].clone();
-                    if let Some(ref best_reply_node) = node.children[best_reply_index] {
-                        
-                        println!("Move {:?} scores {:.2}% ({}/{}/{}), {} searches, best reply {:?} with {:.2}% ({}/{}/{}) after {} searches", 
-                                 go_move, 100.0 * *node.score(),
-                                 node.score.white_wins, node.score.draws, node.score.black_wins,
-                                 node.searches, 
-                                 best_reply, 100.0 * *best_reply_node.score(),
-                                 best_reply_node.score.white_wins, best_reply_node.score.draws,
-                                 best_reply_node.score.black_wins, best_reply_node.searches);
-                        if node.searches > 5000 {
-                            println!("Children//:");
-                            node.print_score(&board_after_move);
-                            println!("//children");
-                        }                 
-                        continue;
-                    }
+                let best_reply = board_after_move.all_legal_moves()[best_reply_index].clone();
+                if let Some(ref best_reply_node) = node.children[best_reply_index] {
+                    
+                    println!("{}Move {:?} scores {:.2}% ({}/{}/{}), n={}, best reply {:?} with {:.2}% ({}/{}/{}), n={}", 
+                             padding, go_move, 100.0 * *node.score(),
+                             node.score.white_wins, node.score.draws, node.score.black_wins,
+                             node.searches, 
+                             best_reply, 100.0 * *best_reply_node.score(),
+                             best_reply_node.score.white_wins, best_reply_node.score.draws,
+                             best_reply_node.score.black_wins, best_reply_node.searches);
+                    if node.searches > 10000 {
+                        println!("Children//:");
+                        padding.push_str("  ");
+                        node.print_score(&board_after_move, padding);
+                        let len = padding.len(); 
+                        padding.truncate(len - 2);
+                        println!("//children");
+                    }                 
+                    continue;
+                }
             }
             if node.searches >= 10 {
                 println!("Move {:?} scores {:.2}%, {} searches, best reply not found", 
-                     go_move, 100.0 * *node.score(), node.searches );
+                         go_move, 100.0 * *node.score(), node.searches );
             }
         }
     }
@@ -225,7 +228,6 @@ impl MonteCarloTree {
             }
             None => (),
         }
-        
         use std::ops::Add;
         let searches_of_children = self.children.iter()
             .map(Option::as_ref).map(Option::unwrap)

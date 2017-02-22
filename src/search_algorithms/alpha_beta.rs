@@ -115,8 +115,8 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::
             if should_stop { panic!("Engine was told to stop") }
         }
         match board.game_result() {
-            Some(GameResult::WhiteWin) => return (BlackWin(0), vec![]),
-            Some(GameResult::BlackWin) => return (WhiteWin(0), vec![]),
+            Some(GameResult::WhiteWin) => return (WhiteWin(0), vec![]),
+            Some(GameResult::BlackWin) => return (BlackWin(0), vec![]),
             Some(GameResult::Draw) => return (Draw(0), vec![]),
             None => (),
         }

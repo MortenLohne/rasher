@@ -79,10 +79,11 @@ fn legal_moves_for_king(board : &ChessBoard, square : Square, moves : &mut Vec<C
             debug_assert!(file == 4, format!("Error: King tried to castle from {} on:{}.",
                                              square, board));
             let square_checked = Square(square.0 + n);
-            if is_attacked(board, square_checked) ||
-                board.piece_at(square_checked) != Piece(Empty, White) {
+            if board.piece_at(square_checked) != Piece(Empty, White)
+                || is_attacked(board, square_checked) {
                     can_castle_here = false;
                 }
+            
         }
         if can_castle_here {
             moves.push(ChessMove::new(&board, square, Square(square.0 + 2)));
@@ -100,8 +101,9 @@ fn legal_moves_for_king(board : &ChessBoard, square : Square, moves : &mut Vec<C
         for n in [1, 2].iter() {
             debug_assert!(file == 4, format!("Error: File is {}.", file));
             let square_checked = Square(square.0 - n);
-            if is_attacked(board, square_checked) ||
-                board.piece_at(square_checked) != Piece(Empty, White) {
+            if board.piece_at(square_checked) != Piece(Empty, White) ||
+                is_attacked(board, square_checked)
+                 {
                     can_castle_here = false;
                 }
         }
@@ -364,7 +366,13 @@ pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : 
     }
 }
 
+/// Returns whether a square is under attack by the side not to move
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
+    if board.piece_at(square).0 != Empty {
+        debug_assert_eq!(board.to_move(), board.piece_at(square).1,
+                         "{:?}\n Tried to check if {} {} at {} was attacked.",
+                         board,  board.piece_at(square).1, board.piece_at(square).0, square);
+    }
     // Direction enemy pawns are coming from
     let pawn_direction = if board.to_move == White { -1 } else { 1 };
     let pos = square.0 as i8;
@@ -509,5 +517,5 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
 }
 
 pub fn king_pos (board : &ChessBoard) -> Square {
-    board.king_pos()
+    board.king_pos(board.to_move())
 }

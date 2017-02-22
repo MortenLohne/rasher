@@ -61,29 +61,7 @@ fn test_score () {
     assert!(BlackWin(3) <= BlackWin(3));
     assert!(BlackWin(2) <= WhiteWin(2));
 }
-/*
-#[test]
-fn test_is_attacked() {
-    let board1 = Board::from_fen("rnbqkbnr/ppNppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1")
-        .unwrap();
-    let king_pos = board1.king_pos();
-    assert_eq!(king_pos, Square(4));
-    assert!(board1.is_attacked(&board1, king_pos) == true,
-            format!("Error: King should be under attack here:\n{}", board1));
 
-    let board2 = ChessBoard::from_fen("k7/1P6/8/8/8/8/8/6K1 b - - 0 1").unwrap();
-    let king_pos = board2.king_pos();
-    assert_eq!(king_pos, Square(0));
-    assert!(move_gen::is_attacked(&board2, king_pos) == true,
-               format!("Error: King should be under attack here:\n{}", board2));
-
-    let board3 = ChessBoard::from_fen("2k5/2P5/8/8/8/8/8/5K2 b - - 0 1").unwrap();
-    let king_pos = board3.king_pos();
-    assert_eq!(king_pos, Square(2));
-    assert!( move_gen::is_attacked(&board3, king_pos) == false,
-               format!("Error: King should not be under attack here:\n{}", board3));
-}
-*/
 
 #[test]
 fn basic_movement_test() {
@@ -101,7 +79,7 @@ fn basic_movement_test() {
 fn respond_to_checks() {
     let mut board1 = ChessBoard::from_fen("rnbqkbnr/ppNppppp/8/8/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1")
         .unwrap();
-    assert!(move_gen::is_attacked(&board1, board1.king_pos()) == true,
+    assert!(move_gen::is_attacked(&board1, board1.king_pos(board1.to_move())) == true,
             format!("Error: King should be under attack here:\n{}", board1));
     let legal_moves = move_gen::all_legal_moves(&mut board1);
     assert!(legal_moves.len() == 1,
@@ -109,7 +87,7 @@ fn respond_to_checks() {
 
     let mut board2 = ChessBoard::from_fen("r1bqkb1r/pppppppp/5N2/8/3n4/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1")
         .unwrap();
-    assert!(move_gen::is_attacked(&board2, board2.king_pos()) == true,
+    assert!(move_gen::is_attacked(&board2, board2.king_pos(board2.to_move())) == true,
             format!("Error: King should be under attack here:\n{}", board2));
     let legal_moves = move_gen::all_legal_moves(&mut board2);
     assert!(legal_moves.len() == 2,
@@ -117,7 +95,7 @@ fn respond_to_checks() {
 
     let mut board3 = ChessBoard::from_fen("r1bqkb1r/pppppppp/5N2/8/3n4/4P3/PPPP1PPP/R1BQKBNR b KQkq - 0 1")
         .unwrap();
-    assert!(move_gen::is_attacked(&board3, board3.king_pos()) == true,
+    assert!(move_gen::is_attacked(&board3, board3.king_pos(board3.to_move())) == true,
             format!("Error: King should be under attack here:\n{}", board3));
     let legal_moves = move_gen::all_legal_moves(&mut board3);
     assert!(legal_moves.len() == 2,
@@ -125,22 +103,22 @@ fn respond_to_checks() {
 
     let mut board4 = ChessBoard::from_fen("r1bqkb1r/pppp1ppp/5p2/7Q/3n4/4P3/PPPP1PPP/R1B1KBNR b KQkq - 0 1")
         .unwrap();
-    assert!(move_gen::is_attacked(&board4, board4.king_pos()) == false,
+    assert!(move_gen::is_attacked(&board4, board4.king_pos(board4.to_move())) == false,
             format!("Error: King should not be under attack here:\n{}", board4));
     let legal_moves = move_gen::all_legal_moves(&mut board4);
     assert!(legal_moves.len() == 29,
             format!("Found {} legal moves, expected 29. Board:\n{}", legal_moves.len(), board4));
 
     let mut board5 = ChessBoard::from_fen("k7/Q6K/8/8/8/8/8/8 b - - 0 1").unwrap();
-    assert!(move_gen::is_attacked(&board5, board5.king_pos()) == true,
+    assert!(move_gen::is_attacked(&board5, board5.king_pos(board5.to_move())) == true,
             format!("Error: King should be under attack here at {}:\n{}",
-                    board5.king_pos(), board5));
+                    board5.king_pos(board5.to_move()), board5));
     let legal_moves = move_gen::all_legal_moves(&mut board5);
     assert!(legal_moves.len() == 1,
             format!("Found {} legal moves, expected 1. Board:\n{}", legal_moves.len(), board5));
 
     let mut board6 = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1").unwrap();
-    assert!(move_gen::is_attacked(&board6, board6.king_pos()) == true,
+    assert!(move_gen::is_attacked(&board6, board6.king_pos(board6.to_move())) == true,
             format!("Error: King should be under attack here:\n{}", board5));
     move_is_available_prop(&mut board6, ChessMove::from_alg("h4g4").unwrap());
     move_is_unavailable_prop(&mut board6, ChessMove::from_alg("f4g3").unwrap());
@@ -185,11 +163,11 @@ fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
         alpha_beta::search_moves(board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
                                  uci::TimeRestriction::Depth(5),
                                  Arc::new(Mutex::new(None)));
-    assert!(tried_moves[0].simple_eq(best_move),
-            format!("Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
+    assert_eq!(tried_moves[0], best_move,
+               "Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
 expected {}, board:\n{}",
-                    tried_moves[0], score, node_count.intern, node_count.leaf,
-                    best_move, board));
+               tried_moves[0], score, node_count.intern, node_count.leaf,
+               best_move, board);
 }
 
 #[test]
@@ -298,7 +276,7 @@ fn castling_test () {
 #[allow(dead_code)]
 fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
-    assert!(all_moves.iter().find(|mv|c_move.simple_eq(**mv)).is_some(),
+    assert!(all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should be legal here, board:{}Legal moves: {:?}",
             c_move.to_alg(), board, all_moves);
 }
@@ -306,7 +284,7 @@ fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
 #[allow(dead_code)]
 fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
-    assert!(!all_moves.iter().find(|mv|c_move.simple_eq(**mv)).is_some(),
+    assert!(!all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should not be legal here, board:{}Legal moves: {:?}",
             c_move.to_alg(), board, all_moves);
 }
@@ -433,7 +411,7 @@ fn correct_move_gen_test6() {
     let mut board6 = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
     for (depth, nodes) in (1..5).zip(
-        [46, 2_079, 89_890, 3_894_594].iter()) {
+        [46, 2_079, 89_890].iter()) {
         assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
     }
 }
@@ -477,39 +455,3 @@ fn legal_moves_after_plies(board : &mut ChessBoard, n : u8) -> u64 {
         total_moves
     }
 }
-
-/*
-// Prevent the benchmark from running forever by interrupting it after 10 runs
-#[allow(dead_code)]
-static mut BENCHES_RUN : u32 = 0;
-
-#[bench]
-fn eval_start_pos_bench (bencher : &mut test::Bencher) {
-    let start_time = time::get_time();
-    let board = START_BOARD.clone();
-    let mut total_nodes = ::NodeCount{ intern: 0, leaf: 0, total: 0 };
-    bencher.iter(|| {
-        unsafe {
-            if BENCHES_RUN > 5 {
-                return;
-            }
-        }
-        let (_, _, node_counter) = alpha_beta::search_moves(
-            board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
-            uci::TimeRestriction::Depth(6), Arc::new(Mutex::new(None)));
-        total_nodes.intern += node_counter.intern;
-        total_nodes.leaf += node_counter.leaf;
-        total_nodes.total += node_counter.total;
-    });
-    
-    unsafe {
-        if BENCHES_RUN > 5 {
-            return;
-        }
-        BENCHES_RUN += 1;
-    }
-    let ms_taken = (time::get_time() - start_time).num_milliseconds();
-    println!("{} nodes/s",
-             (total_nodes.intern + total_nodes.leaf) as f32 / ms_taken as f32);
-}
-*/

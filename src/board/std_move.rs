@@ -4,8 +4,9 @@ use board::std_board::*;
 use search_algorithms::game_move::Move;
 
 use std::fmt;
+use std::cmp;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 pub struct ChessMove {
     pub from : Square,
     pub to : Square,
@@ -29,6 +30,13 @@ impl fmt::Debug for ChessMove {
     }
 }
 
+impl cmp::PartialEq for ChessMove {
+    fn eq(&self, other: &Self) -> bool {
+        self.from == other.from && self.to == other.to && self.prom == other.prom
+    }
+}
+impl cmp::Eq for ChessMove { }
+
 impl ChessMove {
     pub fn new(board: &ChessBoard, from : Square, to : Square) -> ChessMove {
         let capture = board.piece_at(to).0;
@@ -37,10 +45,6 @@ impl ChessMove {
         ChessMove { from: from, to: to, prom: None, capture: capture, 
                old_castling_en_passant: old_castling_en_passant, 
                old_half_move_clock: board.half_move_clock }
-    }
-
-    pub fn simple_eq(&self, other: ChessMove) -> bool {
-        self.from == other.from && self.to == other.to
     }
     
     pub fn new_prom(board: &ChessBoard, from : Square, to : Square, prom : Piece) -> ChessMove {

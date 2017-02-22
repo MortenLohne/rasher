@@ -3,7 +3,6 @@ use std::ops;
 use std::fmt;
 use self::Color::*;
 use rand;
-use rand::Rng;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
@@ -65,6 +64,8 @@ pub trait EvalBoard : PartialEq + Clone {
 
     /// Returns the result if the game is decided, otherwise returns None.
     /// This function should return quickly if the game is not decided yet.
+    /// If the game is over, it must be the losing player's turn,
+    /// otherwise the function may return anything
     fn game_result(&self) -> Option<GameResult>;
     
     fn eval_board(&self) -> f32;
