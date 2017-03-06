@@ -6,6 +6,9 @@ mod search_algorithms;
 extern crate time;
 extern crate rand;
 extern crate ordered_float;
+extern crate futures;
+extern crate futures_cpupool;
+extern crate rayon;
 
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
@@ -73,6 +76,9 @@ fn main() {
             },
             "mcts" => {
                 let mut board = ChessBoard::start_board().clone();
+                search_algorithms::mcts::search_position(&mut board);
+                /*
+                
                 let mut mc_tree = search_algorithms::mcts::MonteCarloTree::new_root(&mut board);
                 let mut searches = mc_tree.searches;
                 let start_time = time::get_time();
@@ -97,6 +103,7 @@ fn main() {
                     
                 }
                 mc_tree.print_score(&board, &mut String::new());
+                 */
                 
                 
             }

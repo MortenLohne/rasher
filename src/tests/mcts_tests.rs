@@ -23,13 +23,10 @@ fn knight_fork_test() {
     let best_move1 = ChessMove::new( &board1, Square::from_alg("d5").unwrap(),
                                 Square::from_alg("c7").unwrap());
     basic_tactics_prop(&board1, best_move1);
-
-    let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
-    let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
-    basic_tactics_prop(&board5, best_move5);
 }
 
-#[test]
+// Commented because it takes a lot of time for little benefit
+/*#[test]
 fn queen_pawn_to_mate() {
     // Checks that white can queen a pawn to mate
     let board2 = ChessBoard::from_fen("k7/p1P5/8/K7/8/8/8/8 w - - 0 1").unwrap();
@@ -37,6 +34,7 @@ fn queen_pawn_to_mate() {
                                      Square::from_alg("c8").unwrap(), Piece(Queen, White) );
     basic_tactics_prop(&board2, best_move2);
 }
+*/
 
 #[test]
 fn underpromote() {
@@ -57,6 +55,13 @@ fn block_pawn() {
     basic_tactics_prop(&board4, best_move4);
 }
 
+#[test]
+fn capture_to_promote() {
+    let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
+    let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
+    basic_tactics_prop(&board5, best_move5);
+}
+
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Move) {
     let mut board = board.clone();
@@ -67,7 +72,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
     
-    while time::get_time() < start_time + time::Duration::seconds(10) {
+    while time::get_time() < start_time + time::Duration::seconds(30) {
         for _ in 0..10 {
             use std::ops::Add;
             mc_tree.select(&mut board, searches, &mut rng);
