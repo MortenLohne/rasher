@@ -55,13 +55,11 @@ impl EvalBoard for CrazyhouseBoard {
         self.base_board.game_result()
     }
     
-    /*
-    fn is_mate_or_stalemate(&self) -> ::Score {
-        self.base_board.is_mate_or_stalemate()
-    }
-     */
-    fn start_board() -> &'static Self {
-        &START_BOARD
+    fn start_board() -> Self {
+        CrazyhouseBoard {base_board: ChessBoard::start_board().clone(),
+                         white_available_pieces: vec![],
+                         black_available_pieces: vec![],
+                         crazyhouse_moves: vec![]}
     }
 
     fn eval_board(&self) -> f32 {
@@ -213,14 +211,6 @@ impl EvalBoard for CrazyhouseBoard {
             }
         }
     }
-}
-
-lazy_static! {
-    static ref START_BOARD : CrazyhouseBoard =
-        CrazyhouseBoard {base_board: ChessBoard::start_board().clone(),
-                         white_available_pieces: vec![],
-                         black_available_pieces: vec![],
-                         crazyhouse_moves: vec![]};
 }
 
 use std::fmt;

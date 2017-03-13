@@ -3,6 +3,7 @@ use search_algorithms::board::GameResult::*;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::Color;
+use search_algorithms::alpha_beta;
 
 use rayon::prelude::*;
 
@@ -15,6 +16,8 @@ use std::io;
 use std::fmt;
 use std::io::Write;
 use std::marker::{Send, Sync};
+use std::sync::mpsc;
+use uci;
 
 pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
     let stdin = io::stdin();
@@ -80,8 +83,96 @@ pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
     println!("{:?}\n{:?} won!", board, board.game_result());
 }
 
+pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
+                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
+    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+{
+    let mut mc_tree = MonteCarloTree::new_root(&mut board);
+    let start_time = time::get_time();
+    let mut rng = rand::weak_rng();
+    let mut total_depth : u64 = 0;
+    loop {
+        for _ in 1..10 {
+            use std::ops::Add;
+            let searches = mc_tree.searches;
+            //searches_last_print = mc_tree.searches;
+            let mut search_data = SearchData::default();
+            mc_tree.select_parallel(&mut board, &mut rng, searches, &mut search_data, 2);
+            //mc_tree.select(board, &mut rng, searches, &mut search_data)
+            total_depth += search_data.total_depth as u64;
+            let searches_of_children = mc_tree.children.iter()
+                .map(Option::as_ref).map(Option::unwrap)
+                .map(|n| n.searches)
+                .fold(0, u64::add);
+            debug_assert!((mc_tree.searches as i64 - searches_of_children as i64).abs() <= 1,
+                          format!("{} searches overall, but sum of searches of children is {}.\n{:?}",
+                                  mc_tree.searches, searches_of_children, mc_tree));
+        }
+        use uci::TimeRestriction::*;
+        use search_algorithms::board::Color::*;
+        let ms_taken = (time::get_time() - start_time).num_milliseconds();
+        match time_limit {
+            GameTime(info) => { 
+                if (board.to_move() == Black && 
+                    ms_taken as u32 > info.black_inc + info.black_time / 20) ||
+                    (board.to_move() == White && 
+                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 20)
+                {
+                    break;
+                }
+            },
+            Depth(n) => if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32) {
+                break
+            }
+            else { },
+            Nodes(n) => if mc_tree.searches >= n { break } else { },
+            Mate(n) => if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32) {
+                break
+            }
+            else { },
+            MoveTime(millis) => {
+                if ms_taken > millis {
+                    break;
+                }
+                else { () }
+            },
+            Infinite => (),
+        }
+        send_uci_info(&mc_tree, &mut board, start_time, &options, &channel);
+    }
+    send_uci_info(&mc_tree, &mut board, start_time, &options, &channel);
+}
+
+fn send_uci_info<B>(mc_tree: &MonteCarloTree<<B as EvalBoard>::Move>,
+                    board: &mut B, start_time: time::Timespec,
+                    options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo>)
+    where B: EvalBoard + fmt::Debug
+{
+    let ms_taken = (time::get_time() - start_time).num_milliseconds();
+    let mut pvs = vec![];
+    for (node, go_move) in mc_tree.children.iter()
+        .map(Option::as_ref)
+        .filter(Option::is_some)
+        .map(Option::unwrap)
+        .take(options.multipv as usize)
+        .zip(board.all_legal_moves())
+        .sorted_by(|&(node1, _), &(node2, _)| {
+            let cmp = node1.score().cmp(&node2.score());
+            if mc_tree.maximizing { cmp.reverse() }
+            else { cmp }
+        })
+        
+    {
+        let pv = node.pv(board).iter().map(Move::to_alg).collect::<Vec<_>>().join(" ");
+        pvs.push((alpha_beta::Score::Val(node.score().into_inner() as f32), pv));
+    }
+    let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken,
+                                  nodes: mc_tree.searches, hashfull: 0.0, pvs: pvs };
+    channel.send(uci_info).unwrap();
+}
+
 pub fn search_position<B>(board: &mut B)
-    where B: EvalBoard + fmt::Debug + Sync + Send, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(board);
     let start_time = time::get_time();
@@ -96,6 +187,7 @@ pub fn search_position<B>(board: &mut B)
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
             mc_tree.select_parallel(board, &mut rng, searches, &mut search_data, 2);
+            //mc_tree.select(board, &mut rng, searches, &mut search_data)
             total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
@@ -116,14 +208,13 @@ pub fn search_position<B>(board: &mut B)
                 mc_tree.print_score(board, &mut String::new());
             }
         }
-        
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MonteCarloTree {
+pub struct MonteCarloTree<M> {
     // All the node's child nodes. 
-    pub children: Vec<Option<MonteCarloTree>>, 
+    children: Vec<(M, Option<MonteCarloTree<M>>)>, 
     pub score: Score,
     pub value: f64,
     pub searches: u64,
@@ -131,7 +222,7 @@ pub struct MonteCarloTree {
     maximizing: bool,
 }
 
-impl MonteCarloTree {
+impl<M> MonteCarloTree<M> {
     pub fn new_root<B: EvalBoard + fmt::Debug>(board : &mut B) -> Self {
         
         let mut root = MonteCarloTree { children: vec![None; board.all_legal_moves().len()],
@@ -155,6 +246,14 @@ impl MonteCarloTree {
         root
     }
 
+    pub fn get_child(&self, index: usize) -> Option<&self> {
+        self.children[index].1.as_ref()
+    }
+
+    pub fn get_child_mut(&mut self, index: usize) -> Option<&mut self> {
+        self.children[index].1.as_mut()
+    }
+    
     pub fn new_child(&self, num_of_children: usize) -> Self {
         MonteCarloTree { children: vec![None; num_of_children], score: Score::new(),
                value: 0.0, searches: 0, is_fully_expanded: false, 
@@ -188,17 +287,45 @@ impl MonteCarloTree {
     /// Returns the index of the best child node
     pub fn best_child(&self) -> Option<usize> {
         let iter = self.children.iter()
-            .filter(|&opt| opt.is_some())
-            .map(Option::as_ref).map(Option::unwrap)
-            .enumerate();
+            .map(Option::as_ref)
+            .enumerate()
+            .filter(|&(_, opt)| opt.is_some())
+            .map(|(n, opt)| (n, opt.unwrap()));
         if self.maximizing {
-            iter.max_by_key(|&(_, child)| child.score()).map(|(n, _)| n)
+            iter.max_by_key(|&(_, child)| child.score())
+                .map(|(n, _)| n)
         }
         else {
-            iter.min_by_key(|&(_, child)| child.score()).map(|(n, _)| n)
+            iter.min_by_key(|&(_, child)| child.score())
+                .map(|(n, _)| n)
         }
     }
 
+    pub fn pv<B: EvalBoard + fmt::Debug>(&self, board: &mut B) -> Vec<<B as EvalBoard>::Move> {
+        match self.best_child() {
+            None => vec![],
+            Some(index) => {
+                let child_node = self.children[index].as_ref()
+                    .expect(&format!("No index {} in {:?}", index, self.children));
+                let moves = board.all_legal_moves();
+                assert_eq!(moves.len(), self.children.len(),
+                           "{:?} has {} moves but node has {} children: {:?}\n{:?}",
+                           board, moves.len(), self.children.len(), self.children, moves);
+                if index >= moves.len() {
+                    println!("{:?}\n{:?}\n{:?}", board, moves, self);
+                }
+                let game_move = moves[index].clone();
+                let old_board = board.clone();
+                let undo_move = board.do_move(game_move.clone());
+                let mut result = child_node.pv(board);
+                board.undo_move(undo_move);
+                debug_assert_eq!(*board, old_board);
+                result.insert(0, game_move);
+                result
+            }
+        }
+        
+    }
 
     pub fn print_score<B: EvalBoard + fmt::Debug>(&self, board: &B, padding: &mut String) {
 
@@ -239,8 +366,8 @@ impl MonteCarloTree {
                 }
             }
             if node.searches >= 10 {
-                println!("Move {:?} scores {:.2}%, {} searches, best reply not found", 
-                         go_move, 100.0 * *node.score(), node.searches );
+                println!("{}Move {:?} scores {:.2}%, {} searches, best reply not found", 
+                         padding, go_move, 100.0 * *node.score(), node.searches );
             }
         }
     }
@@ -265,7 +392,7 @@ impl MonteCarloTree {
     pub fn select_parallel<B, Ra> (&mut self, board: &B, rng: &mut Ra,
                                   total_searches: u64, search_data: &mut SearchData,
                                   threads: u16) -> Score
-        where B: EvalBoard + fmt::Debug + Sync + Send, Ra: rand::Rng + rand::Rand + Send + Clone,
+        where B: EvalBoard + fmt::Debug + Send, Ra: rand::Rng + rand::Rand + Send + Clone,
     <B as EvalBoard>::Move: Sync
     {
         //println!("Selecting in parallel");
@@ -311,24 +438,24 @@ impl MonteCarloTree {
         }
         let (child1, child2) : (&mut MonteCarloTree, &mut MonteCarloTree) = get_two_mut(&mut self.children[0..], child_indices[0], child_indices[1]);
 
-        let value = [(0, child1, rng.clone()), (1, child2, rng.clone())].into_par_iter()
-            .map(|&mut(i, ref mut child, ref mut new_rng)| {
-                let mut board = board.clone();
+        let value = [(0, child1, rng.clone(), board.clone()),
+                     (1, child2, rng.clone(), board.clone())].into_par_iter()
+            .map(|&mut(i, ref mut child, ref mut new_rng, ref mut board)| {
                 let child_index = child_indices[i];
                 board.do_move(moves[child_index].clone());
                 
                 if child.is_fully_expanded {
                     if threads < 2 {
-                        Score::from_game_result(&child.select(&mut board, new_rng,
+                        Score::from_game_result(&child.select(&mut *board, new_rng,
                                                               total_searches, &mut search_data.clone()))
                     }
                     else {
-                        (*child).select_parallel(&mut board, new_rng, total_searches,
+                        (*child).select_parallel(&mut *board, new_rng, total_searches,
                                               &mut search_data.clone(), threads / 2)
                     }
                 }
                 else {
-                    Score::from_game_result(&child.expand(&mut board, new_rng,
+                    Score::from_game_result(&child.expand(&mut *board, new_rng,
                                                           &mut search_data.clone()))
                 }
             })
@@ -405,14 +532,19 @@ impl MonteCarloTree {
                                 moves.len(), self.children.len(), board));
                 
                 let mut random_index = rand::random::<usize>() % moves.len();
+                // Pick random child nodes until we find an unexpanded one
+                // TODO: This takes a long time with few unexplored nodes. Optimize.
                 loop {
                     if self.children[random_index] == None {
                         let undo_move = board.do_move(moves[random_index].clone());
 
                         let value;
-                        let child_moves = board.all_legal_moves();
+                        let num_child_moves = if board.game_result() == None {
+                            board.all_legal_moves().len()
+                        }
+                        else { 0 };
                         self.children[random_index] = Some(
-                            self.new_child(child_moves.len()));
+                            self.new_child(num_child_moves));
                         if !self.children.contains(&None) {
                             self.is_fully_expanded = true;
                         }

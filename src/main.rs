@@ -1,3 +1,5 @@
+#![feature(ordering_chaining)]
+
 mod uci;
 mod board;
 mod tests;
@@ -12,6 +14,8 @@ extern crate rayon;
 
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
+use search_algorithms::game_move::Move;
+use search_algorithms::mcts;
 
 use std::sync::{Arc, Mutex};
 use std::io;
@@ -21,10 +25,10 @@ use std::fmt;
 use search_algorithms::board::EvalBoard;
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
+use board::sjadam_board::SjadamBoard;
 
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate itertools;
 fn main() {
     
@@ -50,12 +54,13 @@ fn main() {
                 println!("readyok");
             }, 
             
-            "mem usage" => {
+            "mem_usage" => {
                 use std::mem;
                 println!("Standard board: {}", mem::size_of::<board::std_board::ChessBoard>());
                 println!("Standard move: {}", mem::size_of::<board::std_move::ChessMove>());
                 println!("Standard piece: {}", mem::size_of::<board::std_board::Piece>());
                 println!("Board score: {}", mem::size_of::<Score>());
+                println!("Size of mcts node: {}", mem::size_of::<mcts::MonteCarloTree>());
                 
             },
             //"play_self" => play_game(&board::START_BOARD.clone()),
@@ -70,51 +75,37 @@ fn main() {
                             let board = CrazyhouseBoard::start_board().clone();
                             play_game(board, log_writer)
                         },
+                        "sjadam" => {
+                            let board = SjadamBoard::start_board().clone();
+                            play_game(board, log_writer)
+                        }
                         s => println!("Unrecognized variant {}.", s),
                     }
                 }
             },
             "mcts" => {
-                let mut board = ChessBoard::start_board().clone();
-                search_algorithms::mcts::search_position(&mut board);
-                /*
                 
-                let mut mc_tree = search_algorithms::mcts::MonteCarloTree::new_root(&mut board);
-                let mut searches = mc_tree.searches;
-                let start_time = time::get_time();
-                let mut rng = rand::weak_rng();
-                
-                while time::get_time() < start_time + time::Duration::seconds(10800) {
-                    for _ in 1..10 {
-                        use std::ops::Add;
-                        mc_tree.select(&mut board, searches, &mut rng);
-                        searches += 1;
-                        let searches_of_children = mc_tree.children.iter()
-                            .map(Option::as_ref).map(Option::unwrap)
-                            .map(|n| n.searches)
-                            .fold(0, u64::add);
-                        debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
-                                      format!("{} searches overall, but sum of searches of children is {}.",
-                                              searches, searches_of_children));
-                        if searches % 4096 == 0 {
-                            mc_tree.print_score(&board, &mut String::new());
-                        }
-                    }
-                    
+                if tokens.len() == 1 || tokens[1] == "standard" {
+                    let mut board = ChessBoard::start_board().clone();
+                    search_algorithms::mcts::search_position(&mut board);
                 }
-                mc_tree.print_score(&board, &mut String::new());
-                 */
-                
-                
+                else {
+                    match tokens[1] {
+                        "crazyhouse" => {
+                            let mut board = CrazyhouseBoard::start_board().clone();
+                            search_algorithms::mcts::search_position(&mut board);
+                        },
+                        "sjadam" => {
+                            let mut board = SjadamBoard::start_board().clone();
+                            search_algorithms::mcts::search_position(&mut board);
+                        }
+                        s => println!("Unrecognized variant {}.", s),
+                    }
+                }
             }
             s => uci::to_log(&format!("Unrecognized command \"{}\".", s), &log_writer),
         }
     }
-    
-    
-    
-    //play_game(&board::START_BOARD.clone());
-    //play_human();
 }
 
 #[allow(dead_code)]
@@ -125,11 +116,14 @@ fn play_game<B> (mut board : B, log_writer : uci::SharableWriter)
     let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
     engine_comm.lock().unwrap().engine_is_running = true;
     
-    let (score, moves, _) = search_algorithms::alpha_beta::search_moves(
-        board.clone(), engine_comm.clone(), uci::TimeRestriction::MoveTime(5000), log_writer.clone());
-    if moves.len() > 0 {
-        println!("Found move with score {}.", score);
-        board.do_move(moves[0].clone());
+    let (score, pv, _) = search_algorithms::alpha_beta::search_moves(
+        board.clone(), engine_comm.clone(), uci::TimeRestriction::MoveTime(5000),
+        log_writer.clone());
+
+        
+    if pv.len() > 0 {
+        println!("Found move {} with score {}.", pv[0].to_alg(), score);
+        board.do_move(pv[0].clone());
         play_game(board, log_writer);
     }
     else {

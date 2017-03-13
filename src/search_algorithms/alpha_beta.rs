@@ -156,7 +156,8 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::
         let legal_moves = board.all_legal_moves();
         
         // If there is mate or stalemate on the board, we should already have returned
-        assert!(legal_moves.len() > 0);
+        assert!(legal_moves.len() > 0, "Found 0 legal moves, but game result was {:?} on \n{:?}",
+                board.game_result(), board);
         
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR

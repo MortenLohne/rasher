@@ -1,4 +1,5 @@
 use board::std_board::ChessBoard;
+use board::sjadam_board::SjadamBoard;
 use board::std_board::TimeInfo;
 
 use board::crazyhouse_board::CrazyhouseBoard;
@@ -6,6 +7,7 @@ use board::crazyhouse_board::CrazyhouseBoard;
 use search_algorithms::game_move;
 use search_algorithms::board;
 use search_algorithms::alpha_beta;
+use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
 
 extern crate time;
@@ -58,6 +60,7 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
         match tokens[1] {
             "standard" => connect_engine::<ChessBoard>(log_writer, stdin),
             "crazyhouse" => connect_engine::<CrazyhouseBoard>(log_writer, stdin),
+            "sjadam" => connect_engine::<SjadamBoard>(log_writer, stdin),
             _ => Err(format!("Unrecognized chess variant {}.", tokens[1])),
         }
     }
@@ -74,9 +77,12 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
 /// Assumes "uci has already been sent"
 pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRead)
                              -> Result<(), String> 
-    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug {
+    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug,
+<Board as board::EvalBoard>::Move: Sync
+{
     
     let mut board : Option<Board> = None;
+    let mut engine_string = "minimax".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
     let mut engine_options = EngineOptions::new();
     
@@ -103,6 +109,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                     try!(parse_setoption(&input, log_writer))
                 }
             },
+            "engine" => engine_string = tokens[1].to_string(),
             "stop" => {
                 let best_move : String;
                 {
@@ -135,10 +142,27 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                     }
                     
                 }
-                let board = try!(board.clone().ok_or("Received go without receiving a position first. Exiting..."));
+                let board = try!(board.clone()
+                                 .ok_or("Received go without receiving a position first. Exiting..."));
                 let time_restriction = try!(parse_go(&input, log_writer));
-                
-                start_engine(board, log_writer.clone(), time_restriction, engine_comm.clone());
+                match engine_string.as_str() {
+                    "minimax" => 
+                        start_engine(board, log_writer.clone(),
+                                     time_restriction, engine_comm.clone()),
+                    "mcts" => {
+                        let rx = start_mcts_engine(board, time_restriction,
+                                                   engine_options.clone());
+                        thread::spawn(move || {
+                            loop {
+                                match rx.recv() {
+                                    Ok(uci_info) => println!("info {}", uci_info.to_info_string()),
+                                    Err(_) => break,
+                                }
+                            }
+                        });
+                    },
+                    _ => (),
+                }
             },
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), log_writer);
@@ -154,7 +178,7 @@ pub enum TimeRestriction {
     Nodes(u64),
     Mate(u16),
     MoveTime(i64),
-    Infinite,   
+    Infinite,
 }
 
 /// Struct for communicating with the engine from another thread
@@ -170,7 +194,19 @@ impl EngineComm {
     }
 }
 
-fn start_engine<B: > (board : B, log_writer : SharableWriter,
+use std::sync::mpsc;
+
+fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
+                        options: EngineOptions) -> mpsc::Receiver<UciInfo>
+    where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
+{
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move ||
+                  mcts::uci_search(board, time_limit, options, tx));
+    rx
+}
+
+fn start_engine<B> (board : B, log_writer : SharableWriter,
                                             time_restriction : TimeRestriction, 
                       engine_comm : Arc<Mutex<EngineComm>>)
     where B: 'static + board::EvalBoard + Send + fmt::Debug
@@ -213,21 +249,24 @@ pub fn open_log_file (log_writer : &SharableWriter) {
     }
 }
 
-enum ChessVariant {
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum ChessVariant {
     Standard,
     Crazyhouse,
 }
 
 // Options set in the UCI engine
-struct EngineOptions {
-    variant: ChessVariant,
-    threads: u32,
-    hash_memory: u32, // In megabytes
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct EngineOptions {
+    pub variant: ChessVariant,
+    pub threads: u32,
+    pub hash_memory: u32, // In megabytes
+    pub multipv: u32,
 }
 
 impl EngineOptions {
     fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64, multipv: 4 }
     }
 }
 
@@ -490,7 +529,33 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
     }
     Ok(board)
 }
+
+/// Trait representing an algorithm returning uci-compatible output
+pub struct UciInfo {
+    pub depth: u16,
+    pub seldepth: u16,
+    pub time: i64,
+    pub nodes: u64,
+    pub hashfull: f64,
+    pub pvs: Vec<(Score, String)>,
+}
     
-//pub fn parse_fen (fen : &str) -> Result<std_board::ChessBoard, String> {
-    
-//}
+impl UciInfo {
+    pub fn to_info_string(&self) -> String {
+        use fmt::Write;
+        let mut string = String::new();
+        if self.pvs.len() == 1 {
+            write!(string, "info depth {} seldepth {} score {} nodes {} time {} nps {} pv {}\n",
+                   self.depth, self.seldepth, self.pvs[0].0, self.nodes,
+                   self.time, (1000 * self.nodes) as i64 / self.time, self.pvs[0].1).unwrap();
+        }
+        else {
+            for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
+                write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} time {} nps {} pv {}\n",
+                       self.depth, self.seldepth, n, score, self.nodes,
+                       self.time, (1000 * self.nodes) as i64 / self.time, moves).unwrap();
+            }
+        }
+        string
+    }
+}

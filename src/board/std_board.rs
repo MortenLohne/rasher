@@ -6,7 +6,8 @@ use board::std_move_gen::move_gen;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 
-use std;
+use std::ops;
+use std::hash;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -73,9 +74,12 @@ impl Piece {
     pub fn is_empty(&self) -> bool {
         self.0 == Empty
     }
+    pub fn empty() -> Self {
+        Piece(Empty, White)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Square(pub u8);
 
 impl fmt::Display for Square {
@@ -125,7 +129,6 @@ pub struct ChessBoard {
     pub half_move_clock : u8,
     pub move_num : u16,
     pub moves : Vec<std_move::ChessMove>,
-    //pub hash : Option<Hasher>,
 }
 
 pub struct BoardIter {
@@ -240,7 +243,7 @@ impl ::uci::UciBoard for ChessBoard {
                                fen, fen_split.len()));
         }
 
-        let mut board = START_BOARD.clone();
+        let mut board = Self::start_board();
         board.board = try!(parse_fen_board(fen_split[0]));
         
         if fen_split[1].len() != 1 {
@@ -324,9 +327,6 @@ impl EvalBoard for ChessBoard {
              [0, 1, 2, 2, 2, 2, 1, 0],
              [0, 1, 1, 1, 1, 1, 1, 0],
              [0, 0, 0, 0, 0, 0, 0, 0]];
-        /*let center_proximity = |file, rank| {
-        (3.5f32).powi(2) - ((3.5 - file as f32).powi(2) + (3.5 - rank as f32).powi(2)).sqrt()
-    };*/
         let mut value = 0.0;
         for rank in 0..8 {
             for file in 0..8 {
@@ -341,6 +341,8 @@ impl EvalBoard for ChessBoard {
                         Piece(Queen, Black) => -0.3,
                         Piece(Pawn, White) => 0.00,
                         Piece(Pawn, Black) => -0.00,
+                        Piece(Rook, Black) => -0.1,
+                        Piece(Rook, White) => 0.1,
                         _ => 0.0,
                     };
                 let pawn_val = match self.board[rank][file] {
@@ -355,12 +357,15 @@ impl EvalBoard for ChessBoard {
         value
     }
 
-    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, mut c_move : Self::Move) -> Self::UndoMove {
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
         let color = self.to_move;
         let piece_moved = self.piece_at(c_move.from).0;
+
+        c_move.old_half_move_clock = self.half_move_clock;
+        c_move.old_castling_en_passant = self.castling_en_passant;
         
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).0) {
@@ -545,8 +550,20 @@ impl EvalBoard for ChessBoard {
         self.to_move = !self.to_move;
     }
     
-    fn start_board() -> &'static Self {
-        &START_BOARD
+    fn start_board() -> Self {
+        let mut board = [[Piece(Empty, White); 8]; 8];
+        board[0] = [Piece(Rook, Black), Piece(Knight, Black), Piece(Bishop, Black),
+                    Piece(Queen, Black), Piece(King, Black), Piece(Bishop, Black),
+                    Piece(Knight, Black), Piece(Rook, Black)];
+        board[1] = [Piece(Pawn, Black); 8];
+        board[6] = [Piece(Pawn, White); 8];
+        for i in 0..board[0].len() {
+            let Piece(p_type, _) = board[0][i];
+            board[7][i] = Piece(p_type, White);
+        }
+        ChessBoard {board : board, to_move : White, castling_en_passant : 0b0000_1111,
+                    half_move_clock : 0, move_num : 0 , moves : vec![]}
+        
     }
 }
 
@@ -555,14 +572,15 @@ impl fmt::Display for ChessBoard {
         fmt.write_str("\n").unwrap();
         for rank in self.board.iter() {
             for piece in rank.iter() {
-                let _ = fmt.write_str(&format!("[{}]", piece));
+                write!(fmt, "[{}]", piece).unwrap();
             }
-            let _ = fmt.write_str("\n");
+            write!(fmt, "\n").unwrap();
         }
-        fmt.write_str(&format!("To move: {}, move_number: {}, flags: {:b}\n", self.to_move,
-                               self.move_num, self.castling_en_passant)).unwrap();
+        write!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}\n",
+               self.to_move, self.move_num, self.castling_en_passant, self.half_move_clock)
+            .unwrap();
         for c_move in &self.moves {
-            let _ = fmt.write_str(&format!("[{}],", &c_move));
+            write!(fmt, "[{}],", &c_move).unwrap();
         }
         Ok(())   
     }
@@ -574,12 +592,27 @@ impl fmt::Debug for ChessBoard {
     }
 }
 
-impl ChessBoard {
-    
-    pub fn piece_at(&self, square : Square) -> Piece {
+impl ops::Index<Square> for ChessBoard {
+    type Output = Piece;
+    fn index(&self, square: Square) -> &Piece {
         let Square(i) = square;
         debug_assert!(i < 64, format!("Tried to find piece at pos {} on board{}!", i, self));
-        self.board[i as usize >> 3][i as usize & 0b0000_0111]
+        &self.board[i as usize >> 3][i as usize & 0b0000_0111]
+    }
+}
+
+impl ops::IndexMut<Square> for ChessBoard {
+    fn index_mut(&mut self, square: Square) -> &mut Piece {
+        let Square(i) = square;
+        debug_assert!(i < 64, format!("Tried to find piece at pos {} on board{}!", i, self));
+        &mut self.board[i as usize >> 3][i as usize & 0b0000_0111]
+    }
+}
+
+impl ChessBoard {
+    // TODO: Remove in favour of indexing operator
+    pub fn piece_at(&self, square : Square) -> Piece {
+        self[square].clone()
     }
     /// Returns a clone of the board, viewed from the other side.
     /// This screws up everything related to pawn movement, castling, etc,
@@ -683,21 +716,6 @@ pub struct TimeInfo {
 }
 
 lazy_static! {
-    static ref START_BOARD: ChessBoard = {
-        
-        let mut board = [[Piece(Empty, White); 8]; 8];
-        board[0] = [Piece(Rook, Black), Piece(Knight, Black), Piece(Bishop, Black),
-                    Piece(Queen, Black), Piece(King, Black), Piece(Bishop, Black),
-                    Piece(Knight, Black), Piece(Rook, Black)];
-        board[1] = [Piece(Pawn, Black); 8];
-        board[6] = [Piece(Pawn, White); 8];
-        for i in 0..board[0].len() {
-            let Piece(p_type, _) = board[0][i];
-            board[7][i] = Piece(p_type, White);
-        }
-        ChessBoard {board : board, to_move : White, castling_en_passant : 0b0000_1111,
-               half_move_clock : 0, move_num : 0 , moves : vec![]}
-    };
     
     pub static ref PIECE_CHAR_MAP : HashMap<Piece, char> = {
         let mut map = HashMap::new();
@@ -723,7 +741,7 @@ lazy_static! {
 }
 
 fn rev_map<K, V> (in_map : HashMap<V, K>) -> HashMap<K, V>
-    where K: Eq + Clone + std::hash::Hash, V: Eq + Clone + std::hash::Hash {
+    where K: Eq + Clone + hash::Hash, V: Eq + Clone + hash::Hash {
     let mut new_map = HashMap::new();
     for (value, key) in in_map.iter() {
         new_map.insert(key.clone(), value.clone());

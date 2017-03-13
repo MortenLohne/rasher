@@ -58,7 +58,7 @@ pub trait EvalBoard : PartialEq + Clone {
     fn do_move(&mut self, Self::Move) -> Self::UndoMove;
     fn undo_move(&mut self, Self::UndoMove);
 
-    fn start_board() -> &'static Self;
+    fn start_board() -> Self;
 
     fn all_legal_moves(&self) -> Vec<Self::Move>;
 
@@ -73,5 +73,9 @@ pub trait EvalBoard : PartialEq + Clone {
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
         let moves = self.all_legal_moves();
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
+    }
+
+    fn branch_factor() -> u64 {
+        20
     }
 }

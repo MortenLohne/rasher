@@ -32,11 +32,13 @@ pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Takes in the king position for the moving player, and whether they are currently in check,
 /// to speed up the move generation
-fn legal_moves_for_piece(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
+pub fn legal_moves_for_piece(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                          is_in_check : bool, king_pos : Square) { 
     let Piece(piece, color) = board.piece_at(square);
     
-    debug_assert!(color == board.to_move && piece != Empty);
+    debug_assert!(color == board.to_move && piece != Empty,
+                  "Tried to find move for {} at {} at:\n{:?}",
+                  board[square], square, board);
     
     match piece {
         King => legal_moves_for_king(board, square, moves),

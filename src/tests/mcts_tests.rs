@@ -1,8 +1,8 @@
 use std::fmt;
-//use std::sync::Arc;
 use time;
 use rand;
 
+use search_algorithms::mcts;
 use search_algorithms::mcts::MonteCarloTree;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
@@ -16,6 +16,7 @@ use board::std_board::Square;
 use board::std_board::Piece;
 use board::std_board::PieceType::*;
 
+#[ignore]
 #[test]
 fn knight_fork_test() {
 // Basic knight fork
@@ -36,6 +37,7 @@ fn queen_pawn_to_mate() {
 }
 */
 
+#[ignore]
 #[test]
 fn underpromote() {
     // Checks that black can underpromote a pawn to avoid mate
@@ -44,7 +46,7 @@ fn underpromote() {
                                            Square::from_alg("e1").unwrap(), Piece(Knight, Black) );
     basic_tactics_prop(&board3, best_move3);
 }
-
+#[ignore]
 #[test]
 fn block_pawn() {
     // Checks that black can block a pawn to draw an endgame
@@ -54,7 +56,7 @@ fn block_pawn() {
 
     basic_tactics_prop(&board4, best_move4);
 }
-
+#[ignore]
 #[test]
 fn capture_to_promote() {
     let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
@@ -72,10 +74,10 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
     
-    while time::get_time() < start_time + time::Duration::seconds(30) {
+    while time::get_time() < start_time + time::Duration::seconds(120) {
         for _ in 0..10 {
             use std::ops::Add;
-            mc_tree.select(&mut board, searches, &mut rng);
+            mc_tree.select(&mut board, &mut rng, searches, &mut mcts::SearchData::default());
             searches += 1;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
