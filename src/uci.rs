@@ -155,7 +155,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                         thread::spawn(move || {
                             loop {
                                 match rx.recv() {
-                                    Ok(uci_info) => println!("info {}", uci_info.to_info_string()),
+                                    Ok(uci_info) => println!("{}", uci_info.to_info_string()),
                                     Err(_) => break,
                                 }
                             }
@@ -266,7 +266,7 @@ pub struct EngineOptions {
 
 impl EngineOptions {
     fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64, multipv: 4 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64, multipv: 8 }
     }
 }
 

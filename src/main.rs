@@ -8,8 +8,7 @@ mod search_algorithms;
 extern crate time;
 extern crate rand;
 extern crate ordered_float;
-extern crate futures;
-extern crate futures_cpupool;
+extern crate scoped_threadpool;
 extern crate rayon;
 
 use search_algorithms::alpha_beta::Score;
@@ -60,7 +59,8 @@ fn main() {
                 println!("Standard move: {}", mem::size_of::<board::std_move::ChessMove>());
                 println!("Standard piece: {}", mem::size_of::<board::std_board::Piece>());
                 println!("Board score: {}", mem::size_of::<Score>());
-                println!("Size of mcts node: {}", mem::size_of::<mcts::MonteCarloTree>());
+                println!("Size of chess mcts node: {}",
+                         mem::size_of::<mcts::MonteCarloTree<ChessBoard>>());
                 
             },
             //"play_self" => play_game(&board::START_BOARD.clone()),
