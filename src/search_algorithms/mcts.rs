@@ -5,8 +5,6 @@ use search_algorithms::game_move::Move;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
 
-use rayon::prelude::*;
-
 use rand;
 use ordered_float::NotNaN;
 use time;
@@ -19,9 +17,11 @@ use std::marker::{Send, Sync};
 use std::sync::mpsc;
 use uci;
 
-use scoped_threadpool;
+use scoped_pool;
 
-type ThreadPool = scoped_threadpool::Pool;
+type ThreadPool = scoped_pool::Pool;
+use scoped_pool::Scope;
+use scoped_pool::ThreadConfig;
 
 pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
     let stdin = io::stdin();
@@ -101,7 +101,11 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
             let searches = mc_tree.searches;
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
-            mc_tree.select_parallel(&mut board, &mut rng, searches, &mut search_data, 2);
+            let thread_pool = ThreadPool::with_thread_config(
+                options.threads as usize, ThreadConfig::new().prefix("mcts"));
+            // TODO: Uncomment
+            mc_tree.select_parallel(&mut rng, searches, &mut search_data,
+                                    &Scope::forever(thread_pool));
             //mc_tree.select(board, &mut rng, searches, &mut search_data)
             total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
@@ -199,7 +203,9 @@ pub fn search_position<B>(board: &mut B)
             let searches = mc_tree.searches;
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
-            mc_tree.select_parallel(board, &mut rng, searches, &mut search_data, 2);
+            let thread_pool = ThreadPool::new(2);
+            // TODO: Uncomment
+            //mc_tree.select_parallel(&mut rng, searches, &mut search_data, &thread_pool);
             //mc_tree.select(board, &mut rng, searches, &mut search_data)
             total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
@@ -412,8 +418,8 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
     }
     
     // Select the node. If the selected child is not fully expanded, expand it
-    pub fn select<R> (&mut self, rng: &mut R,
-                         total_searches: u64, search_data: &mut SearchData) -> GameResult
+    pub fn select<R> (&mut self, rng: &mut R, total_searches: u64,
+                      search_data: &mut SearchData) -> GameResult
         where R: rand::Rng
     {
         //println!("Selecting serially");
@@ -531,25 +537,16 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
 
 impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
 // Select the node. If the selected child is not fully expanded, expand it
-    pub fn select_parallel<Ra> (&mut self, board: &B, rng: &mut Ra,
+    pub fn select_parallel<Ra> (&mut self, rng: &mut Ra,
                                   total_searches: u64, search_data: &mut SearchData,
-                                  threads: u16) -> Score
-        where Ra: rand::Rng + rand::Rand + Send + Clone,
+                                  scope: &Scope) -> Score
+        where Ra: rand::Rng + rand::Rand + Send + Clone + Sync,
     <B as EvalBoard>::Move: Sync
     {
         //println!("Selecting in parallel");
-
-        use std::ops::Add;
-        let searches_of_children = self.children.iter()
-            .map(Option::as_ref).map(Option::unwrap)
-            .map(|n| n.searches)
-            .fold(0, u64::add);
-        debug_assert!((self.searches as i64 - searches_of_children as i64).abs() <= 1,
-                      format!("{} searches in total, but sum of searches of children is {}\n{:?}",
-                              self.searches, searches_of_children, self.children));
         
         assert!(self.is_fully_expanded, "Tried to select node that wasn't fully expanded");
-        match board.game_result() {
+        match self.game_result {
             Some(result) => {
                 self.add_value(result);
                 search_data.selection_depth += 1;
@@ -557,56 +554,88 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
                 return Score::from_game_result(&result)
             }
             None => {
-                // TODO: wtf
-                search_data.selection_depth += threads;
-                search_data.total_depth += threads;
+                // TODO: WHat do do with this data
+                // search_data.selection_depth += threads;
+                // search_data.total_depth += threads;
             },
         }
-        let moves : Vec<B::Move> = board.all_legal_moves();  
         // Find the index of the child node with highest selection value
         let child_indices : Vec<usize>;
         {
-            let mut move_selection_values : Vec<_> = self.children.iter_mut()
-                .map(Option::as_mut).map(Option::unwrap)
+            let mut move_selection_values : Vec<_> = self.children.iter()
+                .map(Option::as_ref).map(Option::unwrap)
                 .enumerate()
                 .map(|(n, child)| (n, child.move_selection_value(total_searches), child))
             .collect();
             move_selection_values.sort_by_key(|&(_, n, _)| n);
             move_selection_values.reverse();
             child_indices = move_selection_values.iter()
-            // TODO: Must sort so that highest value is taken
+            // TODO: Sort so that highest value is taken
                 .take(2)
                 .map(|&(n, _, _)| n).collect();
         }
-        let (child1, child2) : (&mut MonteCarloTree<_>, &mut MonteCarloTree<_>) = get_two_mut(&mut self.children[0..], child_indices[0], child_indices[1]);
+        let (child1, child2) : (&mut MonteCarloTree<_>, &mut MonteCarloTree<_>)
+            = get_two_mut(&mut self.children[0..], child_indices[0], child_indices[1]);
 
-        let value = [(0, child1, rng.clone(), board.clone()),
-                     (1, child2, rng.clone(), board.clone())].into_par_iter()
-            .map(|&mut(i, ref mut child, ref mut new_rng, ref mut board)| {
-                let child_index = child_indices[i];
-                board.do_move(moves[child_index].clone());
-                
-                if child.is_fully_expanded {
-                    if threads < 2 {
-                        Score::from_game_result(&child.select(new_rng,
-                                                              total_searches, &mut search_data.clone()))
-                    }
-                    else {
-                        (*child).select_parallel(&mut *board, new_rng, total_searches,
-                                              &mut search_data.clone(), threads / 2)
-                    }
+        let mut score1 = Score::new();
+        let mut score2 = Score::new();
+
+        scope.zoom(|scope2| {
+            scope2.recurse(|scope3| {
+                score1 = if child1.is_fully_expanded {
+                    (*child1).select_parallel(&mut rng.clone(), total_searches,
+                                              &mut search_data.clone(),
+                                              scope3)
                 }
                 else {
-                    Score::from_game_result(&child.expand(new_rng,
-                                                          &mut search_data.clone()))
-                }
-            })
-            .reduce(Score::new, |acc, score| { let mut a2 = acc.clone(); a2.add_score(&score); a2 });
+                    Score::from_game_result(
+                        &child1.expand(&mut rng.clone(), &mut search_data.clone()))
+                };
+            });
+
+        });
+        score2 = if child2.is_fully_expanded {
+            (*child2).select_parallel(&mut rng.clone(), total_searches,
+                                      &mut search_data.clone(),
+                                      scope)
+        }
+        else {
+            Score::from_game_result(
+                &child2.expand(&mut rng.clone(), &mut search_data.clone()))
+        };
+         
+        score1.add_score(&score2);
+        let value = score1;
+            
+        /*
+        let value = [(0, child1, rng.clone(), board.clone()),
+        (1, child2, rng.clone(), board.clone())].into_par_iter()
+        .map(|&mut(i, ref mut child, ref mut new_rng, ref mut board)| {
+        let child_index = child_indices[i];
+        
+        if child.is_fully_expanded {
+        if threads < 2 {
+        Score::from_game_result(&child.select(new_rng,
+        total_searches, &mut search_data.clone()))
+    }
+        else {
+        (*child).select_parallel(&mut *board, new_rng, total_searches,
+        &mut search_data.clone(), threads / 2)
+    }
+    }
+        else {
+        Score::from_game_result(&child.expand(new_rng,
+        &mut search_data.clone()))
+    }
+    })
+        .reduce(Score::new, |acc, score| { let mut a2 = acc.clone(); a2.add_score(&score); a2 });
+         */
         self.searches += value.sum_score();
         self.score.add_score(&value);
         self.value += (value.black_wins as f64 * 1.0) + (value.draws as f64 * 0.5);
         value
-    }
+            
+    }    
 }
 
 #[derive(PartialEq, Clone, Debug, Default)]

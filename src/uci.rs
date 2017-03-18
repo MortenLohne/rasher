@@ -266,7 +266,7 @@ pub struct EngineOptions {
 
 impl EngineOptions {
     fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 2, hash_memory: 64, multipv: 8 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 4, hash_memory: 64, multipv: 8 }
     }
 }
 
