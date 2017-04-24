@@ -138,7 +138,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         if piece_moved.0 == PieceType::King {
             let new_king_pos = move_gen::king_pos(&board.base_board);
             let is_in_check = move_gen::is_attacked(&board.base_board, new_king_pos);
-            move_gen::legal_moves_for_piece(&board.base_board, chess_move_square,
+            move_gen::legal_moves_for_piece(&mut board.base_board, chess_move_square,
                                             &mut chess_moves, is_in_check, new_king_pos);
             if chess_move_square != square && !is_in_check {
                 pure_sjadam_moves.push(sjadam_move.clone());
@@ -146,7 +146,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         }
         else {
             let is_in_check = move_gen::is_attacked(&board.base_board, king_pos);
-            move_gen::legal_moves_for_piece(&board.base_board, chess_move_square,
+            move_gen::legal_moves_for_piece(&mut board.base_board, chess_move_square,
                                             &mut chess_moves, is_in_check, king_pos);
             if chess_move_square != square && !is_in_check {
                 pure_sjadam_moves.push(sjadam_move.clone());

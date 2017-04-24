@@ -11,6 +11,7 @@ use search_algorithms::board::Color::*;
 
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
+    let mut mut_board = board.clone();
     if board.half_move_clock > 100 { // Draw by 50-move rule
         return vec![]
     }
@@ -21,7 +22,7 @@ pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
         match board.piece_at(Square(i)) {
             Piece(Empty, White) => continue,
             Piece(_, color) if color == board.to_move => {
-                legal_moves_for_piece(board, Square(i), &mut moves, is_in_check, king_pos);
+                legal_moves_for_piece(&mut mut_board, Square(i), &mut moves, is_in_check, king_pos);
             }
             _ => continue,
         }
@@ -32,7 +33,8 @@ pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Takes in the king position for the moving player, and whether they are currently in check,
 /// to speed up the move generation
-pub fn legal_moves_for_piece(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
+#[inline(never)]
+pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                          is_in_check : bool, king_pos : Square) { 
     let Piece(piece, color) = board.piece_at(square);
     
@@ -61,7 +63,8 @@ pub fn legal_moves_for_piece(board : &ChessBoard, square : Square, moves : &mut 
     }
 }
 
-fn legal_moves_for_king(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
+#[inline(never)]
+fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
@@ -134,13 +137,22 @@ fn legal_moves_for_king(board : &ChessBoard, square : Square, moves : &mut Vec<C
             let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
             let c_move = ChessMove::new(board, square, Square(new_pos));
 
-            if piece_to == Empty || color_to != board.to_move {
-                add_if_legal_simple(board, c_move,  moves);
+            if piece_to == Empty {
+                let old_piece = board[square];
+                board[square] = Piece::empty();
+                if !is_attacked(board, Square(new_pos)) {
+                    moves.push(c_move);
+                }
+                board[square] = old_piece;
+            }
+            else if color_to != board.to_move {
+                add_if_legal_simple(board, c_move, moves);
             }
         }
     }
 }
 
+#[inline(never)]
 fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                           is_in_check : bool, king_pos : Square) {
     let file = (square.0 & 0b0000_0111) as i8;
@@ -165,6 +177,7 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
     }
 }
 
+#[inline(never)]
 fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                           is_in_check : bool, king_pos : Square) {
     // Helper variables
@@ -260,6 +273,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
 /// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
+#[inline(never)]
 fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
                 king_pos_c : Square, is_in_check : bool) {
     if is_in_check || is_pinned_to_piece(board, c_move.from, king_pos_c) {
@@ -275,6 +289,7 @@ fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessM
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
 /// This check is more expensive, but works for _all_ positions
+#[inline(never)]
 fn add_if_legal_simple (board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>) {
     let mut cloned = board.clone();
     cloned.do_move(c_move);
@@ -286,6 +301,7 @@ fn add_if_legal_simple (board : &ChessBoard, c_move : ChessMove, moves : &mut Ve
     }
 }
 
+#[inline(never)]
 pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : Square) -> bool {
     debug_assert!(pinee_pos != pinner_pos);
     let (pinner_file, pinner_rank) = pinner_pos.file_rank(); // The piece it is pinned to
@@ -369,6 +385,7 @@ pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : 
 }
 
 /// Returns whether a square is under attack by the side not to move
+#[inline(never)]
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     if board.piece_at(square).0 != Empty {
         debug_assert_eq!(board.to_move(), board.piece_at(square).1,

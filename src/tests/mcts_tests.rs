@@ -77,7 +77,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     while time::get_time() < start_time + time::Duration::seconds(120) {
         for _ in 0..10 {
             use std::ops::Add;
-            mc_tree.select(&mut board, &mut rng, searches, &mut mcts::SearchData::default());
+            mc_tree.select(&mut rng, searches, &mut mcts::SearchData::default());
             searches += 1;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)

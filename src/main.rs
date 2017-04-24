@@ -8,7 +8,6 @@ mod search_algorithms;
 extern crate time;
 extern crate rand;
 extern crate ordered_float;
-extern crate scoped_pool;
 extern crate rayon;
 
 use search_algorithms::alpha_beta::Score;
