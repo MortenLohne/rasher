@@ -8,3 +8,5 @@ mc_log.txt
 
 # Old folder for example games #
 games
+
+callgrind.out.*
