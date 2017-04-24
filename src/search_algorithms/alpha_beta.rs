@@ -1,5 +1,6 @@
 use ::NodeCount;
 
+use std::sync::mpsc;
 use uci;
 use std::fmt;
 use std::cmp;
@@ -14,9 +15,19 @@ use self::Score::*;
 extern crate time;
 use std::sync::{Arc, Mutex};
 
-pub fn search_moves<B> (mut board : B, engine_comm : Arc<Mutex<uci::EngineComm>>,
-                         time_restriction : uci::TimeRestriction,
-                         mut log_writer : uci::SharableWriter) 
+pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
+                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
+    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+{
+    let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
+    let mut log_writer = Arc::new(Mutex::new(None));
+    uci::open_log_file(&mut log_writer);
+}
+
+pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
+                        time_restriction: uci::TimeRestriction,
+                        mut log_writer: uci::SharableWriter,
+                        channel: mpsc::Sender<uci::UciInfo>) 
                          -> (Score, Vec<B::Move>, NodeCount)
     where B: EvalBoard + fmt::Debug
 {
@@ -71,12 +82,19 @@ pub fn search_moves<B> (mut board : B, engine_comm : Arc<Mutex<uci::EngineComm>>
         }
     }
     {
+        // Only runs if the engine finishes completely
+        // Happens when the user requests a search with limited time or depth
         println!("Unclocking best move");
         let mut engine_comm = engine_comm.lock().unwrap();
         println!("Sending best move");
         match engine_comm.best_move.clone() {
-            Some(mv) => uci::uci_send(&format!("bestmove {}", mv), &mut log_writer),
-            None => uci::uci_send(&format!("best score: {}", best_score.unwrap()), &mut log_writer),
+            Some(mv) => {
+                uci::uci_send(&format!("bestmove {}", mv), &mut log_writer);
+            },
+            
+            None => {
+                uci::uci_send(&format!("best score: {}", best_score.unwrap()), &mut log_writer);
+            },
         }
         engine_comm.engine_is_running = false;
         

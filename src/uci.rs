@@ -153,10 +153,30 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                         let rx = start_mcts_engine(board, time_restriction,
                                                    engine_options.clone());
                         thread::spawn(move || {
+                            // Last info that has been received, if any
+                            let mut last_info = None;
                             loop {
                                 match rx.recv() {
-                                    Ok(uci_info) => println!("{}", uci_info.to_info_string()),
-                                    Err(_) => break,
+                                    Ok(uci_info) => {
+                                        println!("{}", uci_info.to_info_string());
+                                        last_info = Some(uci_info);
+                                    },
+                                    Err(_) => {
+                                        // If the channel has hung up,
+                                        // send final data as well as bestmove command
+                                        match last_info {
+                                            None => println!("bestmove none"),
+                                            Some(uci_info) => {
+                                                println!("{}", uci_info.to_info_string());
+                                                let (_, ref moves_string) = uci_info.pvs[0];
+                                                println!("bestmove {}",
+                                                         moves_string
+                                                         .split_whitespace()
+                                                         .next().unwrap_or("none"));
+                                            },
+                                        };
+                                        return;
+                                    },
                                 }
                             }
                         });
@@ -205,6 +225,15 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                   mcts::uci_search(board, time_limit, options, tx));
     rx
 }
+
+fn start_alpha_beta_engine<B>(board: B, time_limit: TimeRestriction,
+                              options: EngineOptions) -> mpsc::Receiver<UciInfo>
+    where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
+{
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || ());
+    rx
+}            
 
 fn start_engine<B> (board : B, log_writer : SharableWriter,
                                             time_restriction : TimeRestriction, 
@@ -537,7 +566,7 @@ pub struct UciInfo {
     pub time: i64,
     pub nodes: u64,
     pub hashfull: f64,
-    pub pvs: Vec<(Score, String)>,
+    pub pvs: Vec<(Score, String)>, // One or more principal variations, sorted from best to worst
 }
     
 impl UciInfo {
