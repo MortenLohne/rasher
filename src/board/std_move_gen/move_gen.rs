@@ -195,8 +195,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(&board, square, take_square,
-                                                Piece(*piece_type, board.to_move));
+                    let c_move = ChessMove::new_prom(&board, square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
                 }
@@ -221,8 +220,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(board, square, take_square,
-                                                Piece(*piece_type, board.to_move));
+                    let c_move = ChessMove::new_prom(board, square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
                 }
@@ -247,8 +245,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     if board.piece_at(square_in_front).is_empty() {
         if rank == prom_rank {
             for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                let c_move = ChessMove::new_prom(board, square, square_in_front,
-                                            Piece(*piece_type, board.to_move));
+                let c_move = ChessMove::new_prom(board, square, square_in_front, *piece_type);
                 add_if_legal(board, c_move,
                              moves, king_pos, is_in_check);
             }

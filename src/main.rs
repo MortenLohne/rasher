@@ -1,5 +1,3 @@
-#![feature(ordering_chaining)]
-
 mod uci;
 mod board;
 mod tests;
@@ -10,6 +8,7 @@ extern crate rand;
 extern crate ordered_float;
 extern crate rayon;
 
+use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
 use search_algorithms::game_move::Move;
@@ -17,10 +16,11 @@ use search_algorithms::mcts;
 
 use std::sync::{Arc, Mutex};
 use std::io;
-
 use std::fmt;
 
+
 use search_algorithms::board::EvalBoard;
+use search_algorithms::board::GameResult;
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use board::sjadam_board::SjadamBoard;
@@ -107,42 +107,30 @@ fn main() {
     }
 }
 
-#[allow(dead_code)]
+/// Makes the engine play a game against itself
 fn play_game<B> (mut board : B, log_writer : uci::SharableWriter) 
-    where B: EvalBoard + uci::UciBoard + fmt::Debug {
+    where B: EvalBoard + uci::UciBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync {
     println!("Board:\n{:?}", board);
     println!("\n");
-    let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
-    engine_comm.lock().unwrap().engine_is_running = true;
-    
-    let (score, pv, _) = search_algorithms::alpha_beta::search_moves(
-        board.clone(), engine_comm.clone(), uci::TimeRestriction::MoveTime(5000),
-        log_writer.clone());
-
-        
-    if pv.len() > 0 {
-        println!("Found move {} with score {}.", pv[0].to_alg(), score);
-        board.do_move(pv[0].clone());
-        play_game(board, log_writer);
-    }
-    else {
-        match score {
-            Val(_) => panic!("Found no moves for {}, but it was not mate! Board:\n{:?}",
-                             board.to_move(), board),
-            WhiteWin(_) => println!("White won at move! Board:\n{:?}", board),
-            BlackWin(_) => println!("Black won! Board:\n{:?}", board),
-            Draw(0) => println!("The game was drawn! Board:\n{:?}", board),
-            Draw(n) => println!("Game was marked as drawn, but with {} moves left. Board:\n{:?}",
-                                n, board),
+    match board.game_result() {
+        None => {
+            let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::MoveTime(5000),
+                                                       uci::EngineOptions::new());
+            let (score, move_str) = uci::get_uci_move(channel);
+            println!("Found move {} with score {}.", move_str, score);
+            board.do_move(B::Move::from_alg(&move_str).unwrap());
+            play_game(board, log_writer);
         }
+        Some(GameResult::WhiteWin) => println!("White won at move! Board:\n{:?}", board),
+        Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", board),
+        Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", board),
     }
 }
-
-
 /*
-#[allow(dead_code)]
-fn play_human() {
-    let mut board = board::START_BOARD.clone();
+fn play_human<B>(mut board : B, log_writer : uci::SharableWriter)
+    where B: EvalBoard + uci::UciBoard + fmt::Debug {
+
+    use search_algorithms::board::Color::*;
     loop {
         println!("Board:\n{}\nHalf move count: {}", board, board.half_move_clock);
         // If black, play as human
@@ -151,10 +139,10 @@ fn play_human() {
 
             let reader = io::stdin();
             let mut input_str = "".to_string();
-            let legal_moves = move_gen::all_legal_moves(&board);
+            let legal_moves = board.all_legal_moves();
             // Loop until user enters a valid move
             loop {
-                match ChessMove::from_alg(&input_str) {
+                match B::Move::from_alg(&input_str) {
                     Ok(val) => {
                         let mut is_legal = false;
                         for c_move in legal_moves.iter() {
@@ -177,7 +165,7 @@ fn play_human() {
                     
             }
 
-            let c_move = ChessMove::from_alg(&input_str).unwrap();
+            let c_move =  B::Move::from_alg(&input_str).unwrap();
             println!("Doing move");
             board = board.do_move(c_move);
             
@@ -186,7 +174,7 @@ fn play_human() {
             let engine_comm = Mutex::new(uci::EngineComm::new());
             engine_comm.lock().unwrap().engine_is_running = true;
             
-            let (score, moves, _) = find_best_move_ab (&board, 3, &engine_comm, None);
+            let (score, moves, _) = alpha_beta:: (&board, 3, &engine_comm, None);
             if moves.len() > 0 {
                 println!("Found move with score {}.", score);
                 board = board.do_move(moves[0]);
@@ -206,7 +194,7 @@ but it was not mate or staltemate! Board:\n{}",
         }
     }
 }
-*/
+  */
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeCount {

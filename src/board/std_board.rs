@@ -423,7 +423,8 @@ impl EvalBoard for ChessBoard {
         else {
             // Does the move, depending on whether the move promotes or not
             match c_move.prom {
-                Some(piece) => self.board[rank_to as usize][file_to as usize] = piece,
+                Some(piece_type) => self.board[rank_to as usize][file_to as usize]
+                    = Piece(piece_type, self.to_move()),
                 None => self.board[rank_to as usize][file_to as usize]
                     = self.board[rank_from as usize][file_from as usize],
                 

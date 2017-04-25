@@ -43,7 +43,7 @@ fn underpromote() {
     // Checks that black can underpromote a pawn to avoid mate
     let board3 = ChessBoard::from_fen("8/8/8/8/8/5K2/4p2R/5k2 b - - 0 1").unwrap();
     let best_move3 = ChessMove::new_prom( &board3, Square::from_alg("e2").unwrap(),
-                                           Square::from_alg("e1").unwrap(), Piece(Knight, Black) );
+                                           Square::from_alg("e1").unwrap(), Knight );
     basic_tactics_prop(&board3, best_move3);
 }
 #[ignore]

@@ -11,17 +11,28 @@ use search_algorithms::board::EvalBoard;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::Color::*;
 use self::Score::*;
+use std::thread;
 
 extern crate time;
 use std::sync::{Arc, Mutex};
 
-pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
+pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
+                        options: uci::EngineOptions) -> mpsc::Receiver<uci::UciInfo>
+    where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
+{
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || uci_search(board, time_limit, options, sender));
+    receiver
+}
+
+pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     let engine_comm = Arc::new(Mutex::new(uci::EngineComm::new()));
     let mut log_writer = Arc::new(Mutex::new(None));
     uci::open_log_file(&mut log_writer);
+    search_moves(board, engine_comm, time_limit, log_writer, channel);
 }
 
 pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
@@ -35,9 +46,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         engine_comm.lock().unwrap().engine_is_running = true;
     }
     
-    let max_depth : u8 = match time_restriction {
+    let max_depth : u16 = match time_restriction {
         uci::TimeRestriction::Depth(d) => d,
-        uci::TimeRestriction::Mate(d) => d as u8,
+        uci::TimeRestriction::Mate(d) => d as u16,
         _ => 128,
     };;
     debug_assert!(max_depth > 1);
@@ -62,9 +73,19 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
             engine_comm.lock().unwrap().best_move = None;
         }
+        let pv_str = moves.iter()
+            .map(Move::to_alg)
+            .collect::<Vec<_>>()
+            .join(" ");
+        
+        let uci_info = uci::UciInfo { depth: depth, seldepth: depth, time: ms_taken,
+                                      nodes: node_count.total, hashfull: 0.0,
+                                      pvs: vec![(score, pv_str)] };
+        channel.send(uci_info);
 
-        uci::send_eval_to_gui(&log_writer, depth,
-                         ms_taken, score, moves, node_count);
+        // No longer needed, because we send uci info through the channel
+        //uci::send_eval_to_gui(&log_writer, depth,
+        //                 ms_taken, score, moves, node_count);
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => { 
                 if (board.to_move() == Black && 
@@ -84,8 +105,10 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     {
         // Only runs if the engine finishes completely
         // Happens when the user requests a search with limited time or depth
+        // No longer needed, happens automatically through the channels
+        /*
         println!("Unclocking best move");
-        let mut engine_comm = engine_comm.lock().unwrap();
+        
         println!("Sending best move");
         match engine_comm.best_move.clone() {
             Some(mv) => {
@@ -96,6 +119,8 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 uci::uci_send(&format!("best score: {}", best_score.unwrap()), &mut log_writer);
             },
         }
+         */
+        let mut engine_comm = engine_comm.lock().unwrap();
         engine_comm.engine_is_running = false;
         
     }
@@ -104,13 +129,13 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 }
 
 /// Returns a score, and a list of moves representing the moves it evaluated
-fn find_best_move_ab<B:> (board : &mut B, depth : u8, engine_comm : &Mutex<uci::EngineComm>,
+fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
                           time_restriction : uci::TimeRestriction )
                           -> (Score, Vec<B::Move>, NodeCount)
     where B: EvalBoard + fmt::Debug
 {
     
-    fn find_best_move_ab_rec<B:> (board: &mut B, depth : u8,
+    fn find_best_move_ab_rec<B:> (board: &mut B, depth : u16,
                                   mut alpha : Score, mut beta : Score,
                                   engine_comm : &Mutex<uci::EngineComm>,
                                   time_restriction : uci::TimeRestriction,

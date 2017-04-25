@@ -135,13 +135,13 @@ fn basic_tactics_test() {
     // Checks that white can queen a pawn to mate
     let board2 = ChessBoard::from_fen("k7/p1P5/8/K7/8/8/8/8 w - - 0 1").unwrap();
     let best_move2 = ChessMove::new_prom( &board2, Square::from_alg("c7").unwrap(),
-                                     Square::from_alg("c8").unwrap(), Piece(Queen, White) );
+                                     Square::from_alg("c8").unwrap(), Queen );
     basic_tactics_prop(&board2, best_move2);
 
     // Checks that black can underpromote a pawn to avoid mate
     let board3 = ChessBoard::from_fen("8/8/8/8/8/5K2/4p2R/5k2 b - - 0 1").unwrap();
     let best_move3 = ChessMove::new_prom( &board3, Square::from_alg("e2").unwrap(),
-                                     Square::from_alg("e1").unwrap(), Piece(Knight, Black) );
+                                     Square::from_alg("e1").unwrap(), Knight );
     basic_tactics_prop(&board3, best_move3);
 
     // Checks that black can block a pawn to draw an endgame
@@ -159,14 +159,16 @@ fn basic_tactics_test() {
 #[allow(dead_code)]
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
-    let (score, tried_moves, node_count) : (_, Vec<ChessMove>,_) =
-        alpha_beta::search_moves(board.clone(), Arc::new(Mutex::new(uci::EngineComm::new())), 
-                                 uci::TimeRestriction::Depth(5),
-                                 Arc::new(Mutex::new(None)));
-    assert_eq!(tried_moves[0], best_move,
-               "Best move was {} with score {},\n ({}/{} internal/leaf nodes evaluated), 
-expected {}, board:\n{}",
-               tried_moves[0], score, node_count.intern, node_count.leaf,
+    let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(5),
+                                               uci::EngineOptions::new());
+    
+    let (score, move_str) = uci::get_uci_move(channel);
+    
+    let game_move = ChessMove::from_alg(&move_str).unwrap();
+    
+    assert_eq!(game_move, best_move,
+               "Best move was {:?} with score {}, expected {:?}, board:\n{}",
+               game_move, score,
                best_move, board);
 }
 

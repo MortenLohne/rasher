@@ -145,47 +145,61 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                 let board = try!(board.clone()
                                  .ok_or("Received go without receiving a position first. Exiting..."));
                 let time_restriction = try!(parse_go(&input, log_writer));
-                match engine_string.as_str() {
-                    "minimax" => 
-                        start_engine(board, log_writer.clone(),
-                                     time_restriction, engine_comm.clone()),
-                    "mcts" => {
-                        let rx = start_mcts_engine(board, time_restriction,
-                                                   engine_options.clone());
-                        thread::spawn(move || {
-                            // Last info that has been received, if any
-                            let mut last_info = None;
-                            loop {
-                                match rx.recv() {
-                                    Ok(uci_info) => {
+                let rx = match engine_string.as_str() {
+                    "minimax" => alpha_beta::start_uci_search(board, time_restriction,
+                                                              engine_options.clone()),
+                    "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone()),
+                    _ => panic!(),
+                };
+                thread::spawn(move || {
+                    // Last info that has been received, if any
+                    let mut last_info = None;
+                    loop {
+                        match rx.recv() {
+                            Ok(uci_info) => {
+                                println!("{}", uci_info.to_info_string());
+                                last_info = Some(uci_info);
+                            },
+                            Err(_) => {
+                                // If the channel has hung up,
+                                // send final data as well as bestmove command
+                                match last_info {
+                                    None => println!("bestmove none"),
+                                    Some(uci_info) => {
                                         println!("{}", uci_info.to_info_string());
-                                        last_info = Some(uci_info);
+                                        let (_, ref moves_string) = uci_info.pvs[0];
+                                        println!("bestmove {}",
+                                                 moves_string
+                                                 .split_whitespace()
+                                                 .next().unwrap_or("none"));
                                     },
-                                    Err(_) => {
-                                        // If the channel has hung up,
-                                        // send final data as well as bestmove command
-                                        match last_info {
-                                            None => println!("bestmove none"),
-                                            Some(uci_info) => {
-                                                println!("{}", uci_info.to_info_string());
-                                                let (_, ref moves_string) = uci_info.pvs[0];
-                                                println!("bestmove {}",
-                                                         moves_string
-                                                         .split_whitespace()
-                                                         .next().unwrap_or("none"));
-                                            },
-                                        };
-                                        return;
-                                    },
-                                }
-                            }
-                        });
-                    },
-                    _ => (),
-                }
-            },
+                                };
+                                return;
+                            },
+                        }
+                    }
+                });
+            }
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), log_writer);
+            },
+        }
+    }
+}
+
+/// Given a receiving channel for uci info, wait until the transmitter closes it
+/// and then return the best score and move
+pub fn get_uci_move (rx: mpsc::Receiver<UciInfo>) -> (Score, String) {
+    let mut last_info = None;
+    loop {
+        match rx.recv() {
+            Ok(uci_info) => last_info = Some(uci_info),
+            Err(_) => {
+                let uci_info = last_info.unwrap();
+                let (score, ref moves_string) = uci_info.pvs[0];
+                return (score, moves_string
+                        .split_whitespace()
+                        .next().unwrap().to_string())
             },
         }
     }
@@ -194,7 +208,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TimeRestriction {
     GameTime(TimeInfo),
-    Depth(u8),
+    Depth(u16),
     Nodes(u64),
     Mate(u16),
     MoveTime(i64),
@@ -225,16 +239,19 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                   mcts::uci_search(board, time_limit, options, tx));
     rx
 }
-
+/*
 fn start_alpha_beta_engine<B>(board: B, time_limit: TimeRestriction,
                               options: EngineOptions) -> mpsc::Receiver<UciInfo>
     where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
 {
     let (tx, rx) = mpsc::channel();
+
+    // TODO: Make this do something
     thread::spawn(move || ());
     rx
-}            
-
+}     
+*/       
+/*
 fn start_engine<B> (board : B, log_writer : SharableWriter,
                                             time_restriction : TimeRestriction, 
                       engine_comm : Arc<Mutex<EngineComm>>)
@@ -264,6 +281,7 @@ fn start_engine<B> (board : B, log_writer : SharableWriter,
     }
     
 }
+*/
 
 pub fn open_log_file (log_writer : &SharableWriter) {
     let mut inner_writer = log_writer.lock().unwrap();
@@ -294,7 +312,7 @@ pub struct EngineOptions {
 }
 
 impl EngineOptions {
-    fn new() -> EngineOptions {
+    pub fn new() -> EngineOptions {
         EngineOptions { variant: ChessVariant::Standard, threads: 4, hash_memory: 64, multipv: 8 }
     }
 }
@@ -390,7 +408,7 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
                  ) as i64)),
         Some("depth") => return Ok(TimeRestriction::Depth(
             try!(parse_int(input.split_whitespace().nth(2))
-            ) as u8)),
+            ) as u16)),
         Some("mate") => return Ok(TimeRestriction::Mate(
             try!(parse_int(input.split_whitespace().nth(2))
             ) as u16)),
@@ -436,7 +454,7 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
                               moves_to_go: moves_to_go.map(|v| v as u16 )};
     Ok(TimeRestriction::GameTime(time_info))
 }
-
+/*
 /// Sends the engine's evaluation to the GUI via uci, along with other data
 /// like node count, time taken, etc
 pub fn send_eval_to_gui<M> (log_writer : &SharableWriter, depth : u8,
@@ -466,6 +484,7 @@ pub fn send_eval_to_gui<M> (log_writer : &SharableWriter, depth : u8,
     }
     uci_send(&inf_str, log_writer);
 }
+*/
 
 /// Simple helper method to write a line to the log
 pub fn to_log (message : &str, log_writer : &SharableWriter) {

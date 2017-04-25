@@ -10,7 +10,7 @@ use std::cmp;
 pub struct ChessMove {
     pub from : Square,
     pub to : Square,
-    pub prom : Option<Piece>,
+    pub prom : Option<PieceType>,
     pub capture : PieceType,
     pub old_castling_en_passant : u8,
     pub old_half_move_clock : u8,
@@ -47,7 +47,7 @@ impl ChessMove {
                old_half_move_clock: board.half_move_clock }
     }
     
-    pub fn new_prom(board: &ChessBoard, from : Square, to : Square, prom : Piece) -> ChessMove {
+    pub fn new_prom(board: &ChessBoard, from : Square, to : Square, prom : PieceType) -> ChessMove {
         let capture = board.piece_at(to).0;
         let old_castling_en_passant = board.castling_en_passant;
 
@@ -65,10 +65,10 @@ impl Move for ChessMove {
                             (8 - rank_from + '0' as u8) as char,
                             (file_to + 'a' as u8) as char, (8 - rank_to + '0' as u8) as char));
         match self.prom {
-            Some(Piece(Queen, _)) => s.push('q'),
-            Some(Piece(Rook, _)) => s.push('r'),
-            Some(Piece(Knight, _)) => s.push('k'),
-            Some(Piece(Bishop, _)) => s.push('b'),
+            Some(Queen) => s.push('q'),
+            Some(Rook) => s.push('r'),
+            Some(Knight) => s.push('n'),
+            Some(Bishop) => s.push('b'),
             None => (),
             _ => panic!("Illegal promotion move"),
         }
@@ -94,14 +94,14 @@ impl Move for ChessMove {
             else {
                 Ok(ChessMove { from: from, to: to, prom: Some(
                     match alg.chars().nth(4) {
-                        Some('Q') => Piece(Queen, White),
-                        Some('q') => Piece(Queen, Black),
-                        Some('R') => Piece(Rook, White),
-                        Some('r') => Piece(Rook, Black),
-                        Some('N') => Piece(Knight, White),
-                        Some('n') => Piece(Knight, Black),
-                        Some('B') => Piece(Bishop, White),
-                        Some('b') => Piece(Bishop, Black),
+                        Some('Q') => Queen,
+                        Some('q') => Queen,
+                        Some('R') => Rook,
+                        Some('r') => Rook,
+                        Some('N') => Knight,
+                        Some('n') => Knight,
+                        Some('B') => Bishop,
+                        Some('b') => Bishop,
                         Some(ch) => return Err(format!("Bad promotion letter {} in move {}", ch, alg)),
                         None => return Err(format!("No promotion letter in move {}", alg)),
                     }), 
