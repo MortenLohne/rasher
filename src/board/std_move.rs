@@ -1,5 +1,4 @@
 use board::std_board::PieceType::*;
-use search_algorithms::board::Color::*;
 use board::std_board::*;
 use search_algorithms::game_move::Move;
 

@@ -10,7 +10,6 @@ extern crate rayon;
 
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::alpha_beta::Score::*;
 use search_algorithms::game_move::Move;
 use search_algorithms::mcts;
 
@@ -63,7 +62,7 @@ fn main() {
                 
             },
             //"play_self" => play_game(&board::START_BOARD.clone()),
-            "play" => {
+            "play_self" => {
                 if tokens.len() == 1 || tokens[1] == "standard" {
                     let board = ChessBoard::start_board().clone();
                     play_game(board, log_writer)
@@ -77,6 +76,25 @@ fn main() {
                         "sjadam" => {
                             let board = SjadamBoard::start_board().clone();
                             play_game(board, log_writer)
+                        }
+                        s => println!("Unrecognized variant {}.", s),
+                    }
+                }
+            },
+            "play" => {
+                if tokens.len() == 1 || tokens[1] == "standard" {
+                    let board = ChessBoard::start_board().clone();
+                    play_human(board, log_writer)
+                }
+                else {
+                    match tokens[1] {
+                        "crazyhouse" => {
+                            let board = CrazyhouseBoard::start_board().clone();
+                            play_human(board, log_writer)
+                        },
+                        "sjadam" => {
+                            let board = SjadamBoard::start_board().clone();
+                            play_human(board, log_writer)
                         }
                         s => println!("Unrecognized variant {}.", s),
                     }
@@ -126,75 +144,58 @@ fn play_game<B> (mut board : B, log_writer : uci::SharableWriter)
         Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", board),
     }
 }
-/*
+/// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B, log_writer : uci::SharableWriter)
-    where B: EvalBoard + uci::UciBoard + fmt::Debug {
+    where B: EvalBoard + 'static + uci::UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+{
+    match board.game_result() {
+        None => {
+            use search_algorithms::board::Color::*;
+            println!("Board:\n{:?}", board);
+            // If black, play as human
+            if board.to_move() == White {
+                println!("Type your move as long algebraic notation (e2e4):");
 
-    use search_algorithms::board::Color::*;
-    loop {
-        println!("Board:\n{}\nHalf move count: {}", board, board.half_move_clock);
-        // If black, play as human
-        if board.to_move == White {
-            println!("Type your move as long algebraic notation (e2-e4):");
-
-            let reader = io::stdin();
-            let mut input_str = "".to_string();
-            let legal_moves = board.all_legal_moves();
-            // Loop until user enters a valid move
-            loop {
-                match B::Move::from_alg(&input_str) {
-                    Ok(val) => {
-                        let mut is_legal = false;
-                        for c_move in legal_moves.iter() {
-                            if *c_move == val { is_legal = true; }
-                        }
-                        if is_legal { break; }
-                        println!("Move {} is illegal!", val);
-                        for c_move in legal_moves.iter() {
-                            println!("{}", c_move);
-                        }
-                    }
-                       
-                    Err(error) => {
-                        println!("{}", error);
-                    },
-                }
-                input_str = "".to_string();
-                reader.read_line(&mut input_str).ok().expect("Failed to read line");
-                input_str = input_str.trim().to_string();
+                let reader = io::stdin();
+                let mut input_str = "".to_string();
+                let legal_moves = board.all_legal_moves();
+                // Loop until user enters a valid move
+                loop {
+                    input_str.clear();
+                    reader.read_line(&mut input_str).ok().expect("Failed to read line");
                     
-            }
-
-            let c_move =  B::Move::from_alg(&input_str).unwrap();
-            println!("Doing move");
-            board = board.do_move(c_move);
-            
-        }
-        else {
-            let engine_comm = Mutex::new(uci::EngineComm::new());
-            engine_comm.lock().unwrap().engine_is_running = true;
-            
-            let (score, moves, _) = alpha_beta:: (&board, 3, &engine_comm, None);
-            if moves.len() > 0 {
-                println!("Found move with score {}.", score);
-                board = board.do_move(moves[0]);
+                    match B::Move::from_alg(input_str.trim()) {
+                        Ok(val) => {
+                            if legal_moves.contains(&val) { break; }
+                            println!("Move {:?} is illegal! Legal moves: {:?}", val, legal_moves);
+                            println!("Try again: ");
+                        }
+                        
+                        Err(error) => {
+                            println!("{}, try again.", error);
+                        },
+                    }
+                }
+                let c_move =  B::Move::from_alg(input_str.trim()).unwrap();
+                board.do_move(c_move);
+                play_human(board, log_writer);
             }
             else {
-                match score {
-                    Val(_) => panic!("Found no moves for {}, 
-but it was not mate or staltemate! Board:\n{}",
-                                     board.to_move, board),
-                    WhiteWin(_) => { println!("White won at move! Board:\n{}", board); break },
-                    BlackWin(_) => { println!("Black won! Board:\n{}", board); break },
-                    Draw(0) => { println!("The game was drawn! Board:\n{}", board); break },
-                    Draw(n) => println!(
-                        "Game was marked as drawn, but with {} moves left. Board:\n{}",  n, board),
-                }
+                let channel = alpha_beta::start_uci_search(
+                    board.clone(), uci::TimeRestriction::MoveTime(5000), uci::EngineOptions::new());
+                let (score, move_str) = uci::get_uci_move(channel);
+                let best_move = <B as EvalBoard>::Move::from_alg(&move_str);
+                println!("Computer played {:?} with score {}", best_move, score);
+                board.do_move(best_move.unwrap());
+                play_human(board, log_writer);
             }
         }
+    
+        Some(GameResult::WhiteWin) => println!("White won at move! Board:\n{:?}", board),
+        Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", board),
+        Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", board),
     }
 }
-  */
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeCount {

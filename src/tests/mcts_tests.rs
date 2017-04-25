@@ -4,7 +4,6 @@ use rand;
 
 use search_algorithms::mcts;
 use search_algorithms::mcts::MonteCarloTree;
-use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::game_move::Move;
 use uci::UciBoard;
@@ -13,7 +12,6 @@ use board::std_board::ChessBoard;
 use board::std_move::ChessMove;
 
 use board::std_board::Square;
-use board::std_board::Piece;
 use board::std_board::PieceType::*;
 
 #[ignore]

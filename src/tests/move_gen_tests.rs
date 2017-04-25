@@ -1,12 +1,9 @@
-#[allow(unused_imports)]
-use board::std_board;
 use board::std_board::*;
 use board::std_move::ChessMove;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::EvalBoard;
 
 use uci;
-#[allow(unused_imports)]
 use uci::UciBoard;
 
 use search_algorithms::alpha_beta;
@@ -14,13 +11,8 @@ use super::super::board::std_move_gen::move_gen;
 
 extern crate time;
 
-use std::sync::{Arc, Mutex};
-
-#[allow(unused_imports)]
 use board::std_board::PieceType::*;
-#[allow(unused_imports)]
 use search_algorithms::board::Color::{Black, White};
-#[allow(unused_imports)]
 use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
@@ -156,7 +148,6 @@ fn basic_tactics_test() {
     basic_tactics_prop(&board5, best_move5);
 }
 
-#[allow(dead_code)]
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(5),
@@ -222,7 +213,6 @@ fn is_pinned_to_piece_test() {
     is_pinned_prop(&board1, Square(10), Square(0), false);
 }
 
-#[allow(dead_code)]
 fn is_pinned_prop(board : &ChessBoard, pinee_pos : Square, pinner_pos : Square, is_pinned : bool) {
     if is_pinned {
         assert!(move_gen::is_pinned_to_piece(&board, pinee_pos, pinner_pos),
@@ -275,7 +265,6 @@ fn castling_test () {
     move_is_available_prop(&mut board5, ChessMove::from_alg("e1f1").unwrap());
 }
 
-#[allow(dead_code)]
 fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
     assert!(all_moves.iter().find(|mv|c_move == **mv).is_some(),
@@ -283,7 +272,6 @@ fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
             c_move.to_alg(), board, all_moves);
 }
 
-#[allow(dead_code)]
 fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
     assert!(!all_moves.iter().find(|mv|c_move == **mv).is_some(),
@@ -438,7 +426,6 @@ fn correct_move_gen_test7() {
 
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
-#[allow(dead_code)]
 fn legal_moves_after_plies(board : &mut ChessBoard, n : u8) -> u64 {
     if n == 0 { 1 }
     else {

@@ -615,20 +615,6 @@ impl ChessBoard {
     pub fn piece_at(&self, square : Square) -> Piece {
         self[square].clone()
     }
-    /// Returns a clone of the board, viewed from the other side.
-    /// This screws up everything related to pawn movement, castling, etc,
-    /// and should only be used to print the board as seen from the black side
-    #[allow(dead_code)]
-    pub fn upside_down(&self) -> Self {
-        let mut new_board = self.clone();
-        for i in 0..8 {
-            new_board.board[i] = self.board[7-i].clone();
-            for j in 0..8 {
-                new_board.board[i][j] = self.board[7-i][7-j];
-            }
-        }
-        new_board
-    }
 
     pub fn king_pos(&self, color: Color) -> Square {
         match self.pos_of(Piece(King, color)) {

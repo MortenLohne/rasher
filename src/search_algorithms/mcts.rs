@@ -83,6 +83,16 @@ pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
     println!("{:?}\n{:?} won!", board, board.game_result());
 }
 
+pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
+                        options: uci::EngineOptions) -> mpsc::Receiver<uci::UciInfo>
+    where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
+{
+    let (sender, receiver) = mpsc::channel();
+    use std::thread;
+    thread::spawn(move || uci_search(board, time_limit, options, sender));
+    receiver
+}
+
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync

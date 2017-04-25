@@ -81,7 +81,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         let uci_info = uci::UciInfo { depth: depth, seldepth: depth, time: ms_taken,
                                       nodes: node_count.total, hashfull: 0.0,
                                       pvs: vec![(score, pv_str)] };
-        channel.send(uci_info);
+        channel.send(uci_info).unwrap();
 
         // No longer needed, because we send uci info through the channel
         //uci::send_eval_to_gui(&log_writer, depth,

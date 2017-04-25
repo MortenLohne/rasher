@@ -4,7 +4,6 @@ use board::std_board::TimeInfo;
 
 use board::crazyhouse_board::CrazyhouseBoard;
 
-use search_algorithms::game_move;
 use search_algorithms::board;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;

@@ -6,7 +6,7 @@ use search_algorithms::game_move::Move;
 
 use std::fmt;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Clone)]
 pub struct SjadamMove {
     pub old_castling_en_passant: u8, // Not used if chess_move is present
     pub old_half_move_clock: u8, // Not used if chess_move is present
@@ -38,6 +38,14 @@ impl SjadamMove {
         }
     }
 }
+
+impl PartialEq for SjadamMove {
+    fn eq(&self, other: &Self) -> bool {
+        self.chess_move == other.chess_move && self.checkers == other.checkers
+    }
+}
+
+impl Eq for SjadamMove {}
 
 impl Move for SjadamMove {
     fn from_alg(input: &str) -> Result<Self, String> {
