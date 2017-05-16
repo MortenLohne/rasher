@@ -238,49 +238,6 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                   mcts::uci_search(board, time_limit, options, tx));
     rx
 }
-/*
-fn start_alpha_beta_engine<B>(board: B, time_limit: TimeRestriction,
-                              options: EngineOptions) -> mpsc::Receiver<UciInfo>
-    where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
-{
-    let (tx, rx) = mpsc::channel();
-
-    // TODO: Make this do something
-    thread::spawn(move || ());
-    rx
-}     
-*/       
-/*
-fn start_engine<B> (board : B, log_writer : SharableWriter,
-                                            time_restriction : TimeRestriction, 
-                      engine_comm : Arc<Mutex<EngineComm>>)
-    where B: 'static + board::EvalBoard + Send + fmt::Debug
-{
-    {
-        engine_comm.lock().unwrap().engine_is_running = true;
-    }
-    let cloned_board = board.clone();
-    let cloned_log_writer = log_writer.clone();
-    
-    let thread_result = thread::Builder::new()
-        .name("alpha_beta_thread".to_string())
-        .spawn (move || {
-            alpha_beta::search_moves(cloned_board, engine_comm,
-                                     time_restriction, cloned_log_writer);
-        });
-    match thread_result {
-        Ok(handle) => {
-            thread::spawn(move || match handle.join() {
-                Ok(_) => (),
-                Err(panic) =>
-                    to_log(&format!("Alpha_beta thread stopped by: \"{:?}\"", panic), &log_writer),
-            });
-        },
-        Err(err) => println!("Couldn't create alpha_beta thread, error: \"{}\"", err),
-    }
-    
-}
-*/
 
 pub fn open_log_file (log_writer : &SharableWriter) {
     let mut inner_writer = log_writer.lock().unwrap();
@@ -290,7 +247,7 @@ pub fn open_log_file (log_writer : &SharableWriter) {
             Ok(log_file) => { 
                 *inner_writer = Some(io::BufWriter::new(log_file));
             },
-            Err(_) => (), //panic!(err), // TODO: Panic here for debugging purposes. This error can be ignored, and the engine can run without logging
+            Err(_) => (), 
         }
     }
 }
@@ -453,37 +410,6 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
                               moves_to_go: moves_to_go.map(|v| v as u16 )};
     Ok(TimeRestriction::GameTime(time_info))
 }
-/*
-/// Sends the engine's evaluation to the GUI via uci, along with other data
-/// like node count, time taken, etc
-pub fn send_eval_to_gui<M> (log_writer : &SharableWriter, depth : u8,
-                         ms_taken : i64, 
-                              score : Score, moves : Vec<M>, node_count : ::NodeCount)
-    where M: game_move::Move
-{
-    let eng_score = score.to_string();
-    
-    let mut inf_str = "info ".to_string();
-    inf_str.push_str(&format!("depth {} ", depth));
-    // inf_str.push_str(&format!("selDepth {} ", depth));
-    inf_str.push_str(&format!("score {} ", eng_score));
-    
-    let total_nodes = node_count.intern + node_count.leaf;
-    
-    inf_str.push_str(&format!("nodes {} ", total_nodes));
-    inf_str.push_str(&format!("time {} ", ms_taken));
-    if ms_taken > 0 {   
-        inf_str.push_str(&format!("nps {} ", total_nodes * 1000 / ms_taken as u64));
-    }
-    if moves.len() > 0 {
-        inf_str.push_str("pv ");
-    }
-    for c_move in moves {
-        inf_str.push_str(&format!("{} ", c_move.to_alg()));
-    }
-    uci_send(&inf_str, log_writer);
-}
-*/
 
 /// Simple helper method to write a line to the log
 pub fn to_log (message : &str, log_writer : &SharableWriter) {
@@ -594,13 +520,13 @@ impl UciInfo {
         if self.pvs.len() == 1 {
             write!(string, "info depth {} seldepth {} score {} nodes {} time {} nps {} pv {}\n",
                    self.depth, self.seldepth, self.pvs[0].0, self.nodes,
-                   self.time, (1000 * self.nodes) as i64 / self.time, self.pvs[0].1).unwrap();
-        }
+                   self.time, (1000 * self.nodes) as i64 / (self.time + 1), self.pvs[0].1).unwrap();
+        } // Add one to self.time to avoid division by zero
         else {
             for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
                 write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} time {} nps {} pv {}\n",
                        self.depth, self.seldepth, n, score, self.nodes,
-                       self.time, (1000 * self.nodes) as i64 / self.time, moves).unwrap();
+                       self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
             }
         }
         string

@@ -83,9 +83,6 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                                       pvs: vec![(score, pv_str)] };
         channel.send(uci_info).unwrap();
 
-        // No longer needed, because we send uci info through the channel
-        //uci::send_eval_to_gui(&log_writer, depth,
-        //                 ms_taken, score, moves, node_count);
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => { 
                 if (board.to_move() == Black && 
@@ -103,26 +100,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         }
     }
     {
-        // Only runs if the engine finishes completely
-        // Happens when the user requests a search with limited time or depth
-        // No longer needed, happens automatically through the channels
-        /*
-        println!("Unclocking best move");
-        
-        println!("Sending best move");
-        match engine_comm.best_move.clone() {
-            Some(mv) => {
-                uci::uci_send(&format!("bestmove {}", mv), &mut log_writer);
-            },
-            
-            None => {
-                uci::uci_send(&format!("best score: {}", best_score.unwrap()), &mut log_writer);
-            },
-        }
-         */
+        // TODO: Makes this always get executed when the engine shuts down
         let mut engine_comm = engine_comm.lock().unwrap();
         engine_comm.engine_is_running = false;
-        
     }
     (best_score.unwrap(), best_moves.unwrap(), best_node_count.unwrap())
     
@@ -250,7 +230,6 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0),
                               engine_comm, time_restriction, &mut node_counter);
     moves.reverse();
-    // println!("Evaluated {} internal nodes and {} leaves", node_counter.intern, node_counter.leaf);
     (score, moves, node_counter)
 }   
 
@@ -295,10 +274,3 @@ impl PartialOrd for Score {
         }
     }
 }
-/*
-impl Ord for Score {
-    fn cmp (&self, other: &Score) -> cmp::Ordering {
-        
-    }
-}
- */
