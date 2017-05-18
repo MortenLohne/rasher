@@ -31,14 +31,12 @@ pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      engine_comm: Arc<Mutex<uci::EngineComm>> )
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
-    let mut log_writer = Arc::new(Mutex::new(None));
     //uci::open_log_file(&mut log_writer);
-    search_moves(board, engine_comm, time_limit, log_writer, channel);
+    search_moves(board, engine_comm, time_limit, channel);
 }
 
 pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         time_restriction: uci::TimeRestriction,
-                        mut log_writer: uci::SharableWriter,
                         channel: mpsc::Sender<uci::UciInfo>) 
                          -> (Score, Vec<B::Move>, NodeCount)
     where B: EvalBoard + fmt::Debug
@@ -71,7 +69,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             engine_comm.lock().unwrap().best_move = Some(moves[0].to_alg());
         }
         else {
-            uci::to_log("Warning: find_best_move_ab didn't return any moves", &mut log_writer);
+            warn!("Find_best_move_ab didn't return any moves");
             engine_comm.lock().unwrap().best_move = None;
         }
         let pv_str = moves.iter()

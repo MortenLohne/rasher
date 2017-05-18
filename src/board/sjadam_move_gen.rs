@@ -40,12 +40,14 @@ impl BitBoard {
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
         self.board & (1<<i) != 0
     }
+    // Sets the square to true
     fn set(&mut self, idx: Square) {
         let Square(i) = idx;
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
         self.board |= 1<<i;
     }
-
+    #[allow(dead_code)]
+    // Sets the square to false
     fn clear(&mut self, idx: Square) {
         let Square(i) = idx;
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));

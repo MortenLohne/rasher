@@ -15,12 +15,8 @@ use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
-use std::io::Write;
 use std::io::Read;
-use std::{fs, process};
 use std::str::FromStr;
-
-pub type SharableWriter = Arc<Mutex<Option<io::BufWriter<fs::File>>>>;
 
 pub trait UciBoard : Sized {
     fn from_fen(&str) -> Result<Self, String>;
@@ -32,50 +28,44 @@ pub trait UciMove : Sized {
     fn to_alg(&self) -> String;
 }
 
-pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> Result<(), String> {
-
-    open_log_file(log_writer);
+pub fn choose_variant(stdin : &mut io::BufRead) -> Result<(), String> {
 
     // Do the standard handshake with the GUI
-    to_log("Received uci command from GUI", log_writer);
-    uci_send("id name rasher", log_writer);
+    info!("Received uci command from GUI");
+    uci_send("id name rasher");
 
-    uci_send("option name Write Debug Log type check default true", log_writer);
-    uci_send("option name Variant type string", log_writer);
-    uci_send("option name Hash type spin default 64 min 16 max 32768", log_writer);
-    uci_send("option name Threads type spin default 2 min 1 max 16", log_writer);
+    uci_send("option name Write Debug Log type check default true");
+    uci_send("option name Variant type string");
+    uci_send("option name Hash type spin default 64 min 16 max 32768");
+    uci_send("option name Threads type spin default 2 min 1 max 16");
     
-    uci_send("uciok", log_writer);
-    
-    //uci_send("variants standard crazyhouse", log_writer);
+    uci_send("uciok");
 
-    let input : String = get_engine_input(log_writer, stdin)?;
+    let input : String = get_engine_input(stdin)?;
     let tokens = input.split_whitespace().collect::<Vec<_>>();
     if tokens.len() < 1 {
-        to_log(&format!("Unrecognized variant string \"{}\", continuing normally", input), log_writer);
+        warn!("Unrecognized variant string \"{}\", continuing normally", input);
         //continue; TODO: Go to connect_engine
     }
     if tokens[0] == "variant" {
         match tokens[1] {
-            "standard" => connect_engine::<ChessBoard>(log_writer, stdin),
-            "crazyhouse" => connect_engine::<CrazyhouseBoard>(log_writer, stdin),
-            "sjadam" => connect_engine::<SjadamBoard>(log_writer, stdin),
+            "standard" => connect_engine::<ChessBoard>(stdin),
+            "crazyhouse" => connect_engine::<CrazyhouseBoard>(stdin),
+            "sjadam" => connect_engine::<SjadamBoard>(stdin),
             _ => Err(format!("Unrecognized chess variant {}.", tokens[1])),
         }
     }
     else {
         let mut input_with_newline = input.clone();
         input_with_newline.push_str("\n");
-        connect_engine::<ChessBoard>(log_writer,
-                                     &mut io::Cursor::new(input_with_newline)
+        connect_engine::<ChessBoard>(&mut io::Cursor::new(input_with_newline)
                                      .chain(stdin))
     }
 }
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRead)
-                             -> Result<(), String> 
+pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String> 
     where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug,
 <Board as board::EvalBoard>::Move: Sync
 {
@@ -87,25 +77,25 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
     
     // Listen to commands from GUI forever
     loop {
-        let input = get_engine_input(log_writer, stdin)?;
+        let input = get_engine_input(stdin)?;
         let tokens = input.split_whitespace().collect::<Vec<_>>();
         if tokens.is_empty() {
-            to_log(&format!("Unrecognized input \"{}\"", input), log_writer);
+            warn!("Unrecognized input \"{}\"", input);
             continue;
         }
         match tokens[0] { // Parse the first word of the input
-            "isready" => uci_send("readyok", log_writer),
-            "quit" => { to_log("Quitting...", log_writer); process::exit(0); },
+            "isready" => uci_send("readyok"),
+            "quit" => { info!("Quitting..."); return Ok(()); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => board = Some(try!(parse_position::<Board>(&input, log_writer))),
+            "position" => board = Some(try!(parse_position::<Board>(&input))),
             "setoption" => { 
                 // If the board has not been sent, we are in init mode,
                 // which means init options can still be changed
                 if board == None { 
-                    try!(parse_setoption_init(&input, &mut engine_options, log_writer))
+                    try!(parse_setoption_init(&input, &mut engine_options))
                 }
                 else {
-                    try!(parse_setoption(&input, log_writer))
+                    try!(parse_setoption(&input))
                 }
             },
             "engine" =>
@@ -120,12 +110,12 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                     best_move = match engine_comm.best_move.clone() {
                         Some(mv) => mv,
                         None => {
-                            to_log(&"Haven't found a move yet: sending a bogus move", log_writer);
+                            warn!("Haven't found a move yet: sending a bogus move");
                             "e2e4".to_string() // Send a bogus move
                         },
                     };
                 }
-                uci_send(&format!("bestmove {}", best_move), log_writer);
+                uci_send(&format!("bestmove {}", best_move));
             },
             "go" => {
                 loop {
@@ -138,7 +128,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                         engine_comm.engine_is_running
                     };
                     if engine_is_running {
-                        to_log("Engine was already running, cannot start new. Trying again later", log_writer);
+                        warn!("Engine was already running, cannot start new. Trying again later");
                         thread::sleep(::std::time::Duration::from_millis(100));
                         
                     }
@@ -146,7 +136,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                 }
                 let board = try!(board.clone()
                                  .ok_or("Received go without receiving a position first. Exiting..."));
-                let time_restriction = try!(parse_go(&input, log_writer));
+                let time_restriction = parse_go(&input)?;
                 let rx = match engine_string.as_str() {
                     "minimax" => alpha_beta::start_uci_search(board, time_restriction,
                                                               engine_options.clone(),
@@ -155,24 +145,22 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                                                 engine_comm.clone()),
                     _ => panic!(),
                 };
-                let log_writer = log_writer.clone();
                 thread::spawn(move || {
                     // Last info that has been received, if any
                     let mut last_info = None;
                     loop {
                         match rx.recv() {
                             Ok(uci_info) => {
-                                uci_send(&uci_info.to_info_string(), &log_writer);
+                                uci_send(&uci_info.to_info_string());
                                 last_info = Some(uci_info);
                             },
                             Err(_) => {
                                 // If the channel has hung up,
                                 // send final data as well as bestmove command
                                 match last_info {
-                                    None => uci_send("bestmove none", &log_writer),
+                                    None => uci_send("bestmove none"),
                                     Some(uci_info) => {
-                                        uci_send(&uci_info.to_info_string(),
-                                                 &log_writer);
+                                        uci_send(&uci_info.to_info_string());
                                         assert!(!uci_info.pvs.is_empty());
                                         let (_, ref moves_string) = uci_info.pvs[0];
                                         println!("bestmove {}",
@@ -188,7 +176,7 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                 });
             }
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
-                to_log(&format!("Unrecognized input \"{}\". Ignoring.", input), log_writer);
+                warn!("Unrecognized input \"{}\". Ignoring.", input);
             },
         }
     }
@@ -249,21 +237,6 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
     rx
 }
 
-pub fn open_log_file (log_writer : &SharableWriter) {
-    let mut inner_writer = log_writer.lock().unwrap();
-    match *inner_writer {
-        Some(_) => (), // Log is already open, do nothing
-        None => match fs::File::create("mc_log.txt") {
-            Ok(log_file) => { 
-                *inner_writer = Some(io::BufWriter::new(log_file));
-            },
-            Err(err) => {
-                writeln!(&mut io::stderr(), "{}", err).unwrap();
-            },
-        }
-    }
-}
-
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ChessVariant {
     Standard,
@@ -287,8 +260,7 @@ impl EngineOptions {
 
 // Parse "setoption" strings from the GUI. Some options (# of cores etc) can only
 // be changed during engine initialization, these should be set here
-fn parse_setoption_init (input: &str, options: &mut EngineOptions, log_writer : &SharableWriter)
-                             -> Result<(), String> {
+fn parse_setoption_init (input: &str, options: &mut EngineOptions) -> Result<(), String> {
 
     let (option_name, value) = try!(parse_setoption_data(input));
 
@@ -308,7 +280,7 @@ fn parse_setoption_init (input: &str, options: &mut EngineOptions, log_writer : 
             options.hash_memory = hash;
         }
         // If no init-only option matches, try the other ones
-        s => try!(parse_setoption(s, log_writer)),
+        s => parse_setoption(s)?,
     }
     Ok(())
 }
@@ -316,24 +288,21 @@ fn parse_setoption_init (input: &str, options: &mut EngineOptions, log_writer : 
 // Parse "setoption" strings from the GUI. Most options (# of cores etc) can only
 // be changed during engine initialization.
 // A few, like debug logs, can be toggled while the engine is running
-fn parse_setoption (input : &str, log_writer : &SharableWriter) -> Result<(), String> {
+fn parse_setoption (input : &str) -> Result<(), String> {
     
     let (option_name, value) = try!(parse_setoption_data(input));
 
     match &option_name.to_lowercase()[..] {
         "write debug log" => {
             match &value.to_lowercase()[..] {
-                "true" => open_log_file(log_writer),
-                "false" => {
-                    let mut inner_writer = log_writer.lock().unwrap();
-                    *inner_writer = None;
-                },
-                _ => to_log(&format!("Unrecognized value {} in option {}, ignoring...", 
-                                     value, option_name), log_writer),
+                "true" => (),
+                "false" => (),
+                _ => warn!("Unrecognized value {} in option {}, ignoring...", 
+                                     value, option_name),
             }
         },
-        _ => to_log(&format!("Unrecognized option {} with value {}, ignoring...", 
-                             option_name, value), log_writer),
+        _ => warn!("Unrecognized option {} with value {}, ignoring...", 
+                             option_name, value),
     }
     Ok(())
 }
@@ -357,7 +326,7 @@ fn parse_setoption_data(input : &str) -> Result<(String, String), String> {
     Ok((option_name, value))    
 }
 
-pub fn parse_go (input : &str, log_writer : &SharableWriter)
+pub fn parse_go (input : &str)
              -> Result<TimeRestriction, String> {
 
     // Parses an optional string to return a u32
@@ -410,11 +379,11 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
         return Err(String::from("Did not receive time left for white and black, nor other restrictions on \"go\" command."))
     }
     if white_inc == None {
-        to_log("Did not receive white increment times, assuming 0", log_writer);
+        warn!("Did not receive white increment times, assuming 0");
         white_inc = Some(0);
     }
     if black_inc == None {
-        to_log("Did not receive black increment times, assuming 0", log_writer);
+        warn!("Did not receive black increment times, assuming 0");
         black_inc = Some(0);
     }
     let time_info = TimeInfo {white_time: white_time.unwrap(), black_time: black_time.unwrap(),
@@ -423,43 +392,23 @@ pub fn parse_go (input : &str, log_writer : &SharableWriter)
     Ok(TimeRestriction::GameTime(time_info))
 }
 
-/// Simple helper method to write a line to the log
-pub fn to_log (message : &str, log_writer : &SharableWriter) {
-
-    let mut inner_writer = log_writer.lock().unwrap();
-
-    match *inner_writer {
-        Some(ref mut writer) => {
-            
-            let time = format!("[{}:{}]", time::get_time().sec % 3600, 
-                               time::get_time().nsec / 1000000);
-            writer.write(&format!("{} {}\n", time, message)
-                             .bytes().collect::<Vec<u8>>()).unwrap();
-            writer.flush().unwrap();
-        },
-        None => (),
-    }
-}
-
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it
 /// to the log file, if it is present
-pub fn uci_send (message : &str, log_writer : &SharableWriter) {
-
-    let log_message = format!("Engine: {}", message);
-    to_log(&log_message, log_writer);
+pub fn uci_send (message : &str) {
+    info!("Engine: {}", message);
     println!("{}", message);
 }
 
 /// Waits for input from the GUI, and writes the input to the log and returns it
 /// Returns error if stdin is closed, or on any io error
-pub fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> Result<String, String> {
+pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 
     let mut input = "".to_string();
     match stdin.read_line(&mut input) {
         Ok(0) => Err("Got empty input from stdin, presumably the handle is closed".to_string()),
         Ok(_) => {
             input = input.trim().to_string();
-            to_log(&format!("GUI: {}", input), log_writer);
+            info!("GUI: {}", input);
             Ok(input)
         },
         Err(err) => Err(err.to_string()),
@@ -469,7 +418,7 @@ pub fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) 
 
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
-fn parse_position<Board> (input : &String, log_writer : &SharableWriter) -> Result<Board, String>
+fn parse_position<Board> (input : &String) -> Result<Board, String>
     where Board: 'static + board::EvalBoard + UciBoard{
     
     let words : Vec<&str> = input.split_whitespace().collect();
@@ -505,8 +454,7 @@ fn parse_position<Board> (input : &String, log_writer : &SharableWriter) -> Resu
                 let c_move = match Board::Move::from_alg(c_move_str) {
                     Ok(m) => m,
                     Err(err) => {
-                        to_log(&err, log_writer);
-                        return Err(format!("{}", err));
+                        return Err(err.to_string());
                     },
                 };
                 board.do_move(c_move);
