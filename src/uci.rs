@@ -49,7 +49,7 @@ pub fn choose_variant(log_writer : &SharableWriter, stdin : &mut io::BufRead) ->
     
     //uci_send("variants standard crazyhouse", log_writer);
 
-    let input : String = get_engine_input(log_writer, stdin);
+    let input : String = get_engine_input(log_writer, stdin)?;
     let tokens = input.split_whitespace().collect::<Vec<_>>();
     if tokens.len() < 1 {
         to_log(&format!("Unrecognized variant string \"{}\", continuing normally", input), log_writer);
@@ -87,9 +87,9 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
     
     // Listen to commands from GUI forever
     loop {
-        let input = get_engine_input(log_writer, stdin);
+        let input = get_engine_input(log_writer, stdin)?;
         let tokens = input.split_whitespace().collect::<Vec<_>>();
-        if tokens.len() == 0 {
+        if tokens.is_empty() {
             to_log(&format!("Unrecognized input \"{}\"", input), log_writer);
             continue;
         }
@@ -108,7 +108,10 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                     try!(parse_setoption(&input, log_writer))
                 }
             },
-            "engine" => engine_string = tokens[1].to_string(),
+            "engine" =>
+                if tokens.len() >= 2 {
+                    engine_string = tokens[1].to_string(); }
+                else { },
             "stop" => {
                 let best_move : String;
                 {
@@ -146,26 +149,31 @@ pub fn connect_engine<Board>(log_writer : &SharableWriter,stdin : &mut io::BufRe
                 let time_restriction = try!(parse_go(&input, log_writer));
                 let rx = match engine_string.as_str() {
                     "minimax" => alpha_beta::start_uci_search(board, time_restriction,
-                                                              engine_options.clone()),
-                    "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone()),
+                                                              engine_options.clone(),
+                                                              engine_comm.clone()),
+                    "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone(),
+                                                engine_comm.clone()),
                     _ => panic!(),
                 };
+                let log_writer = log_writer.clone();
                 thread::spawn(move || {
                     // Last info that has been received, if any
                     let mut last_info = None;
                     loop {
                         match rx.recv() {
                             Ok(uci_info) => {
-                                println!("{}", uci_info.to_info_string());
+                                uci_send(&uci_info.to_info_string(), &log_writer);
                                 last_info = Some(uci_info);
                             },
                             Err(_) => {
                                 // If the channel has hung up,
                                 // send final data as well as bestmove command
                                 match last_info {
-                                    None => println!("bestmove none"),
+                                    None => uci_send("bestmove none", &log_writer),
                                     Some(uci_info) => {
-                                        println!("{}", uci_info.to_info_string());
+                                        uci_send(&uci_info.to_info_string(),
+                                                 &log_writer);
+                                        assert!(!uci_info.pvs.is_empty());
                                         let (_, ref moves_string) = uci_info.pvs[0];
                                         println!("bestmove {}",
                                                  moves_string
@@ -195,6 +203,7 @@ pub fn get_uci_move (rx: mpsc::Receiver<UciInfo>) -> (Score, String) {
             Ok(uci_info) => last_info = Some(uci_info),
             Err(_) => {
                 let uci_info = last_info.unwrap();
+                assert!(!uci_info.pvs.is_empty());
                 let (score, ref moves_string) = uci_info.pvs[0];
                 return (score, moves_string
                         .split_whitespace()
@@ -230,7 +239,8 @@ impl EngineComm {
 use std::sync::mpsc;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
-                        options: EngineOptions) -> mpsc::Receiver<UciInfo>
+                        options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
+                        -> mpsc::Receiver<UciInfo>
     where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
 {
     let (tx, rx) = mpsc::channel();
@@ -247,7 +257,9 @@ pub fn open_log_file (log_writer : &SharableWriter) {
             Ok(log_file) => { 
                 *inner_writer = Some(io::BufWriter::new(log_file));
             },
-            Err(_) => (), 
+            Err(err) => {
+                writeln!(&mut io::stderr(), "{}", err).unwrap();
+            },
         }
     }
 }
@@ -439,14 +451,20 @@ pub fn uci_send (message : &str, log_writer : &SharableWriter) {
 }
 
 /// Waits for input from the GUI, and writes the input to the log and returns it
-fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> String {
+/// Returns error if stdin is closed, or on any io error
+pub fn get_engine_input(log_writer : &SharableWriter, stdin : &mut io::BufRead) -> Result<String, String> {
 
     let mut input = "".to_string();
-    stdin.read_line(&mut input).unwrap();
-    input = input.trim().to_string();
-    to_log(&format!("GUI: {}", input), log_writer);
-
-    input
+    match stdin.read_line(&mut input) {
+        Ok(0) => Err("Got empty input from stdin, presumably the handle is closed".to_string()),
+        Ok(_) => {
+            input = input.trim().to_string();
+            to_log(&format!("GUI: {}", input), log_writer);
+            Ok(input)
+        },
+        Err(err) => Err(err.to_string()),
+    }
+    
 }
 
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")

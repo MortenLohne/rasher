@@ -15,6 +15,8 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::{Black, White};
 use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
+use std::sync;
+
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
 /// Also assumes that std_board::START_BOARD is correct
 #[test]
@@ -151,7 +153,8 @@ fn basic_tactics_test() {
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(5),
-                                               uci::EngineOptions::new());
+                                               uci::EngineOptions::new(),
+                                               sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())));
     
     let (score, move_str) = uci::get_uci_move(channel);
     
