@@ -265,8 +265,7 @@ pub fn all_legal_base_moves (board : &ChessBoard) -> Vec<ChessMove> {
 }
 
 /// Adds all the legal moves for the piece in this position, to the input vector
-/// Takes in the king position for the moving player, and whether they are currently in check,
-/// to speed up the move generation
+/// Adds all moves, also those that put the player in check
 #[inline(never)]
 pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                          is_in_check : bool, king_pos : Square) { 
@@ -499,108 +498,18 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     }
 }
 
-/// Checks that the move does not put the player in check
-/// , and add the move to the vector
-/// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
-#[inline(never)]
+/// Adds a move to the list. In sjadam, every move is considered legal.
 fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
                 king_pos_c : Square, is_in_check : bool) {
     moves.push(c_move);
 }
 
-/// Checks that the move does not put the player in check
-/// , and add the move to the vector
-/// This check is more expensive, but works for _all_ positions
-#[inline(never)]
+/// Adds a move to the list. In sjadam, every move is considered legal.
 fn add_if_legal_simple (board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>) {
     moves.push(c_move);
 }
-/*
-#[inline(never)]
-pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : Square) -> bool {
-    debug_assert!(pinee_pos != pinner_pos);
-    let (pinner_file, pinner_rank) = pinner_pos.file_rank(); // The piece it is pinned to
-    let (pinee_file, pinee_rank) = pinee_pos.file_rank(); // The piece that is pinned
-    let (file_diff, rank_diff) = ((pinee_file as i8 - pinner_file as i8),
-                                  (pinee_rank as i8 - pinner_rank as i8));
-    // If on the same diagonal
-    if file_diff.abs() == rank_diff.abs() {
-        
-        let (dir_file, dir_rank) = (file_diff.signum(), rank_diff.signum());
-        let (mut cur_file, mut cur_rank) = (pinner_file as i8, pinner_rank as i8);
-        
-        // Check for enemy pieces, or pieces blocking, on the diagonal
-        loop {
-            cur_file += dir_file;
-            cur_rank += dir_rank;
-            if cur_file < 0 || cur_file >= 8 || cur_rank < 0 || cur_rank >= 8 {
-                return false;
-            }
-            if cur_file == pinee_file as i8 {
-                continue;
-            }
-            match board.piece_at(Square::from_ints(cur_file as u8, cur_rank as u8)) {
-                Piece(Empty, White) => continue,
-                // If you first find an opposite color queen/bishop, you're pinned
-                Piece(Bishop, color) | Piece(Queen, color) if color != board.to_move =>
-                    return true,
-                // If you first find any other piece blocking the check, you're not pinned
-                _ => return false,
-            }
-        }
-    }
-    // If on the same file
-    else if file_diff == 0 {
-        debug_assert!(rank_diff != 0);
-        let dir_rank = rank_diff.signum();
-        let mut cur_rank = pinner_rank as i8;
-        
-        // Check for enemy pieces, or pieces blocking, on the file
-        loop {
-            cur_rank += dir_rank;
-            if cur_rank < 0 || cur_rank >= 8 {
-                return false;
-            }
-            if cur_rank == pinee_rank as i8 {
-                continue;
-            }
-            match board.piece_at(Square::from_ints(pinner_file as u8, cur_rank as u8)) {
-                Piece(Empty, White) => continue,
-                Piece(Rook, color) | Piece(Queen, color) if color != board.to_move =>
-                    return true,
-                _ => return false,
-            }
-        }
-    }
-    else if rank_diff == 0 {
-        debug_assert!(file_diff != 0);
-        let dir_file = file_diff.signum();
-        let mut cur_file = pinner_file as i8;
-        
-        // Check for enemy pieces, or pieces blocking, on the file
-        loop {
-            cur_file += dir_file;
-            if cur_file < 0 || cur_file >= 8 {
-                return false;
-            }
-            if cur_file == pinee_file as i8 {
-                continue;
-            }
-            match board.piece_at(Square::from_ints(cur_file as u8, pinner_rank as u8)) {
-                Piece(Empty, White) => continue,
-                Piece(Rook, color) | Piece(Queen, color) if color != board.to_move =>
-                    return true,
-                _ => return false,
-            }
-        }
-    }
-    else {
-        false
-    }
-}
-*/
+
 /// Returns whether a square is under attack by the side not to move
-#[inline(never)]
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     if board.piece_at(square).0 != Empty {
         debug_assert_eq!(board.to_move(), board.piece_at(square).1,
@@ -617,7 +526,6 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
         if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
             let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
             let Piece(piece, color) = board.piece_at(pawn_square);
-            //println!("Pawn square: {} has a {} {}", pawn_square, piece, color);
             if piece == Pawn && color != board.to_move { return true; }
         }
     }
@@ -626,7 +534,6 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
             
             let Piece(piece, color) = board.piece_at(pawn_square);
-            //println!("Pawn square: {} has a {} {}", pawn_square, piece, color);
             if piece == Pawn && color != board.to_move { return true; }
         }
     }
@@ -634,13 +541,11 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 
     for &(i, j) in [(0, 1), (1, 0), (0, -1), (-1, 0)].iter() {
         if check_threats_in_direction (i, j, board, square, &vec![Queen, Rook]) {
-            //println!("Is under attack diagonally!");
             return true;
         }
     }
     for &(i, j) in [(1, 1), (1, -1), (-1, 1), (-1, -1)].iter() {
         if check_threats_in_direction (i, j, board, square, &vec![Queen, Bishop]) {
-            //println!("Is under attack veritcally or horizontally!");
             return true;
         }
     }
@@ -665,7 +570,6 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
                 }
             let new_pos = ((rank + j) * 8 + file + i) as u8;
 
-            
             // Check that there is no enemy king around
             let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
             if piece_to == King && color_to != board.to_move {
@@ -719,7 +623,6 @@ fn add_straight_moves(board : &ChessBoard, square : Square, moves : &mut Vec<Che
 fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
                            moves : &mut Vec<ChessMove>, king_pos : Square, is_in_check : bool) {
     
-    // let mut pos = square.0 as i8;
     let mut file = (square.0 & 0b0000_0111) as i8;
     let mut rank = (square.0 >> 3) as i8;
     loop {
