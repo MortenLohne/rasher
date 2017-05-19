@@ -59,6 +59,7 @@ fn main() {
                             error!("Engine front terminated unexpectedly with \"{}\"", e);
                         },
                     }
+                    return;
                 },
                 "isready" => {
                     info!("received isready from GUI");

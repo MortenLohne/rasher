@@ -1,12 +1,16 @@
 use board::sjadam_board::SjadamBoard;
-use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
+use board::sjadam_move::SjadamMove;
+use board::std_board::*;
+use board::std_move::ChessMove;
+use search_algorithms::game_move::Move;
+use search_algorithms::board::{GameResult, EvalBoard};
 
 #[test]
 fn correct_move_gen_start_pos() {
     let start_board = SjadamBoard::start_board().clone();
     let moves = start_board.all_legal_moves();
-    assert_eq!(moves.len(), 146, "Found {} moves: {:?}, expected 56",
+    assert_eq!(moves.len(), 146, "Found {} moves: {:?}, expected 146",
                moves.len(), moves);
 }
 
@@ -32,6 +36,24 @@ fn no_stalemate_test() {
                "Expected 8 legal moves, found {} moves: {:?}\n{:?}",
                moves.len(), moves, board);
 }
+
+#[test]
+fn can_take_king_while_checked() {
+    let board = SjadamBoard::from_fen("r2q2n1/pp4pp/6k1/2Nb4/8/5P2/P1P1PK2/2B3q1 w - - 0 1").unwrap();
+    // Black is really sjadammated, so this is also a possible outcome
+    if board.game_result() != Some(GameResult::WhiteWin) { 
+        let moves = board.all_legal_moves();
+        
+        let mut correct_move = SjadamMove::from_sjadam_move(Square::from_alg("c5").unwrap(),
+                                                        Square::from_alg("e5").unwrap(),
+                                                        &board);
+        correct_move.chess_move = Some(ChessMove::from_alg("e5g6").unwrap());
+        assert!(board.all_legal_moves().contains(&correct_move),
+                "White couldn't take king on board:\n{:?}Moves: {:?}",
+                board, moves);
+    }
+}
+
 /*
 SjadamBoard { base_board: 
 [ ][ ][ ][ ][ ][ ][ ][ ]
