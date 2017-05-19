@@ -114,8 +114,6 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
 
     let mut chess_moves = vec![]; // Moves with both
     let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
-
-    let old_king_pos = king_pos(&board.base_board);
     let piece_moved = board.base_board[square];
     
     for chess_move_square in BoardIter::new()
@@ -141,16 +139,13 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         // TODO: Currently does not allow moves that puts the player in conventional check,
         // even though this is "allowed" in sjadam
         if piece_moved.0 == PieceType::King {
-            let new_king_pos = king_pos(&board.base_board);
-            legal_moves_for_piece(&mut board.base_board, chess_move_square,
-                                  &mut chess_moves, false, new_king_pos);
+            legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
             if chess_move_square != square {
                 pure_sjadam_moves.push(sjadam_move.clone());
             }
         }
         else {
-            legal_moves_for_piece(&mut board.base_board, chess_move_square,
-                                            &mut chess_moves, false, old_king_pos);
+            legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
             if chess_move_square != square {
                 pure_sjadam_moves.push(sjadam_move.clone());
             }
@@ -184,11 +179,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     // Two moves are considered equal if they place the same piece on the same square,
     // and do not castle
     combined_moves.sort_by(move_cmp);
-    //println!("Found {} moves for {} at {} before removing duplicates",
-             //combined_moves.len(), piece_moved.0, square);
     combined_moves.dedup_by(move_eq);
-    //println!("Found {} moves for {} at {} after removing duplicates",
-             //combined_moves.len(), piece_moved.0, square);
     // TODO: Here castling and non-castling moves will be considered equal,
     // and may be removed. Fix that
     combined_moves
@@ -242,33 +233,10 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     }
 }
 
-
-
-#[inline(never)]
-pub fn all_legal_base_moves (board : &ChessBoard) -> Vec<ChessMove> {
-    let mut mut_board = board.clone();
-    if board.half_move_clock > 100 { // Draw by 50-move rule
-        return vec![]
-    }
-    let mut moves = Vec::new();
-    let king_pos = king_pos(board);
-    for i in 0..64 {
-        match board.piece_at(Square(i)) {
-            Piece(Empty, White) => continue,
-            Piece(_, color) if color == board.to_move => {
-                legal_moves_for_piece(&mut mut_board, Square(i), &mut moves, false, king_pos);
-            }
-            _ => continue,
-        }
-    }
-    moves
-}
-
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Adds all moves, also those that put the player in check
 #[inline(never)]
-pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
-                         is_in_check : bool, king_pos : Square) { 
+pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) { 
     let Piece(piece, color) = board.piece_at(square);
     
     debug_assert!(color == board.to_move && piece != Empty,
@@ -279,18 +247,18 @@ pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &
         King => legal_moves_for_king(board, square, moves),
         
         Queen =>  {
-            add_moves_diagonally (board, square, moves, king_pos, is_in_check);
-            add_straight_moves(board, square, moves, king_pos, is_in_check);
+            add_moves_diagonally (board, square, moves);
+            add_straight_moves(board, square, moves);
         },
         Rook => {
-            add_straight_moves(board, square, moves, king_pos, is_in_check);
+            add_straight_moves(board, square, moves);
         },
         Bishop => {
-            add_moves_diagonally(board, square, moves, king_pos, is_in_check);
+            add_moves_diagonally(board, square, moves);
         },
-        Knight => legal_moves_for_knight(board, square, moves, is_in_check, king_pos),
+        Knight => legal_moves_for_knight(board, square, moves),
         
-        Pawn => legal_moves_for_pawn(board, square, moves, is_in_check, king_pos),
+        Pawn => legal_moves_for_pawn(board, square, moves),
         
         Empty => (),
     }
@@ -377,15 +345,14 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
                 board[square] = old_piece;
             }
             else if color_to != board.to_move {
-                add_if_legal_simple(board, c_move, moves);
+                moves.push(c_move);
             }
         }
     }
 }
 
 #[inline(never)]
-fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
-                          is_in_check : bool, king_pos : Square) {
+fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
     
@@ -402,15 +369,13 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
         if piece_to == Empty || color_to != board.to_move {
             //println!("Knight can move to {}, onto a {} {}, on: {}",
             //             Square(new_pos), color_to, piece_to, board);
-            add_if_legal(board, c_move, moves,
-                         king_pos, is_in_check);
+            moves.push(c_move);
         }
     }
 }
 
 #[inline(never)]
-fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
-                          is_in_check : bool, king_pos : Square) {
+fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     // Helper variables
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
@@ -427,21 +392,19 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
                     let c_move = ChessMove::new_prom(&board, square, take_square, *piece_type);
-                    add_if_legal(board, c_move,
-                                 moves, king_pos, is_in_check);
+                    moves.push(c_move);
                 }
             }
             else {
                 let c_move = ChessMove::new(board, square, take_square);
-                add_if_legal(board, c_move, moves,
-                             king_pos, is_in_check);
+                moves.push(c_move);
             }
         }
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
             let c_move = ChessMove::new(board, square, take_square);
-            add_if_legal_simple(board, c_move, moves);
+            moves.push(c_move);
         }
     }
     // Ditto, but to the right
@@ -452,21 +415,19 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
                     let c_move = ChessMove::new_prom(board, square, take_square, *piece_type);
-                    add_if_legal(board, c_move,
-                                 moves, king_pos, is_in_check);
+                    moves.push(c_move);
                 }
             }
             else {
                 let c_move = ChessMove::new(board, square, take_square);
-                add_if_legal(board, c_move, moves,
-                             king_pos, is_in_check);
+                moves.push(c_move);
             }
         }
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
             let c_move = ChessMove::new(board, square, take_square);
-            add_if_legal_simple(board, c_move, moves);
+            moves.push(c_move);
         }
     }
 
@@ -477,36 +438,22 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if rank == prom_rank {
             for piece_type in [Queen, Rook, Bishop, Knight].iter() {
                 let c_move = ChessMove::new_prom(board, square, square_in_front, *piece_type);
-                add_if_legal(board, c_move,
-                             moves, king_pos, is_in_check);
+                moves.push(c_move);
             }
         }
         else {
             let c_move = ChessMove::new(board, square, square_in_front);
-            add_if_legal(board, c_move, moves, king_pos,
-                         is_in_check);
+            moves.push(c_move);
         }
         if rank == start_rank {
             let square_2_in_front = Square::from_ints(file as u8,
                                                       (rank + direction * 2) as u8);
             let c_move = ChessMove::new(board, square, square_2_in_front);
             if board.piece_at(square_2_in_front).is_empty() {
-                add_if_legal(board, c_move, moves,
-                             king_pos, is_in_check);
+                moves.push(c_move);
             }
         }
     }
-}
-
-/// Adds a move to the list. In sjadam, every move is considered legal.
-fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
-                king_pos_c : Square, is_in_check : bool) {
-    moves.push(c_move);
-}
-
-/// Adds a move to the list. In sjadam, every move is considered legal.
-fn add_if_legal_simple (board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>) {
-    moves.push(c_move);
 }
 
 /// Returns whether a square is under attack by the side not to move
@@ -537,7 +484,6 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             if piece == Pawn && color != board.to_move { return true; }
         }
     }
-    // println!("Checked pawns");
 
     for &(i, j) in [(0, 1), (1, 0), (0, -1), (-1, 0)].iter() {
         if check_threats_in_direction (i, j, board, square, &vec![Queen, Rook]) {
@@ -606,22 +552,20 @@ fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Squ
     }
 }
 
-fn add_moves_diagonally (board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
-                         king_pos : Square, is_in_check : bool) {
+fn add_moves_diagonally (board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     for &(i, j) in [(1, 1), (1, -1), (-1, 1), (-1, -1)].iter() {
-        add_moves_in_direction(i, j, board, square, moves, king_pos, is_in_check);
+        add_moves_in_direction(i, j, board, square, moves);
     }
 }
 
-fn add_straight_moves(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
-                      king_pos : Square, is_in_check : bool) {
+fn add_straight_moves(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     for &(i, j) in [(0, 1), (1, 0), (0, -1), (-1, 0)].iter() {
-        add_moves_in_direction(i, j, board, square, moves, king_pos, is_in_check);
+        add_moves_in_direction(i, j, board, square, moves);
     }
 }
     
 fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
-                           moves : &mut Vec<ChessMove>, king_pos : Square, is_in_check : bool) {
+                           moves : &mut Vec<ChessMove>) {
     
     let mut file = (square.0 & 0b0000_0111) as i8;
     let mut rank = (square.0 >> 3) as i8;
@@ -638,18 +582,14 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
         let c_move = ChessMove::new(board, square, target_square);
         match piece_to {
             Piece(Empty, _) => {
-                add_if_legal(board, c_move, moves, king_pos, is_in_check);
+                moves.push(c_move);
                 continue; },
             
             Piece(_, color) => {
                 if color != board.to_move {
-                    add_if_legal(board, c_move, moves, king_pos, is_in_check);
+                    moves.push(c_move);
                 }
                 break; }, // Break after finding a piece, friend or foe
         }
     }
-}
-
-pub fn king_pos (board : &ChessBoard) -> Square {
-    board.king_pos(board.to_move())
 }

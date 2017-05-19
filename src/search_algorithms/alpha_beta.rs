@@ -31,7 +31,6 @@ pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      engine_comm: Arc<Mutex<uci::EngineComm>> )
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
-    //uci::open_log_file(&mut log_writer);
     search_moves(board, engine_comm, time_limit, channel);
 }
 
@@ -49,7 +48,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         uci::TimeRestriction::Depth(d) => d,
         uci::TimeRestriction::Mate(d) => d as u16,
         _ => 128,
-    };;
+    };
     debug_assert!(max_depth > 1);
     
     let start_time = time::get_time();
@@ -107,7 +106,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
 }
 
-/// Returns a score, and a list of moves representing the moves it evaluated
+/// Returns a score, and a list of moves representing the best line it found
 fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
                           time_restriction : uci::TimeRestriction )
                           -> (Score, Vec<B::Move>, NodeCount)

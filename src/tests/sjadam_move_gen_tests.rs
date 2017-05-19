@@ -20,8 +20,8 @@ fn jump_over_opponent() {
     let board = SjadamBoard::from_fen("8/8/8/7p/7P/8/8/K1k5 w - - 1 1").unwrap();
     assert_eq!(board.game_result(), None);
     let moves = board.all_legal_moves();
-    assert_eq!(board.all_legal_moves().len(), 3,
-               "Expected 3 legal moves, found {} moves: {:?}\n{:?}",
+    assert_eq!(board.all_legal_moves().len(), 5,
+               "Expected 5 legal moves, found {} moves: {:?}\n{:?}",
                moves.len(), moves, board);
 }
 
@@ -32,8 +32,8 @@ fn no_stalemate_test() {
     let moves = board.all_legal_moves();
     // The exact number may be wrong due to other bugs
     // So don't trust this test
-    assert_eq!(board.all_legal_moves().len(), 8,
-               "Expected 8 legal moves, found {} moves: {:?}\n{:?}",
+    assert_eq!(board.all_legal_moves().len(), 13,
+               "Expected 13 legal moves, found {} moves: {:?}\n{:?}",
                moves.len(), moves, board);
 }
 

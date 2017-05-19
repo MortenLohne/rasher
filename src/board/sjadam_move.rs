@@ -18,8 +18,8 @@ impl SjadamMove {
     // Creates a Sjadam Move with only a regular move
     pub fn from_chess_move(mv: &ChessMove) -> Self {
         SjadamMove { old_castling_en_passant: mv.old_castling_en_passant,
-               old_half_move_clock: mv.old_half_move_clock,
-               checkers: None, chess_move: Some(mv.clone()) }
+                     old_half_move_clock: mv.old_half_move_clock,
+                     checkers: None, chess_move: Some(mv.clone()) }
     }
 
     pub fn from_sjadam_move(from: Square, to: Square, board: &SjadamBoard) -> Self {

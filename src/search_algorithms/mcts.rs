@@ -93,6 +93,8 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
     receiver
 }
 
+/// The standard way to use this module
+/// Searches until time restriction is reached, continually sending results through a channel
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
@@ -102,13 +104,13 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
     let mut rng = rand::weak_rng();
     let mut total_depth : u64 = 0;
     loop {
-        for _ in 0..10 {
+        for _ in 0..100 {
             use std::ops::Add;
             let searches = mc_tree.searches;
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
-            //mc_tree.select_parallel(&mut rng, searches, &mut search_data, 1);
-            mc_tree.select(&mut rng, searches, &mut search_data);
+            mc_tree.select_parallel(&mut rng, searches, &mut search_data, 1);
+            //mc_tree.select(&mut rng, searches, &mut search_data);
             total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
@@ -161,17 +163,17 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
     debug_assert_eq!(mc_tree.board, *board);
     let ms_taken = (time::get_time() - start_time).num_milliseconds();
     let mut pvs = vec![];
-    for (node, go_move) in mc_tree.children.iter()
+    for &(ref node, ref go_move) in mc_tree.children.iter()
         .map(Option::as_ref)
         .filter(Option::is_some)
         .map(Option::unwrap)
-        .take(options.multipv as usize)
         .zip(board.all_legal_moves())
         .sorted_by(|&(node1, _), &(node2, _)| {
             let cmp = node1.score().cmp(&node2.score());
             if mc_tree.maximizing { cmp.reverse() }
             else { cmp }
         })
+        .iter().take(options.multipv as usize)
         
     {
         let undo_move = board.do_move(go_move.clone());
@@ -190,6 +192,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
     channel.send(uci_info).unwrap();
 }
 
+/// Scecial non-uci search that gives additional debug information
 pub fn search_position<B>(board: &mut B)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
@@ -593,7 +596,7 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
             .map(|&mut(ref mut child, ref mut new_rng)| {
 
                 if child.is_fully_expanded {
-                    if depth > 2 {
+                    if depth > 3 {
                         Score::from_game_result(&child.select(new_rng,
                                                               total_searches, &mut search_data.clone()))
                     }
