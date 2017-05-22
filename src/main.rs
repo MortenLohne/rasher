@@ -146,14 +146,14 @@ fn main() {
 
 /// Makes the engine play a game against itself
 fn play_game<B> (mut board : B) 
-    where B: EvalBoard + uci::UciBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync {
+    where B: EvalBoard + uci::UciBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync + Send {
     println!("Board:\n{:?}", board);
     println!("\n");
     match board.game_result() {
         None => {
             let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::MoveTime(5000),
                                                        uci::EngineOptions::new(),
-                                                       Arc::new(Mutex::new(uci::EngineComm::new())));
+                                                       Arc::new(Mutex::new(uci::EngineComm::new())), None);
             let (score, move_str) = uci::get_uci_move(channel);
             println!("Found move {} with score {}.", move_str, score);
             board.do_move(B::Move::from_alg(&move_str).unwrap());
@@ -166,7 +166,7 @@ fn play_game<B> (mut board : B)
 }
 /// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B)
-    where B: EvalBoard + 'static + uci::UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + 'static + uci::UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync + Send
 {
     match board.game_result() {
         None => {
@@ -203,7 +203,7 @@ fn play_human<B>(mut board : B)
             else {
                 let channel = alpha_beta::start_uci_search(
                     board.clone(), uci::TimeRestriction::MoveTime(5000), uci::EngineOptions::new(),
-                    Arc::new(Mutex::new(uci::EngineComm::new())));
+                    Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 let (score, move_str) = uci::get_uci_move(channel);
                 let best_move = <B as EvalBoard>::Move::from_alg(&move_str);
                 println!("Computer played {:?} with score {}", best_move, score);
@@ -223,4 +223,18 @@ pub struct NodeCount {
     intern: u64,
     leaf: u64,
     total: u64,
+}
+
+impl NodeCount {
+    fn new() -> Self {
+        NodeCount { intern: 0, leaf: 0, total: 0 }
+    }
+}
+
+impl std::ops::Add for NodeCount {
+    type Output = NodeCount;
+    fn add(self, other: NodeCount) -> Self {
+        NodeCount { intern: self.intern + other.intern, leaf: self.leaf + other.leaf,
+                    total: self.total + other.total }
+    }
 }

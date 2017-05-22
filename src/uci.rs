@@ -67,7 +67,7 @@ pub fn choose_variant(stdin : &mut io::BufRead) -> Result<(), String> {
 /// Assumes "uci has already been sent"
 pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String> 
     where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug,
-<Board as board::EvalBoard>::Move: Sync
+<Board as board::EvalBoard>::Move: Sync + Send
 {
     
     let mut board : Option<Board> = None;
@@ -136,11 +136,11 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
                 }
                 let board = try!(board.clone()
                                  .ok_or("Received go without receiving a position first. Exiting..."));
-                let time_restriction = parse_go(&input)?;
+                let (time_restriction, searchmoves) = parse_go(&input)?;
                 let rx = match engine_string.as_str() {
                     "minimax" => alpha_beta::start_uci_search(board, time_restriction,
                                                               engine_options.clone(),
-                                                              engine_comm.clone()),
+                                                              engine_comm.clone(), None),
                     "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone(),
                                                 engine_comm.clone()),
                     _ => panic!(),
@@ -254,7 +254,7 @@ pub struct EngineOptions {
 
 impl EngineOptions {
     pub fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 4, hash_memory: 64, multipv: 8 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 4, hash_memory: 64, multipv: 4 }
     }
 }
 
@@ -327,7 +327,7 @@ fn parse_setoption_data(input : &str) -> Result<(String, String), String> {
 }
 
 pub fn parse_go (input : &str)
-             -> Result<TimeRestriction, String> {
+                 -> Result<(TimeRestriction, Option<Vec<String>>), String> {
 
     // Parses an optional string to return a u32
     fn parse_int (next_token : Option<&str>) -> Result<u32, String> {
@@ -339,20 +339,21 @@ pub fn parse_go (input : &str)
     }        
 
     match input.split_whitespace().nth(1) {
-        Some("infinite") => return Ok(TimeRestriction::Infinite),
-        Some("movetime") => return Ok(TimeRestriction::MoveTime(
+        Some("infinite") => return Ok((TimeRestriction::Infinite, None)),
+        Some("movetime") => return Ok((TimeRestriction::MoveTime(
             try!(parse_int(input.split_whitespace().nth(2))
-                 ) as i64)),
-        Some("depth") => return Ok(TimeRestriction::Depth(
+                 ) as i64), None)),
+        Some("depth") => return Ok((TimeRestriction::Depth(
             try!(parse_int(input.split_whitespace().nth(2))
-            ) as u16)),
-        Some("mate") => return Ok(TimeRestriction::Mate(
+            ) as u16), None)),
+        Some("mate") => return Ok((TimeRestriction::Mate(
             try!(parse_int(input.split_whitespace().nth(2))
-            ) as u16)),
-        Some("nodes") => return Ok(TimeRestriction::Nodes(
+            ) as u16), None)),
+        Some("nodes") => return Ok((TimeRestriction::Nodes(
             try!(parse_int(input.split_whitespace().nth(2))
-            ) as u64)),
-        None => return Ok(TimeRestriction::Infinite),
+            ) as u64), None)),
+        Some("searchmoves") => return Ok((TimeRestriction::Infinite, Some(input.split_whitespace().skip(2).map(|s|s.to_string()).collect::<Vec<_>>()))),
+        None => return Ok((TimeRestriction::Infinite, None)),
         Some(_) => (),
     }
     
@@ -389,7 +390,7 @@ pub fn parse_go (input : &str)
     let time_info = TimeInfo {white_time: white_time.unwrap(), black_time: black_time.unwrap(),
                               white_inc: white_inc.unwrap(), black_inc: black_inc.unwrap(),
                               moves_to_go: moves_to_go.map(|v| v as u16 )};
-    Ok(TimeRestriction::GameTime(time_info))
+    Ok((TimeRestriction::GameTime(time_info), None))
 }
 
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it
