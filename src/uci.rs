@@ -326,6 +326,8 @@ fn parse_setoption_data(input : &str) -> Result<(String, String), String> {
     Ok((option_name, value))    
 }
 
+/// Parses a go command, returning a time restriction and the moves to search
+/// If moves to search is none, search all moves
 pub fn parse_go (input : &str)
                  -> Result<(TimeRestriction, Option<Vec<String>>), String> {
 

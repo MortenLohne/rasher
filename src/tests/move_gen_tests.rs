@@ -154,7 +154,7 @@ fn basic_tactics_test() {
 fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(5),
                                                uci::EngineOptions::new(),
-                                               sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())));
+                                               sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let (score, move_str) = uci::get_uci_move(channel);
     
