@@ -91,7 +91,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             
         }
         if can_castle_here {
-            moves.push(ChessMove::new(&board, square, Square(square.0 + 2)));
+            moves.push(ChessMove::new(square, Square(square.0 + 2)));
         }
         
         
@@ -117,7 +117,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             can_castle_here = false;
         }
         if can_castle_here {
-            moves.push(ChessMove::new(&board, square, Square(square.0 - 2)));
+            moves.push(ChessMove::new(square, Square(square.0 - 2)));
         }
         
     }
@@ -135,7 +135,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             
             // Check that the square is not occupied by a friendly piece
             let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-            let c_move = ChessMove::new(board, square, Square(new_pos));
+            let c_move = ChessMove::new(square, Square(new_pos));
 
             if piece_to == Empty {
                 let old_piece = board[square];
@@ -166,7 +166,7 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
         let new_pos = ((rank + j) * 8 + file + i) as u8;
         
         let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-        let c_move = ChessMove::new (&board, square, Square(new_pos));
+        let c_move = ChessMove::new(square, Square(new_pos));
 
         if piece_to == Empty || color_to != board.to_move {
             //println!("Knight can move to {}, onto a {} {}, on: {}",
@@ -195,13 +195,13 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(&board, square, take_square, *piece_type);
+                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
                 }
             }
             else {
-                let c_move = ChessMove::new(board, square, take_square);
+                let c_move = ChessMove::new(square, take_square);
                 add_if_legal(board, c_move, moves,
                              king_pos, is_in_check);
             }
@@ -209,7 +209,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(board, square, take_square);
+            let c_move = ChessMove::new(square, take_square);
             add_if_legal_simple(board, c_move, moves);
         }
     }
@@ -220,13 +220,13 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(board, square, take_square, *piece_type);
+                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
                 }
             }
             else {
-                let c_move = ChessMove::new(board, square, take_square);
+                let c_move = ChessMove::new(square, take_square);
                 add_if_legal(board, c_move, moves,
                              king_pos, is_in_check);
             }
@@ -234,7 +234,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(board, square, take_square);
+            let c_move = ChessMove::new(square, take_square);
             add_if_legal_simple(board, c_move, moves);
         }
     }
@@ -245,20 +245,20 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     if board.piece_at(square_in_front).is_empty() {
         if rank == prom_rank {
             for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                let c_move = ChessMove::new_prom(board, square, square_in_front, *piece_type);
+                let c_move = ChessMove::new_prom(square, square_in_front, *piece_type);
                 add_if_legal(board, c_move,
                              moves, king_pos, is_in_check);
             }
         }
         else {
-            let c_move = ChessMove::new(board, square, square_in_front);
+            let c_move = ChessMove::new(square, square_in_front);
             add_if_legal(board, c_move, moves, king_pos,
                          is_in_check);
         }
         if rank == start_rank {
             let square_2_in_front = Square::from_ints(file as u8,
                                                       (rank + direction * 2) as u8);
-            let c_move = ChessMove::new(board, square, square_2_in_front);
+            let c_move = ChessMove::new(square, square_2_in_front);
             if board.piece_at(square_2_in_front).is_empty() {
                 add_if_legal(board, c_move, moves,
                              king_pos, is_in_check);
@@ -517,7 +517,7 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
         let target_square = Square::from_ints(file as u8, rank as u8);
         let piece_to = board.piece_at(target_square);
 
-        let c_move = ChessMove::new(board, square, target_square);
+        let c_move = ChessMove::new(square, target_square);
         match piece_to {
             Piece(Empty, _) => {
                 add_if_legal(board, c_move, moves, king_pos, is_in_check);

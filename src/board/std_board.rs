@@ -287,7 +287,7 @@ impl ::uci::UciBoard for ChessBoard {
 impl EvalBoard for ChessBoard {
 
     type Move = std_move::ChessMove;
-    type UndoMove = std_move::ChessMove;
+    type UndoMove = std_move::ChessUndoMove;
     
     fn to_move(&self) -> Color {
         self.to_move
@@ -357,15 +357,14 @@ impl EvalBoard for ChessBoard {
         value
     }
 
-    fn do_move(&mut self, mut c_move : Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
         let color = self.to_move;
         let piece_moved = self.piece_at(c_move.from).0;
-
-        c_move.old_half_move_clock = self.half_move_clock;
-        c_move.old_castling_en_passant = self.castling_en_passant;
+        let captured_piece : PieceType = self[c_move.to].0;
+        let undo_move = std_move::ChessUndoMove::from_move(c_move, self);
         
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).0) {
@@ -376,7 +375,6 @@ impl EvalBoard for ChessBoard {
 
         self.moves.push(c_move);
         self.move_num += 1;
-        
         
         // Perform castling
         // It will castle regardless of whether it is legal to do so
@@ -410,7 +408,7 @@ impl EvalBoard for ChessBoard {
             }
         // If a pawn takes towards an empty square, assume it is doing a legal en passant capture
         else if piece_moved == Pawn && file_from != file_to &&
-            c_move.capture == Empty {
+            captured_piece == Empty {
                 self.board[rank_to as usize][file_to as usize]
                     = self.board[rank_from as usize][file_from as usize];
 
@@ -475,7 +473,7 @@ impl EvalBoard for ChessBoard {
         }
         
         self.to_move = !self.to_move;
-        c_move
+        undo_move
     }
     fn undo_move(&mut self, c_move : Self::UndoMove) {
         
@@ -525,7 +523,7 @@ impl EvalBoard for ChessBoard {
             }
         }
         else {
-            if c_move.prom.is_some() {
+            if c_move.prom {
                 self.board[rank_from as usize][file_from as usize] = 
                     Piece(Pawn, color);
             }

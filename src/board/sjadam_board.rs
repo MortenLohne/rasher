@@ -1,8 +1,6 @@
 use board::std_board;
-use board::std_board::ChessBoard;
-use board::std_board::Piece;
-use board::std_board::PieceType;
-use board::sjadam_move::SjadamMove;
+use board::std_board::{ChessBoard, Piece, PieceType, Square};
+use board::sjadam_move::{SjadamMove, SjadamUndoMove};
 use board::sjadam_move_gen;
 use board::std_move_gen::move_gen;
 
@@ -38,69 +36,91 @@ impl Clone for SjadamBoard {
 
 impl EvalBoard for SjadamBoard {
     type Move = SjadamMove;
-    type UndoMove = SjadamMove;
+    type UndoMove = SjadamUndoMove;
 
     fn to_move(&self) -> Color {
         self.base_board.to_move()
     }
 
-    fn do_move(&mut self, mut mv: Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
+        let start_color = self.to_move();
         *self.legal_moves_cache.borrow_mut() = None;
-        debug_assert!(mv.checkers.is_some() || mv.chess_move.is_some());
-        mv.old_castling_en_passant = self.base_board.castling_en_passant;
-        mv.old_half_move_clock = self.base_board.half_move_clock;
-        match mv.checkers {
-            None => (),
-            Some((from, to)) => {
-                self.base_board[to] = self.base_board[from];
-                self.base_board[from] = Piece::empty();
-            },
+        debug_assert!(mv.from != mv.sjadam_square || mv.sjadam_square != mv.to);
+
+        let undo_move = SjadamUndoMove {
+            from: mv.from, sjadam_square: mv.sjadam_square,
+            capture: self.base_board[mv.to].0,
+            prom: mv.prom /*(self.base_board[mv.from].0 != PieceType::King)
+                && (self.to_move() == Black && mv.to.0 >= 56
+                    || self.to_move() == White && mv.to.0 < 8)*/,
+            to: mv.to, piece_moved: self.base_board[mv.from].0,
+            old_castling_en_passant: self.base_board.castling_en_passant,
+            old_half_move_clock: self.base_board.half_move_clock };
+
+        // Do sjadam move. Has no effect if there is no sjadam jump
+        self.base_board[mv.sjadam_square] = self.base_board[mv.from];
+        if mv.from != mv.sjadam_square {
+            self.base_board[mv.from] = Piece::empty();
         }
-        match mv.chess_move {
+        
+        let chess_move = mv.chess_move(self);
+        match chess_move {
             None => {
-                let piece_moved = self.base_board[mv.checkers.unwrap().1].0;
-                if piece_moved == PieceType::King {
+                if undo_move.piece_moved == PieceType::King {
                     let color = self.to_move();
                     self.base_board.disable_castling(color)
                 }
                 // TODO: Remove castling privileges on rook moves
-                if piece_moved != PieceType::Pawn {
-                    self.base_board.half_move_clock += 1; // Pure checkers moves are never captures
+                if undo_move.piece_moved != PieceType::Pawn {
+                    self.base_board.half_move_clock += 1; // Pure sjadam moves are never captures
                 }
 
-                // Checkers moves never create en passant squares
+                // Sjadam moves never create en passant squares
                 self.base_board.set_en_passant_square(None); 
                 self.base_board.to_move = !self.base_board.to_move;
-
-               
                 
             }, // TODO: Figure out if anything else needs to be done here
             Some(chess_move) => {
-                let undo_move = self.base_board.do_move(chess_move);
-                mv.chess_move.as_mut().map(|old| *old = undo_move);
+                self.base_board.do_move(chess_move);
             },
         }
-        mv
+        
+        for square in 56..63 {
+            let Piece(piece, color) = self.base_board[Square(square)];
+            if color == Black && piece != PieceType::King && piece != PieceType::Empty{
+                self.base_board[Square(square)] = Piece(PieceType::Queen, Black)
+            }
+        }
+        for square in 0..7 {
+            let Piece(piece, color) = self.base_board[Square(square)];
+            if color == White && piece != PieceType::King && piece != PieceType::Empty {
+                self.base_board[Square(square)] = Piece(PieceType::Queen, White)
+            }
+        }
+        debug_assert!(start_color != self.to_move());
+        undo_move
     }
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
+        let start_color = self.to_move();
         *self.legal_moves_cache.borrow_mut() = None;
-        self.base_board.half_move_clock = mv.old_half_move_clock;
-        self.base_board.castling_en_passant = mv.old_castling_en_passant;
-        match mv.chess_move {
+        match mv.chess_move(self) {
             None => {
                 self.base_board.to_move = !self.base_board.to_move;
-                }, 
+            },
             Some(chess_move) => self.base_board.undo_move(chess_move),
         }
-        
-        match mv.checkers {
-            None => (),
-            Some((from, to)) => {
-                self.base_board[from] = self.base_board[to];
-                self.base_board[to] = Piece::empty();
-            },
+        self.base_board.half_move_clock = mv.old_half_move_clock;
+        self.base_board.castling_en_passant = mv.old_castling_en_passant;
+
+        let color = self.base_board[mv.sjadam_square].1;
+        self.base_board[mv.from] = Piece(mv.piece_moved, color); 
+        // Undo sjadam move
+        if mv.from != mv.sjadam_square {
+            self.base_board[mv.sjadam_square] = Piece::empty();
         }
+        debug_assert!(start_color != self.to_move());
+        
     }
 
     fn start_board() -> Self {
@@ -112,16 +132,16 @@ impl EvalBoard for SjadamBoard {
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
         
-        let moves;
+        /*let moves;
         let mut moves_cache = self.legal_moves_cache.borrow_mut();
         if (*moves_cache).is_some(){
             moves = (*moves_cache).as_ref().unwrap().clone();
         }
-        else {
-            let mut cloned_board = self.clone();
-            moves = sjadam_move_gen::all_legal_moves(&mut cloned_board);
-            *moves_cache = Some(moves.clone());
-        }
+        else {*/
+        let mut cloned_board = self.clone();
+        let moves = sjadam_move_gen::all_legal_moves(&mut cloned_board);
+        //*moves_cache = Some(moves.clone());
+        
         moves
     }
 

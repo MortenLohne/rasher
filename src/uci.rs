@@ -5,6 +5,7 @@ use board::std_board::TimeInfo;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use search_algorithms::board;
+use search_algorithms::game_move;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
@@ -136,11 +137,18 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
                 }
                 let board = try!(board.clone()
                                  .ok_or("Received go without receiving a position first. Exiting..."));
-                let (time_restriction, searchmoves) = parse_go(&input)?;
+                let (time_restriction, searchmoves_input) = parse_go(&input)?;
+                let searchmoves = searchmoves_input.map(
+                    |moves|
+                    moves.iter()
+                        .map(|move_string| <Board::Move as game_move::Move>::from_alg(move_string))
+                        .map(Result::unwrap)
+                        .collect::<Vec<_>>()
+                );
                 let rx = match engine_string.as_str() {
                     "minimax" => alpha_beta::start_uci_search(board, time_restriction,
                                                               engine_options.clone(),
-                                                              engine_comm.clone(), None),
+                                                              engine_comm.clone(), searchmoves),
                     "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone(),
                                                 engine_comm.clone()),
                     _ => panic!(),
@@ -231,10 +239,7 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         -> mpsc::Receiver<UciInfo>
     where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
 {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move ||
-                  mcts::uci_search(board, time_limit, options, tx));
-    rx
+    mcts::start_uci_search(board, time_limit, options, engine_comm)
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -254,7 +259,7 @@ pub struct EngineOptions {
 
 impl EngineOptions {
     pub fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 4, hash_memory: 64, multipv: 4 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 64, multipv: 1 }
     }
 }
 
@@ -265,22 +270,26 @@ fn parse_setoption_init (input: &str, options: &mut EngineOptions) -> Result<(),
     let (option_name, value) = try!(parse_setoption_data(input));
 
     match &option_name.to_lowercase()[..] {
-        "Variant" => match &value.to_lowercase()[..] {
+        "variant" => match &value.to_lowercase()[..] {
             "standard" => options.variant = ChessVariant::Standard,
             "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
-        "Threads" => {
+        "threads" => {
             let threads = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
             options.threads = threads;
         }
 
-        "Hash" => {
+        "hash" => {
             let hash = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
             options.hash_memory = hash;
         }
+        "multipv" => {
+            let multipv = u32::from_str(&value).map_err(|e|format!("{:?}", e))?;
+            options.multipv = multipv;
+        }
         // If no init-only option matches, try the other ones
-        s => parse_setoption(s)?,
+        _ => parse_setoption(input)?,
     }
     Ok(())
 }
@@ -310,20 +319,20 @@ fn parse_setoption (input : &str) -> Result<(), String> {
 ///Helper method for parsing a setoption string into the option's name and value
 fn parse_setoption_data(input : &str) -> Result<(String, String), String> {
     if !(input.contains("name") && input.contains("value")) {
-        return Err("Setoption string did not include name and value".to_string());
+        panic!(format!("setoption string \"{}\" did not include name and value", input));
     }
     let mut input_iter = input.split_whitespace();
     if input_iter.next() != Some("setoption") || input_iter.next() != Some("name") {
         return Err("Setoption string did not start with \"setoption name\"".to_string())
     }
-    let option_name : String = input.split_whitespace()
-        .skip(2)
+    let option_name : String = input_iter
+        .by_ref()
         .take_while(|token| token != &"value")
-        .collect();
+        .collect(); // TODO: Will not correctly concatinate multi-word options
     
-    let value : String = input.split_whitespace().skip_while(|token| token != &"value").collect();
+    let value : String = input_iter.collect();
     
-    Ok((option_name, value))    
+    Ok((option_name, value.trim().to_string()))    
 }
 
 /// Parses a go command, returning a time restriction and the moves to search

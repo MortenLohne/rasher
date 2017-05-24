@@ -1,6 +1,12 @@
-use board::std_move::ChessMove;
+use board::std_move::{ChessMove, ChessUndoMove};
 use board::std_board::*;
 use search_algorithms::game_move::Move;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CrazyhouseUndoMove {
+    NormalMove(ChessUndoMove),
+    CrazyMove(PieceType, Square, u8),
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CrazyhouseMove {

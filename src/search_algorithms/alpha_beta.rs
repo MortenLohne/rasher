@@ -66,8 +66,16 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         let mut pv_moves = vec![];
         for _ in 0..options.multipv {
             
-            let mut moves_to_search = board.all_legal_moves();
+            let mut moves_to_search = if move_list.is_some() {
+                move_list.clone().unwrap()
+            }
+            else {
+                board.all_legal_moves()
+            };
             moves_to_search.retain(|mv| !pv_moves.iter().any(|mv2| mv == mv2));
+            if moves_to_search.is_empty() {
+                continue;
+            }
             let (score, moves, node_count) =
             // TODO: If engine is told through uci to only search some moves, this will not work
                 

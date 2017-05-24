@@ -135,6 +135,7 @@ fn main() {
                         }
                     }
                 }
+                "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
                 s => warn!("Unrecognized command \"{}\".", s),
             }
         }

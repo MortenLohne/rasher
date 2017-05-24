@@ -14,7 +14,7 @@ use std::io;
 use std::fmt;
 use std::io::Write;
 use std::marker::{Send, Sync};
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use uci;
 
 use rayon::prelude::*;
@@ -84,25 +84,26 @@ pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
 }
 
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
-                        options: uci::EngineOptions) -> mpsc::Receiver<uci::UciInfo>
+                            options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
+                            -> mpsc::Receiver<uci::UciInfo>
     where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
 {
     let (sender, receiver) = mpsc::channel();
     use std::thread;
-    thread::spawn(move || uci_search(board, time_limit, options, sender));
+    thread::spawn(move || uci_search(board, time_limit, options, engine_comm, sender));
     receiver
 }
 
 /// The standard way to use this module
 /// Searches until time restriction is reached, continually sending results through a channel
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
-                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>)
+                     options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
+                     channel: mpsc::Sender<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
-    let mut total_depth : u64 = 0;
     loop {
         for _ in 0..100 {
             use std::ops::Add;
@@ -111,7 +112,6 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
             let mut search_data = SearchData::default();
             mc_tree.select_parallel(&mut rng, searches, &mut search_data, 1);
             //mc_tree.select(&mut rng, searches, &mut search_data);
-            total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
                 .map(|n| n.searches)
@@ -149,6 +149,9 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                 else { () }
             },
             Infinite => (),
+        }
+        if engine_comm.lock().unwrap().engine_should_stop {
+            break;
         }
         send_uci_info(&mc_tree, &mut board, start_time, &options, &channel);
     }

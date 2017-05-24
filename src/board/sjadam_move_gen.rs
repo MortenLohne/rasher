@@ -68,7 +68,6 @@ impl fmt::Debug for BitBoard {
 }
 
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
-    //self.base_board.all_legal_moves().iter().map(SjadamMove::from_chess_move).collect()
     let mut moves = vec![];
     for square in BoardIter::new() {
         let Piece(piece, color) = board.base_board[square];
@@ -107,9 +106,6 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
                           &all_pieces, square);
 
-    //println!("Friendly squares:\n{:?}All_pieces:\n{:?}", friendly_pieces, all_pieces);
-    //println!("Sjadam squares from {}:\n{:?}", square, sjadam_squares);
-
     sjadam_opponent_moves(&mut sjadam_squares, &opponent_pieces, &all_pieces);
 
     let mut chess_moves = vec![]; // Moves with both
@@ -118,18 +114,23 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     
     for chess_move_square in BoardIter::new()
         .filter(|&i| sjadam_squares.get(i))
-        .filter(|&i| piece_moved.0 != PieceType::Pawn || (i.file_rank().1 != 0 && i.file_rank().1 != 7)) // TODO: Pawns cannot promote in sjadam now
         
     {
         // TODO: Currently only checks if player is in regular check, not in sjadam.
-        // TODO: Currently pawns are not allowed to queen in a sjadam move
 
-        let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square, board);
+        let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
         let old_board = board.clone();
+        let mut old_castling = None;
         if chess_move_square != square {
             // "Do" the pure sjadam part of the move, but keep the same player to move
-            board.do_move(sjadam_move.clone());
-            board.base_board.to_move = !board.base_board.to_move;
+            // Also do not promote pieces
+            board.base_board[chess_move_square] = board.base_board[square];
+            board.base_board[square] = Piece::empty();
+            old_castling = Some(board.base_board.castling_en_passant);
+            if board.base_board[chess_move_square].0 == PieceType::King {
+                let color = board.to_move();
+                board.base_board.disable_castling(color)
+            }
         }
 
         debug_assert!(!board.base_board[chess_move_square].is_empty(),
@@ -152,17 +153,17 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         }
 
         if chess_move_square != square {
-            board.undo_move(sjadam_move);
-            board.base_board.to_move = !board.base_board.to_move;
-            debug_assert_eq!(*board, old_board)
+            board.base_board[square] = board.base_board[chess_move_square];
+            board.base_board[chess_move_square] = Piece::empty();
+            board.base_board.castling_en_passant = old_castling.unwrap();
+            //board.undo_move(undo_move.unwrap());
+            //board.base_board.to_move = !board.base_board.to_move;
+            debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
         }
     }
     let mut combined_moves = chess_moves.iter()
-        .map(|mv| SjadamMove { checkers: if square != mv.from { Some((square, mv.from)) }
-                               else { None },
-                               chess_move: Some(*mv),
-                               old_castling_en_passant: board.base_board.castling_en_passant,
-                               old_half_move_clock: board.base_board.half_move_clock })
+        .map(|mv| SjadamMove
+             { from: square, sjadam_square: mv.from, to: mv.to, prom: mv.prom.is_some() })
         .collect::<Vec<_>>();
     combined_moves.append(&mut pure_sjadam_moves);
     let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
@@ -292,7 +293,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             
         }
         if can_castle_here {
-            moves.push(ChessMove::new(&board, square, Square(square.0 + 2)));
+            moves.push(ChessMove::new(square, Square(square.0 + 2)));
         }
         
         
@@ -318,7 +319,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             can_castle_here = false;
         }
         if can_castle_here {
-            moves.push(ChessMove::new(&board, square, Square(square.0 - 2)));
+            moves.push(ChessMove::new(square, Square(square.0 - 2)));
         }
         
     }
@@ -336,7 +337,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             
             // Check that the square is not occupied by a friendly piece
             let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-            let c_move = ChessMove::new(board, square, Square(new_pos));
+            let c_move = ChessMove::new(square, Square(new_pos));
 
             if piece_to == Empty {
                 let old_piece = board[square];
@@ -364,7 +365,7 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
         let new_pos = ((rank + j) * 8 + file + i) as u8;
         
         let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-        let c_move = ChessMove::new (&board, square, Square(new_pos));
+        let c_move = ChessMove::new(square, Square(new_pos));
 
         if piece_to == Empty || color_to != board.to_move {
             //println!("Knight can move to {}, onto a {} {}, on: {}",
@@ -380,9 +381,12 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
     let pos = square.0 as i8;
-    let (start_rank, prom_rank, direction) =
-        if board.to_move == White { (6, 1, -1) } else { (1, 6, 1) };
-    debug_assert!(rank > 0 && rank < 7);;
+    let (start_rank, prom_rank, back_rank, direction) =
+        if board.to_move == White { (6, 1, 0, -1) } else { (1, 6, 7, 1) };
+
+    if rank == back_rank { return }
+    
+    debug_assert!(rank > 0 && board.to_move == White || rank < 7 && board.to_move == Black);;
     // Checks if there are any pieces available for capture to the left,
     // including en passant capture
     if file > 0 {
@@ -391,19 +395,19 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(&board, square, take_square, *piece_type);
+                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     moves.push(c_move);
                 }
             }
             else {
-                let c_move = ChessMove::new(board, square, take_square);
+                let c_move = ChessMove::new(square, take_square);
                 moves.push(c_move);
             }
         }
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(board, square, take_square);
+            let c_move = ChessMove::new(square, take_square);
             moves.push(c_move);
         }
     }
@@ -414,19 +418,19 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         if piece != Empty && color != board.to_move {
             if rank == prom_rank {
                 for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                    let c_move = ChessMove::new_prom(board, square, take_square, *piece_type);
+                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     moves.push(c_move);
                 }
             }
             else {
-                let c_move = ChessMove::new(board, square, take_square);
+                let c_move = ChessMove::new(square, take_square);
                 moves.push(c_move);
             }
         }
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(board, square, take_square);
+            let c_move = ChessMove::new(square, take_square);
             moves.push(c_move);
         }
     }
@@ -436,19 +440,16 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     
     if board.piece_at(square_in_front).is_empty() {
         if rank == prom_rank {
-            for piece_type in [Queen, Rook, Bishop, Knight].iter() {
-                let c_move = ChessMove::new_prom(board, square, square_in_front, *piece_type);
-                moves.push(c_move);
-            }
+            moves.push(ChessMove::new_prom(square, square_in_front, Queen));
         }
         else {
-            let c_move = ChessMove::new(board, square, square_in_front);
+            let c_move = ChessMove::new(square, square_in_front);
             moves.push(c_move);
         }
         if rank == start_rank {
             let square_2_in_front = Square::from_ints(file as u8,
                                                       (rank + direction * 2) as u8);
-            let c_move = ChessMove::new(board, square, square_2_in_front);
+            let c_move = ChessMove::new(square, square_2_in_front);
             if board.piece_at(square_2_in_front).is_empty() {
                 moves.push(c_move);
             }
@@ -579,7 +580,7 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
         let target_square = Square::from_ints(file as u8, rank as u8);
         let piece_to = board.piece_at(target_square);
 
-        let c_move = ChessMove::new(board, square, target_square);
+        let c_move = ChessMove::new(square, target_square);
         match piece_to {
             Piece(Empty, _) => {
                 moves.push(c_move);

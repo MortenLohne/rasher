@@ -152,7 +152,7 @@ fn basic_tactics_test() {
 
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
-    let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(5),
+    let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(4),
                                                uci::EngineOptions::new(),
                                                sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
@@ -436,9 +436,9 @@ fn legal_moves_after_plies(board : &mut ChessBoard, n : u8) -> u64 {
         for c_move in move_gen::all_legal_moves(board) {
             let mut old_board = board.clone();
             
-            board.do_move(c_move);
+            let undo_move = board.do_move(c_move);
             total_moves += legal_moves_after_plies(board, n - 1);
-            board.undo_move(c_move);
+            board.undo_move(undo_move);
 
             debug_assert!(&mut old_board == board,
                           format!("Board was not the same after undoing move {}:\nOld:{}New:{}",

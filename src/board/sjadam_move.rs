@@ -1,51 +1,85 @@
-use board::std_move::ChessMove;
+use board::std_move::{ChessMove, ChessUndoMove};
 use board::std_board::Square;
+use board::std_board::PieceType;
+use board::std_board::Piece;
 use board::sjadam_board::SjadamBoard;
 
+use search_algorithms::board::Color::*;
+use search_algorithms::board::EvalBoard;
 use search_algorithms::game_move::Move;
 
 use std::fmt;
 
-#[derive(Clone)]
-pub struct SjadamMove {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SjadamUndoMove {
+    pub from: Square,
+    pub sjadam_square: Square,
+    pub to: Square,
+    pub prom: bool,
+    pub piece_moved: PieceType,
+    pub capture: PieceType,
     pub old_castling_en_passant: u8, // Not used if chess_move is present
     pub old_half_move_clock: u8, // Not used if chess_move is present
-    pub checkers: Option<(Square, Square)>, // All checkers moves are done in one go
-    pub chess_move: Option<ChessMove>,
 }
 
-impl SjadamMove {
-    // Creates a Sjadam Move with only a regular move
-    pub fn from_chess_move(mv: &ChessMove) -> Self {
-        SjadamMove { old_castling_en_passant: mv.old_castling_en_passant,
-                     old_half_move_clock: mv.old_half_move_clock,
-                     checkers: None, chess_move: Some(mv.clone()) }
-    }
-
-    pub fn from_sjadam_move(from: Square, to: Square, board: &SjadamBoard) -> Self {
-        SjadamMove { checkers: Some((from, to)),
-                     chess_move: None,
-                     old_castling_en_passant: board.base_board.castling_en_passant,
-                     old_half_move_clock: board.base_board.half_move_clock }
-    }
-
-    pub fn from_to_squares(&self) -> (Square, Square) {
-        match (self.checkers, self.chess_move) {
-            (Some((from, _)), Some(mv)) => (from, mv.to),
-            (Some((from, to)), None) => (from, to),
-            (None, Some(mv)) => (mv.from, mv.to),
-            (None, None) => panic!("Cannot have empty move"),
+impl SjadamUndoMove {
+    /// Extract the underlying chess undo move
+    pub fn chess_move(&self, _: &SjadamBoard) -> Option<ChessUndoMove> {
+        if self.sjadam_square == self.to {
+            None
+        }
+        else {
+            Some(ChessUndoMove {
+                from: self.sjadam_square, to: self.to, capture: self.capture,
+                prom: self.prom,
+                old_castling_en_passant: self.old_castling_en_passant,
+                old_half_move_clock: self.old_half_move_clock
+            })
         }
     }
 }
 
-impl PartialEq for SjadamMove {
-    fn eq(&self, other: &Self) -> bool {
-        self.chess_move == other.chess_move && self.checkers == other.checkers
-    }
+#[derive(Clone, PartialEq, Eq)]
+pub struct SjadamMove {
+    pub from: Square,
+    pub sjadam_square: Square,
+    pub to: Square,
+    pub prom: bool,
 }
 
-impl Eq for SjadamMove {}
+impl SjadamMove {
+    /// Creates a Sjadam Move with only a regular move
+    pub fn from_chess_move(mv: &ChessMove) -> Self {
+        SjadamMove { from: mv.from, sjadam_square: mv.from, to: mv.to, prom: mv.prom.is_some() }
+    }
+
+    pub fn from_sjadam_move(from: Square, to: Square) -> Self {
+        SjadamMove { from: from, sjadam_square: to, to: to, prom: false }
+    }
+
+    pub fn from_to_squares(&self) -> (Square, Square) {
+        (self.from, self.to)
+    }
+
+    pub fn chess_move(&self, board: &SjadamBoard) -> Option<ChessMove> {
+        if self.sjadam_square == self.to {
+            None
+        }
+        else {
+            if board.base_board.to_move() == White && self.sjadam_square.0 < 8
+                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White) {
+                    Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
+                }
+            else if board.base_board.to_move() == Black && self.sjadam_square.0 >= 56
+                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White) {
+                    Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
+                }
+            else {
+                Some(ChessMove::new(self.sjadam_square, self.to))
+            }
+        }
+    }
+}
 
 impl Move for SjadamMove {
     fn from_alg(input: &str) -> Result<Self, String> {
@@ -64,13 +98,11 @@ impl Move for SjadamMove {
             let from = try!(Square::from_alg(&alg[0..2]).ok_or("Illegal square"));
             let to = try!(Square::from_alg(&alg[2..4]).ok_or("Illegal square"));
             if alg.chars().nth(4).unwrap() == '-' {
-                Ok(SjadamMove { checkers: Some((from, to)), chess_move: None,
-                                old_castling_en_passant: 0, old_half_move_clock: 0 })
+                Ok(SjadamMove { from: from, sjadam_square: to, to: to, prom: false })
             }
             else {
-                Ok(SjadamMove { checkers: Some((from, to)),
-                                chess_move: Some(try!(ChessMove::from_alg(&alg[4..]))),
-                                old_castling_en_passant: 0, old_half_move_clock: 0 })
+                let ChessMove { to: chess_to, prom, .. } = ChessMove::from_alg(&alg[4..])?;
+                Ok(SjadamMove { from: from, sjadam_square: to, to: chess_to, prom: prom.is_some() })
             }
         }
     }
@@ -82,8 +114,18 @@ impl Move for SjadamMove {
 impl fmt::Debug for SjadamMove {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}",
-               self.checkers.map_or("-".to_string(), |(from, to)| format!("{}{}", from, to)),
-               self.chess_move.map_or("-".to_string(), |mv| mv.to_string()))
+               if self.from == self.sjadam_square {
+                   "-".to_string()
+               }
+               else {
+                   format!("{}{}", self.from, self.sjadam_square)
+               },
+               if self.sjadam_square == self.to {
+                   "-".to_string()
+               }
+               else {
+                   format!("{}{}", self.sjadam_square, self.to)
+               })
     }
 }
 

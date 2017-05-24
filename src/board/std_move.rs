@@ -3,16 +3,34 @@ use board::std_board::*;
 use search_algorithms::game_move::Move;
 
 use std::fmt;
-use std::cmp;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub struct ChessUndoMove {
+    pub from : Square,
+    pub to : Square,
+    pub capture : PieceType,
+    pub prom : bool,
+    pub old_castling_en_passant : u8,
+    pub old_half_move_clock : u8,
+}
+
+impl ChessUndoMove {
+    /// Returns the corresponding undo move for a move
+    /// Must be called before the move was done on the board
+    pub fn from_move(c_move: ChessMove, board: &ChessBoard) -> ChessUndoMove {
+        ChessUndoMove { from: c_move.from, to: c_move.to, capture: board[c_move.to].0,
+                        prom: c_move.prom.is_some(),
+                        old_castling_en_passant: board.castling_en_passant,
+                        old_half_move_clock: board.half_move_clock
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ChessMove {
     pub from : Square,
     pub to : Square,
     pub prom : Option<PieceType>,
-    pub capture : PieceType,
-    pub old_castling_en_passant : u8,
-    pub old_half_move_clock : u8,
 }
 
 impl fmt::Display for ChessMove {
@@ -29,30 +47,13 @@ impl fmt::Debug for ChessMove {
     }
 }
 
-impl cmp::PartialEq for ChessMove {
-    fn eq(&self, other: &Self) -> bool {
-        self.from == other.from && self.to == other.to && self.prom == other.prom
-    }
-}
-impl cmp::Eq for ChessMove { }
-
 impl ChessMove {
-    pub fn new(board: &ChessBoard, from : Square, to : Square) -> ChessMove {
-        let capture = board.piece_at(to).0;
-        let old_castling_en_passant = board.castling_en_passant;
-
-        ChessMove { from: from, to: to, prom: None, capture: capture, 
-               old_castling_en_passant: old_castling_en_passant, 
-               old_half_move_clock: board.half_move_clock }
+    pub fn new(from : Square, to : Square) -> ChessMove {
+        ChessMove { from: from, to: to, prom: None }
     }
     
-    pub fn new_prom(board: &ChessBoard, from : Square, to : Square, prom : PieceType) -> ChessMove {
-        let capture = board.piece_at(to).0;
-        let old_castling_en_passant = board.castling_en_passant;
-
-        ChessMove { from: from, to: to, prom: Some(prom), capture: capture, 
-               old_castling_en_passant: old_castling_en_passant, 
-               old_half_move_clock: board.half_move_clock }
+    pub fn new_prom(from : Square, to : Square, prom : PieceType) -> ChessMove {
+        ChessMove { from: from, to: to, prom: Some(prom) }
     }
 }
 impl Move for ChessMove {
@@ -87,8 +88,7 @@ impl Move for ChessMove {
             let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
             let to = Square::from_alg(&alg[2..4]).unwrap_or(Square(0));
             if alg.len() == 4 {
-                Ok(ChessMove { from: from, to: to, prom: None, capture: Empty, 
-                               old_castling_en_passant: 0, old_half_move_clock: 0 })
+                Ok(ChessMove { from: from, to: to, prom: None })
             }
             else {
                 Ok(ChessMove { from: from, to: to, prom: Some(
@@ -103,9 +103,8 @@ impl Move for ChessMove {
                         Some('b') => Bishop,
                         Some(ch) => return Err(format!("Bad promotion letter {} in move {}", ch, alg)),
                         None => return Err(format!("No promotion letter in move {}", alg)),
-                    }), 
-                               capture: Empty, 
-                               old_castling_en_passant: 0, old_half_move_clock: 0 })
+                    })
+                })
             }
         }
         
