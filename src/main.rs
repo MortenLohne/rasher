@@ -183,7 +183,7 @@ fn play_human<B>(mut board : B)
                 // Loop until user enters a valid move
                 loop {
                     input_str.clear();
-                    reader.read_line(&mut input_str).ok().expect("Failed to read line");
+                    reader.read_line(&mut input_str).expect("Failed to read line");
                     
                     match B::Move::from_alg(input_str.trim()) {
                         Ok(val) => {

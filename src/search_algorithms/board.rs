@@ -22,12 +22,10 @@ impl ops::Not for Color {
 
 impl fmt::Display for Color {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let _ = fmt.write_str( match self {
-            &White => ("White"),
-            &Black => ("Black"),
-        });
-        
-        Ok(())   
+        fmt.write_str(match *self {
+            White => ("White"),
+            Black => ("Black"),
+        })
     }
 }
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]

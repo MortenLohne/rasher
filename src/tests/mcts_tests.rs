@@ -19,8 +19,8 @@ use board::std_board::PieceType::*;
 fn knight_fork_test() {
 // Basic knight fork
     let board1 = ChessBoard::from_fen("q3k3/2p5/8/3N4/1K5P/8/8/8 w - - 0 1").unwrap();
-    let best_move1 = ChessMove::new( &board1, Square::from_alg("d5").unwrap(),
-                                Square::from_alg("c7").unwrap());
+    let best_move1 = ChessMove::new(Square::from_alg("d5").unwrap(),
+                                    Square::from_alg("c7").unwrap());
     basic_tactics_prop(&board1, best_move1);
 }
 
@@ -29,7 +29,7 @@ fn knight_fork_test() {
 fn queen_pawn_to_mate() {
     // Checks that white can queen a pawn to mate
     let board2 = ChessBoard::from_fen("k7/p1P5/8/K7/8/8/8/8 w - - 0 1").unwrap();
-    let best_move2 = ChessMove::new_prom( &board2, Square::from_alg("c7").unwrap(),
+    let best_move2 = ChessMove::new_prom(Square::from_alg("c7").unwrap(),
                                      Square::from_alg("c8").unwrap(), Piece(Queen, White) );
     basic_tactics_prop(&board2, best_move2);
 }
@@ -40,8 +40,8 @@ fn queen_pawn_to_mate() {
 fn underpromote() {
     // Checks that black can underpromote a pawn to avoid mate
     let board3 = ChessBoard::from_fen("8/8/8/8/8/5K2/4p2R/5k2 b - - 0 1").unwrap();
-    let best_move3 = ChessMove::new_prom( &board3, Square::from_alg("e2").unwrap(),
-                                           Square::from_alg("e1").unwrap(), Knight );
+    let best_move3 = ChessMove::new_prom(Square::from_alg("e2").unwrap(),
+                                         Square::from_alg("e1").unwrap(), Knight );
     basic_tactics_prop(&board3, best_move3);
 }
 #[ignore]
@@ -49,8 +49,8 @@ fn underpromote() {
 fn block_pawn() {
     // Checks that black can block a pawn to draw an endgame
     let board4 = ChessBoard::from_fen("1k6/2P5/3K4/8/8/8/8/8 b - - 0 1").unwrap();
-    let best_move4 = ChessMove::new( &board4, Square::from_alg("b8").unwrap(),
-                                      Square::from_alg("c8").unwrap() );
+    let best_move4 = ChessMove::new(Square::from_alg("b8").unwrap(),
+                                    Square::from_alg("c8").unwrap() );
 
     basic_tactics_prop(&board4, best_move4);
 }

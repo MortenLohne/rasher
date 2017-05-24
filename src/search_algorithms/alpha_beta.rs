@@ -85,7 +85,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             best_moves = Some(moves.clone()); 
             best_node_count = Some(node_count.clone());
 
-            if moves.len() > 0 {
+            if !moves.is_empty() {
                 engine_comm.lock().unwrap().best_move = Some(moves[0].to_alg());
             }
             else {
@@ -211,7 +211,7 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         };
         
         // If there is mate or stalemate on the board, we should already have returned
-        assert!(legal_moves.len() > 0, "Found 0 legal moves, but game result was {:?} on \n{:?}",
+        assert!(!legal_moves.is_empty(), "Found 0 legal moves, but game result was {:?} on \n{:?}",
                 board.game_result(), board);
         
         for c_move in legal_moves {
@@ -244,9 +244,8 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
                 }
             }
         }
-        match best_move {   
-            Some(c_move) => best_line.push(c_move),
-            None => (),
+        if let Some(c_move) = best_move {
+            best_line.push(c_move);
         }
         let score = if color == White { alpha } else { beta };
         (match score {
