@@ -72,7 +72,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
     
-    while time::get_time() < start_time + time::Duration::seconds(120) {
+    while time::get_time() < start_time + time::Duration::seconds(60) {
         for _ in 0..10 {
             use std::ops::Add;
             mc_tree.select(&mut rng, searches, &mut mcts::SearchData::default());

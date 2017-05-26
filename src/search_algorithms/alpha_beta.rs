@@ -24,14 +24,14 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
     where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
-    thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, move_list));
+    thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
     receiver
 }
 
 
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
-                     engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: Option<Vec<B::Move>>)
+                     engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
@@ -41,7 +41,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         time_restriction: uci::TimeRestriction,
                         options: uci::EngineOptions,
                         channel: mpsc::Sender<uci::UciInfo>,
-                        move_list: Option<Vec<B::Move>>) 
+                        move_list: &Option<Vec<B::Move>>) 
                          -> (Score, Vec<B::Move>, NodeCount)
     where B: EvalBoard + fmt::Debug
 {

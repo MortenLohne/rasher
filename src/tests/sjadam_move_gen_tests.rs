@@ -71,27 +71,3 @@ fn no_moves_on_back_rank() {
     let moves = board.all_legal_moves();
     assert_eq!(moves.len(), 9, "Expected to find {} moves, found {}: {:?}", 9, moves.len(), moves);
 }
-
-/*
-SjadamBoard { base_board: 
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][p][ ][k]
-[ ][ ][ ][p][ ][Q][ ][ ]
-[ ][ ][ ][P][ ][ ][R][ ]
-[P][ ][ ][ ][p][ ][ ][P]
-[ ][ ][ ][ ][K][ ][ ][ ]
-To move: Black, move_number: 39, flags: 0, half_move_clock: 2
-
-SjadamBoard { base_board: 
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][ ][ ][ ]
-[ ][ ][ ][ ][ ][p][ ][k]
-[ ][ ][ ][p][ ][Q][ ][ ]
-[ ][ ][ ][P][ ][ ][R][ ]
-[P][ ][ ][ ][p][ ][ ][P]
-[ ][ ][ ][ ][K][ ][ ][ ]
-To move: Black, move_number: 2, flags: 0, half_move_clock: 39
-*/
