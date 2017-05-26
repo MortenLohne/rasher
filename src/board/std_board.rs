@@ -10,6 +10,7 @@ use std::ops;
 use std::hash;
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
@@ -79,7 +80,7 @@ impl Piece {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Square(pub u8);
 
 impl fmt::Display for Square {
@@ -121,7 +122,7 @@ impl Square {
 
 // use std::hash::{Hash, Hasher, SipHasher};
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct ChessBoard {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,
@@ -130,6 +131,23 @@ pub struct ChessBoard {
     pub move_num : u16,
     pub moves : Vec<std_move::ChessMove>,
 }
+
+impl Hash for ChessBoard {
+    fn hash<H: Hasher> (&self, state: &mut H) {
+        self.board.hash(state);
+        self.to_move.hash(state);
+        self.castling_en_passant.hash(state);
+    }
+}
+
+impl PartialEq for ChessBoard {
+    fn eq(&self, other: &ChessBoard) -> bool {
+        self.board == other.board && self.to_move == other.to_move
+            && self.castling_en_passant == other.castling_en_passant
+    }
+}
+
+impl Eq for ChessBoard {}
 
 pub struct BoardIter {
     current_x: u8,

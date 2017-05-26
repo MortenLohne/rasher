@@ -12,6 +12,7 @@ use itertools::Itertools;
 
 use uci;
 
+use std::hash::{Hash, Hasher};
 use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseUndoMove};
 
 #[derive(Clone, Eq)]
@@ -20,6 +21,14 @@ pub struct CrazyhouseBoard {
     white_available_pieces : Vec<PieceType>,
     black_available_pieces : Vec<PieceType>,
     crazyhouse_moves : Vec<(u16, CrazyhouseMove)>,
+}
+
+impl Hash for CrazyhouseBoard {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.base_board.hash(state);
+        self.white_available_pieces.hash(state);
+        self.black_available_pieces.hash(state);
+    }
 }
 
 impl PartialEq for CrazyhouseBoard {

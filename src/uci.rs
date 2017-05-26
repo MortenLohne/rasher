@@ -18,6 +18,7 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::io::Read;
 use std::str::FromStr;
+use std::hash::Hash;
 
 pub trait UciBoard : Sized {
     fn from_fen(&str) -> Result<Self, String>;
@@ -67,7 +68,7 @@ pub fn choose_variant(stdin : &mut io::BufRead) -> Result<(), String> {
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
 pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String> 
-    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug,
+    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug + Hash + Eq,
 <Board as board::EvalBoard>::Move: Sync + Send
 {
     

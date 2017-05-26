@@ -20,6 +20,7 @@ use search_algorithms::mcts;
 use std::sync::{Arc, Mutex};
 use std::io;
 use std::fmt;
+use std::hash::Hash;
 
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::GameResult;
@@ -147,7 +148,8 @@ fn main() {
 
 /// Makes the engine play a game against itself
 fn play_game<B> (mut board : B) 
-    where B: EvalBoard + uci::UciBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync + Send {
+    where B: EvalBoard + uci::UciBoard + fmt::Debug + Send + 'static + Hash + Eq,
+<B as EvalBoard>::Move: Sync + Send {
     println!("Board:\n{:?}", board);
     println!("\n");
     match board.game_result() {
@@ -167,7 +169,7 @@ fn play_game<B> (mut board : B)
 }
 /// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B)
-    where B: EvalBoard + 'static + uci::UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync + Send
+    where B: EvalBoard + 'static + uci::UciBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
 {
     match board.game_result() {
         None => {

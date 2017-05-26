@@ -4,6 +4,8 @@ use std::sync::mpsc;
 use uci;
 use std::fmt;
 use std::cmp;
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::cmp::Ordering;
 
 use search_algorithms::board::GameResult;
@@ -21,7 +23,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
                             -> mpsc::Receiver<uci::UciInfo>
-    where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync + Send
+    where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
@@ -32,7 +34,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
-    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
 }
@@ -43,7 +45,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         channel: mpsc::Sender<uci::UciInfo>,
                         move_list: &Option<Vec<B::Move>>) 
                          -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug
+    where B: EvalBoard + fmt::Debug + Hash + Eq
 {
     {
         engine_comm.lock().unwrap().engine_is_running = true;
@@ -60,6 +62,8 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
     let (mut best_score, mut best_moves, mut best_node_count) = (None, None, None);
 
+    let mut table = HashMap::new();
+    
     for depth in 1..(max_depth + 1) {
         let mut total_node_count = NodeCount::new();
         let mut pvs = vec![];
@@ -80,7 +84,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             // TODO: If engine is told through uci to only search some moves, this will not work
                 
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
-                                  Some(moves_to_search));
+                                  Some(moves_to_search), &mut table);
             best_score = Some(score); 
             best_moves = Some(moves.clone()); 
             best_node_count = Some(node_count.clone());
@@ -133,12 +137,14 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
 }
 
+type Table<B, M> = HashMap<B, HashEntry<M>>;
+
 /// Returns a score, and a list of moves representing the best line it found
 fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
                           time_restriction: uci::TimeRestriction,
-                          move_list: Option<Vec<B::Move>>)
+                          move_list: Option<Vec<B::Move>>, table: &mut Table<B, B::Move>)
                           -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug
+    where B: EvalBoard + fmt::Debug + Hash + Eq
 {
     
     fn find_best_move_ab_rec<B:> (board: &mut B, depth : u16,
@@ -146,12 +152,28 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
                                   engine_comm: &Mutex<uci::EngineComm>,
                                   time_restriction: uci::TimeRestriction,
                                   node_counter: &mut NodeCount,
-                                  mut move_list: Option<Vec<B::Move>>)
+                                  mut move_list: Option<Vec<B::Move>>,
+                                  table: &mut Table<B, B::Move>)
                                   -> (Score, Vec<B::Move>)
-        where B: EvalBoard + fmt::Debug
+        where B: EvalBoard + fmt::Debug + Hash + Eq
     {
         use uci::TimeRestriction::*;
-        
+        let first_candidate =
+            if let Some(&HashEntry{ref best_move, score, depth: entry_depth }) = table.get(board) {
+                if entry_depth >= depth {
+                    if depth != entry_depth {
+                        //println!("Position was already in cache stored at depth {}, found at depth  {}",
+                        // entry_depth, depth);
+                    }
+                    return (score, match *best_move { Some(ref mv) => vec![mv.clone()], None => vec![]})
+                }
+                else {
+                    best_move.clone()
+                }
+            }
+        else {
+            None
+        };
         // Check if the thread should stop
         if node_counter.total % 8096 == 0 {
             let should_stop : bool;
@@ -173,7 +195,10 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         if depth == 0 {
             node_counter.leaf += 1;
             node_counter.total += 1;
-            return (Val(board.eval_board()), vec![]);
+            let eval = board.eval_board();
+            //let hash_entry = HashEntry::new_bottom_move(eval);
+            //table.insert(board.clone(), hash_entry);
+            return (Val(eval), vec![]);
         }
         else {
             node_counter.intern += 1;
@@ -203,7 +228,7 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         let mut best_move = None;
         let mut best_line = vec![];
         
-        let legal_moves = if move_list.is_some() {
+        let mut legal_moves = if move_list.is_some() {
             move_list.take().unwrap()
         }
         else {
@@ -213,6 +238,10 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         // If there is mate or stalemate on the board, we should already have returned
         assert!(!legal_moves.is_empty(), "Found 0 legal moves, but game result was {:?} on \n{:?}",
                 board.game_result(), board);
+        if let Some(mv) = first_candidate {
+            let position = legal_moves.iter().position(|e| *e == mv).unwrap();
+            legal_moves.swap(0, position);
+        }
         
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR
@@ -226,8 +255,8 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
                 let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
                 let (tried_score, tried_line) =
                     
-                    find_best_move_ab_rec( board, depth - 1, alpha, beta,
-                                            engine_comm, time_restriction, node_counter, None);
+                    find_best_move_ab_rec( board, depth - 1, alpha, beta, engine_comm,
+                                           time_restriction, node_counter, None, table);
                 board.undo_move(undo_move);
                 debug_assert_eq!(board, &old_board,
                                  "Failed to restore board after move {:?}", c_move);
@@ -244,11 +273,11 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
                 }
             }
         }
-        if let Some(c_move) = best_move {
-            best_line.push(c_move);
+        if let Some(ref c_move) = best_move {
+            best_line.push(c_move.clone());
         }
         let score = if color == White { alpha } else { beta };
-        (match score {
+        let final_score = match score {
             BlackWin(i) => BlackWin(i + 1),
             WhiteWin(i) => WhiteWin(i + 1),
             Draw(i) => Draw(i + 1),
@@ -258,18 +287,31 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
             }
             else {
                 Val(n)
-            }, },
-         best_line)
+            }, };
+        if !table.contains_key(board) {
+            // When doing multipv search, the positoin may already be in the hash
+            // In that case, do not overwrite it
+            table.insert(board.clone(),
+                         HashEntry {best_move: best_move, score: final_score, depth: depth});
+        }
+         (final_score, best_line)
             
     };
     let mut node_counter = NodeCount { intern: 0, leaf: 0, total: 0 };
     let (score, mut moves) =
-        find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0),
-                              engine_comm, time_restriction, &mut node_counter, move_list);
+        find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0), engine_comm,
+                              time_restriction, &mut node_counter, move_list, table);
     moves.reverse();
     (score, moves, node_counter)
-}   
+}
 
+struct HashEntry<M> {
+    best_move: Option<M>, // The best reply. May be none if the position is game over, or if if child positions have not been evaluated yet
+    score: Score,
+    depth: u16,
+}
+
+/// The evaluation of a position. May be extact (A player wins in n moves) or an approximate evaluation. 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Score {
     Val(f32),

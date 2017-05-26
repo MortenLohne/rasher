@@ -7,8 +7,6 @@ use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 
-
-
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> Vec<ChessMove> {
     let mut mut_board = board.clone();
@@ -88,14 +86,12 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
                 || is_attacked(board, square_checked) {
                     can_castle_here = false;
                 }
-            
         }
         if can_castle_here {
             moves.push(ChessMove::new(square, Square(square.0 + 2)));
         }
-        
-        
     }
+    
     // Queenside castling
     if board.can_castle_queenside(board.to_move) {
         let mut can_castle_here = true;
@@ -119,7 +115,6 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
         if can_castle_here {
             moves.push(ChessMove::new(square, Square(square.0 - 2)));
         }
-        
     }
     
     for i in -1..2 {
@@ -455,7 +450,6 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             }
         }
     }
-    
     false
 }
 

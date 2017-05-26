@@ -12,6 +12,7 @@ use search_algorithms::board::GameResult;
 use rand;
 
 use std::cell::RefCell;
+use std::hash::{Hash, Hasher};
 
 use uci::UciBoard;
 
@@ -21,11 +22,19 @@ pub struct SjadamBoard {
     legal_moves_cache: RefCell<Option<Vec<SjadamMove>>>,
 }
 
+impl Hash for SjadamBoard {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.base_board.hash(state);
+    }
+}
+
 impl PartialEq for SjadamBoard {
     fn eq(&self, other: &SjadamBoard) -> bool {
         self.base_board == other.base_board
     }
 }
+
+impl Eq for SjadamBoard { }
 
 impl Clone for SjadamBoard {
     fn clone(&self) -> Self {
