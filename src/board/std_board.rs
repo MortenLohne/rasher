@@ -129,7 +129,6 @@ pub struct ChessBoard {
     pub castling_en_passant : u8,
     pub half_move_clock : u8,
     pub move_num : u16,
-    pub moves : Vec<std_move::ChessMove>,
 }
 
 impl Hash for ChessBoard {
@@ -185,8 +184,6 @@ impl IntoIterator for ChessBoard {
         BoardIter::new()
     }
 }
-
-
 
 // Parses the first token in a FEN string, which describes the positions
 /// of the pieces
@@ -391,7 +388,6 @@ impl EvalBoard for ChessBoard {
             (_, _) => self.half_move_clock = 0,
         }
 
-        self.moves.push(c_move);
         self.move_num += 1;
         
         // Perform castling
@@ -562,7 +558,6 @@ impl EvalBoard for ChessBoard {
         self.castling_en_passant = c_move.old_castling_en_passant;
         self.half_move_clock = c_move.old_half_move_clock;
         self.move_num -= 1;
-        self.moves.pop();
 
         self.to_move = !self.to_move;
     }
@@ -579,7 +574,7 @@ impl EvalBoard for ChessBoard {
             board[7][i] = Piece(p_type, White);
         }
         ChessBoard {board : board, to_move : White, castling_en_passant : 0b0000_1111,
-                    half_move_clock : 0, move_num : 0 , moves : vec![]}
+                    half_move_clock : 0, move_num : 0}
         
     }
 }
@@ -596,9 +591,6 @@ impl fmt::Display for ChessBoard {
         write!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}\n",
                self.to_move, self.move_num, self.castling_en_passant, self.half_move_clock)
             .unwrap();
-        for c_move in &self.moves {
-            write!(fmt, "[{}],", &c_move).unwrap();
-        }
         Ok(())   
     }
 }
