@@ -59,13 +59,14 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     debug_assert!(max_depth > 1);
     
     let start_time = time::get_time();
+    let mut total_node_count = NodeCount::new();
     
     let (mut best_score, mut best_moves, mut best_node_count) = (None, None, None);
 
     let mut table = HashMap::new();
     
     for depth in 1..(max_depth + 1) {
-        let mut total_node_count = NodeCount::new();
+        
         let mut pvs = vec![];
         let mut pv_moves = vec![];
         for _ in 0..options.multipv {
@@ -81,8 +82,6 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 continue;
             }
             let (score, moves, node_count) =
-            // TODO: If engine is told through uci to only search some moves, this will not work
-                
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                   Some(moves_to_search), &mut table);
             best_score = Some(score); 
@@ -161,11 +160,10 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         let first_candidate =
             if let Some(&HashEntry{ref best_move, score, depth: entry_depth }) = table.get(board) {
                 if entry_depth >= depth {
-                    if depth != entry_depth {
-                        //println!("Position was already in cache stored at depth {}, found at depth  {}",
-                        // entry_depth, depth);
-                    }
-                    return (score, match *best_move { Some(ref mv) => vec![mv.clone()], None => vec![]})
+                    return (score, match *best_move {
+                        Some(ref mv) => vec![mv.clone()],
+                        None => vec![]
+                    })
                 }
                 else {
                     best_move.clone()
@@ -239,8 +237,10 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
         assert!(!legal_moves.is_empty(), "Found 0 legal moves, but game result was {:?} on \n{:?}",
                 board.game_result(), board);
         if let Some(mv) = first_candidate {
-            let position = legal_moves.iter().position(|e| *e == mv).unwrap();
-            legal_moves.swap(0, position);
+            // May fail if search is restricted to only certain moves
+            if let Some(position) = legal_moves.iter().position(|e| *e == mv) {
+                legal_moves.swap(0, position);
+            }
         }
         
         for c_move in legal_moves {
