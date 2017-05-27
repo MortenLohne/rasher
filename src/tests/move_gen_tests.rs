@@ -180,14 +180,12 @@ fn en_passant_test () {
     board1.do_move(move2);
 
     // The board that's expected
-    let mut board_expected1 = ChessBoard::from_fen("7k/8/P7/8/8/8/8/7K b - - 0 3").unwrap();
+    let board_expected1 = ChessBoard::from_fen("7k/8/P7/8/8/8/8/7K b - - 0 3").unwrap();
     // Add the same moves, to ensure complete equality
-    board_expected1.moves.push(move1);
-    board_expected1.moves.push(move2);
 
     // Check that the boards are completely equal
-    assert!(board1 == board_expected1, format!("Boards were not equal. Board1:\n{}\nBoard2:\n{}",
-                                               board1, board_expected1));
+    assert_eq!(board1, board_expected1, "Boards were not equal. Board1:\n{}\nBoard2:\n{}",
+               board1, board_expected1);
 
 
     // Check that an en passant move is only available for one move after the pawn push
@@ -202,8 +200,8 @@ fn en_passant_test () {
                           Square::from_alg("h7").unwrap());
     board2.do_move(move3);
 
-    assert!(move_gen::all_legal_moves(&mut board2).len() == 6,
-            format!("Only 6 moves should be available, board:\n{}", board2));
+    assert_eq!(move_gen::all_legal_moves(&mut board2).len(), 6,
+               "Only 6 moves should be available, board:\n{}", board2);
     
 }
 
