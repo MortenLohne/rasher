@@ -10,37 +10,11 @@ use search_algorithms::board::Color::*;
 use search_algorithms::board::GameResult;
 
 use rand;
-
-use std::cell::RefCell;
-use std::hash::{Hash, Hasher};
-
 use uci::UciBoard;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub struct SjadamBoard {
     pub base_board: std_board::ChessBoard,
-    legal_moves_cache: RefCell<Option<Vec<SjadamMove>>>,
-}
-
-impl Hash for SjadamBoard {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.base_board.hash(state);
-    }
-}
-
-impl PartialEq for SjadamBoard {
-    fn eq(&self, other: &SjadamBoard) -> bool {
-        self.base_board == other.base_board
-    }
-}
-
-impl Eq for SjadamBoard { }
-
-impl Clone for SjadamBoard {
-    fn clone(&self) -> Self {
-        // When cloning the board, the cache is not brought along
-        SjadamBoard { base_board: self.base_board.clone(), legal_moves_cache: RefCell::new(None) }
-    }
 }
 
 impl EvalBoard for SjadamBoard {
@@ -53,15 +27,12 @@ impl EvalBoard for SjadamBoard {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
         let start_color = self.to_move();
-        *self.legal_moves_cache.borrow_mut() = None;
         debug_assert!(mv.from != mv.sjadam_square || mv.sjadam_square != mv.to);
 
         let undo_move = SjadamUndoMove {
             from: mv.from, sjadam_square: mv.sjadam_square,
             capture: self.base_board[mv.to].0,
-            prom: mv.prom /*(self.base_board[mv.from].0 != PieceType::King)
-                && (self.to_move() == Black && mv.to.0 >= 56
-                    || self.to_move() == White && mv.to.0 < 8)*/,
+            prom: mv.prom,
             to: mv.to, piece_moved: self.base_board[mv.from].0,
             old_castling_en_passant: self.base_board.castling_en_passant,
             old_half_move_clock: self.base_board.half_move_clock };
@@ -112,7 +83,6 @@ impl EvalBoard for SjadamBoard {
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
         let start_color = self.to_move();
-        *self.legal_moves_cache.borrow_mut() = None;
         match mv.chess_move(self) {
             None => {
                 self.base_board.to_move = !self.base_board.to_move;
@@ -135,23 +105,12 @@ impl EvalBoard for SjadamBoard {
     fn start_board() -> Self {
         SjadamBoard {
             base_board: std_board::ChessBoard::start_board(),
-            legal_moves_cache: RefCell::new(None),
         }
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
-        
-        /*let moves;
-        let mut moves_cache = self.legal_moves_cache.borrow_mut();
-        if (*moves_cache).is_some(){
-            moves = (*moves_cache).as_ref().unwrap().clone();
-        }
-        else {*/
         let mut cloned_board = self.clone();
-        let moves = sjadam_move_gen::all_legal_moves(&mut cloned_board);
-        //*moves_cache = Some(moves.clone());
-        
-        moves
+        sjadam_move_gen::all_legal_moves(&mut cloned_board)
     }
 
     fn game_result(&self) -> Option<GameResult> {
@@ -199,8 +158,7 @@ impl EvalBoard for SjadamBoard {
 
 impl UciBoard for SjadamBoard {
     fn from_fen(input: &str) -> Result<Self, String> {
-        Ok(SjadamBoard { base_board: try!(ChessBoard::from_fen(input)),
-                         legal_moves_cache: RefCell::new(None), })
+        Ok(SjadamBoard { base_board: try!(ChessBoard::from_fen(input)) })
     }
 
     fn to_fen(&self) -> String {
