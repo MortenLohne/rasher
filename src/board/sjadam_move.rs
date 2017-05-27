@@ -66,14 +66,13 @@ impl SjadamMove {
             None
         }
         else {
-            if board.base_board.to_move() == White && self.sjadam_square.0 < 8
-                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White) {
-                    Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
-                }
-            else if board.base_board.to_move() == Black && self.sjadam_square.0 >= 56
-                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White) {
-                    Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
-                }
+            if (board.base_board.to_move() == White && self.sjadam_square.0 < 8
+                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White))
+                || (board.base_board.to_move() == Black && self.sjadam_square.0 >= 56
+                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White))
+            {
+                Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
+            }
             else {
                 Some(ChessMove::new(self.sjadam_square, self.to))
             }

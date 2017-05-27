@@ -166,7 +166,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
     debug_assert_eq!(mc_tree.board, *board);
     let ms_taken = (time::get_time() - start_time).num_milliseconds();
     let mut pvs = vec![];
-    for &(ref node, ref go_move) in mc_tree.children.iter()
+    for &(node, ref go_move) in mc_tree.children.iter()
         .map(Option::as_ref)
         .filter(Option::is_some)
         .map(Option::unwrap)
@@ -226,7 +226,7 @@ pub fn search_position<B>(board: &mut B)
                 let elapsed_seconds = (time::get_time() - start_time).num_seconds() as u64;
                 println!("{} total searches at {}nps, t={}s, {:.2}% draws, average depth {}.",
                          mc_tree.searches,
-                         mc_tree.searches / (elapsed_seconds + 0),
+                         mc_tree.searches / elapsed_seconds,
                          elapsed_seconds,
                          100.0 * mc_tree.score.draws as f64 / mc_tree.searches as f64,
                          total_depth / mc_tree.searches);
@@ -257,13 +257,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                                         score: Score::new(), value: 0.0, searches: 0,
                                         game_result: board.game_result(),
                                         is_fully_expanded: false,
-                                        maximizing: 
-                                        if board.to_move() == Color::Black {
-                                            true 
-                                        } 
-                                        else { 
-                                            false 
-                                        }
+                                        maximizing: board.to_move() == Color::Black 
         };
         let mut rng = rand::weak_rng();
         while !root.is_fully_expanded {
@@ -294,7 +288,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
     }
 
     pub fn score(&self) -> NotNaN<f64> {
-        NotNaN::new(self.value / self.searches as f64).unwrap_or(NotNaN::new(0.5).unwrap())
+        NotNaN::new(self.value / self.searches as f64).unwrap_or_else(|_|NotNaN::new(0.5).unwrap())
     }
 
     /// Increments the search counter for the node, and adds 1.0, 0.5 or 0.0 to the value,
@@ -432,12 +426,9 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         search_data.selection_depth += 1;
         search_data.total_depth += 1;
         assert!(self.is_fully_expanded, "Tried to select node that wasn't fully expanded");
-        match self.game_result {
-            Some(result) => {
-                self.add_value(result);
-                return result
-            }
-            None => (),
+        if let Some(result) = self.game_result {
+            self.add_value(result);
+            return result
         }
         use std::ops::Add;
         let searches_of_children = self.children.iter()
@@ -532,9 +523,8 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         where R: rand::Rng
     {
         search_data.total_depth += 1;
-        match board.game_result() { 
-            Some(result) => return result,
-            None => (),
+        if let Some(result) = board.game_result() {
+            return result
         }
         board.do_random_move(rng);
         Self::simulate(board, rng, search_data)
@@ -552,19 +542,18 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
         //println!("Selecting in parallel");
         
         assert!(self.is_fully_expanded, "Tried to select node that wasn't fully expanded");
-        match self.game_result {
-            Some(result) => {
-                self.add_value(result);
-                search_data.selection_depth += 1;
-                search_data.total_depth += 1;
-                return Score::from_game_result(&result)
-            }
-            None => {
-                // TODO: WHat do do with this data
-                // search_data.selection_depth += threads;
-                // search_data.total_depth += threads;
-            },
+        if let Some(result) = self.game_result {
+            self.add_value(result);
+            search_data.selection_depth += 1;
+            search_data.total_depth += 1;
+            return Score::from_game_result(&result)
         }
+        else {
+            // TODO: WHat do do with this data
+            // search_data.selection_depth += threads;
+            // search_data.total_depth += threads;
+        };
+    
         if self.children.len() == 1 {
             let child = self.children[0].as_mut().unwrap();
             if child.is_fully_expanded {
@@ -665,8 +654,8 @@ impl Score {
 
 /// Returns mutable references to two elements in a slice
 /// Returns None if either index is out of bounds, or the indices are not distinct
-fn get_two_mut<'a, T>(slice: &'a mut[Option<T>], index1: usize, index2: usize) 
-    -> (&'a mut T, &'a mut T) {
+fn get_two_mut<T>(slice: &mut[Option<T>], index1: usize, index2: usize) 
+    -> (&mut T, &mut T) {
     
     if index1 >= slice.len() || index2 >= slice.len()
         || index1 == index2 {

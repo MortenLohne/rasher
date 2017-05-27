@@ -106,7 +106,7 @@ impl EvalBoard for SjadamBoard {
                 self.base_board[Square(square)] = Piece(PieceType::Queen, White)
             }
         }
-        debug_assert!(start_color != self.to_move());
+        debug_assert_ne!(start_color, self.to_move());
         undo_move
     }
 
@@ -128,7 +128,7 @@ impl EvalBoard for SjadamBoard {
         if mv.from != mv.sjadam_square {
             self.base_board[mv.sjadam_square] = Piece::empty();
         }
-        debug_assert!(start_color != self.to_move());
+        debug_assert_ne!(start_color, self.to_move());
         
     }
 
@@ -187,7 +187,7 @@ impl EvalBoard for SjadamBoard {
     }
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
         let moves = self.all_legal_moves();
-        assert!(moves.len() > 0,
+        assert!(!moves.is_empty(),
                 "Tried to do a random move, but there were no legal moves on {:?}",
                 self);
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
