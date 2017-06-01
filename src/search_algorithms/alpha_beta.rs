@@ -331,6 +331,12 @@ impl fmt::Display for Score {
     }
 }
 
+impl fmt::Debug for Score {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt::Display::fmt(self, fmt)
+    }
+}
+
 impl PartialOrd for Score {
     fn partial_cmp (&self, other: &Score) -> Option<cmp::Ordering> {
         match (*self, *other) {
