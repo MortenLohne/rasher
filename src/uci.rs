@@ -146,7 +146,7 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
                         .map(Result::unwrap)
                         .collect::<Vec<_>>()
                 );
-                let rx = match engine_string.as_str() {
+                let (_, rx) = match engine_string.as_str() {
                     "minimax" => alpha_beta::start_uci_search(board, time_restriction,
                                                               engine_options.clone(),
                                                               engine_comm.clone(), searchmoves),
@@ -209,6 +209,38 @@ pub fn get_uci_move (rx: mpsc::Receiver<UciInfo>) -> (Score, String) {
         }
     }
 }
+//*
+/// A version of `get_uci_move` that checks for more error conditions, and never panics.
+/// For the function to return ok, the engine must have terminated successfully
+/// If the engine crashes, the error value will contain the last move the engine
+/// sent, if any.
+pub fn get_uci_move_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
+                             -> Result<(Score, String), (Option<(Score, String)>, String)> {
+    let mut last_info = None;
+    loop {
+        match rx.recv() {
+            Ok(uci_info) => last_info = Some(uci_info),
+            Err(_) => {
+                if let Some(uci_info) = last_info {
+                    if uci_info.pvs.is_empty() {
+                        return Err((None, "Engine returned 0 moves".to_string()));
+                    }
+                    let (score, ref moves_string) = uci_info.pvs[0];
+                    let pv_string = moves_string
+                        .split_whitespace()
+                        .next().unwrap().to_string();
+                    if let Err(err) = handle.join() {
+                        return Err((Some((score, pv_string)), format!("{:?}", err)))
+                    }
+                    return Ok((score, pv_string))
+                }
+                else {
+                    return Err((None, "Engine returned no output".to_string()));
+                }
+            },
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TimeRestriction {
@@ -237,7 +269,7 @@ use std::sync::mpsc;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
-                        -> mpsc::Receiver<UciInfo>
+                        -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
     where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)

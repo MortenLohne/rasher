@@ -18,11 +18,11 @@ fn promote_pawn_to_mate() {
 
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
-    let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(4),
+    let (handle, channel) = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(4),
                                                uci::EngineOptions::new(),
                                                sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move(channel);
+    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
     
     let game_move = SjadamMove::from_alg(&move_str).unwrap();
     
@@ -109,13 +109,27 @@ fn sjadammate13() {
     is_mate_in_one(&board, correct_move);
 }
 
+#[test]
+fn sjadammate14() {
+    let board = SjadamBoard::from_fen("q2k1b1r/2p1pppp/1p6/1R6/2P5/3P1Q2/4PPPP/5KN1 w - - 0 1").unwrap();
+    let correct_move = SjadamMove::from_alg("-f3c6").unwrap();
+    is_mate_in_one(&board, correct_move);
+}
+
+#[test]
+fn sjadammate15() {
+    let board = SjadamBoard::from_fen("r1bqkb1r/2ppp1pp/p1n3n1/4P3/1NpP1p2/4P3/P2NP1PP/R1BQKB1R w KQkq - 0 1").unwrap();
+    let correct_move = SjadamMove::from_alg("d4f6f6f7").unwrap();
+    is_mate_in_one(&board, correct_move);
+}
+
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
-    let channel = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(3),
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Depth(4),
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move(channel);
+    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
     
     let game_move = SjadamMove::from_alg(&move_str).unwrap();
     

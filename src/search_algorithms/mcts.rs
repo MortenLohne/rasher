@@ -83,15 +83,17 @@ pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
     println!("{:?}\n{:?} won!", board, board.game_result());
 }
 
+use std::thread;
+
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
-                            -> mpsc::Receiver<uci::UciInfo>
+                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
 {
     let (sender, receiver) = mpsc::channel();
-    use std::thread;
-    thread::spawn(move || uci_search(board, time_limit, options, engine_comm, sender));
-    receiver
+    
+    let thread = thread::spawn(move || uci_search(board, time_limit, options, engine_comm, sender));
+    (thread, receiver)
 }
 
 /// The standard way to use this module

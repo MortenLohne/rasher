@@ -154,10 +154,12 @@ fn play_game<B> (mut board : B)
     println!("\n");
     match board.game_result() {
         None => {
-            let channel = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::MoveTime(5000),
-                                                       uci::EngineOptions::new(),
-                                                       Arc::new(Mutex::new(uci::EngineComm::new())), None);
-            let (score, move_str) = uci::get_uci_move(channel);
+            let (handle, channel) = alpha_beta::start_uci_search(
+                board.clone(), uci::TimeRestriction::MoveTime(5000),
+                uci::EngineOptions::new(),
+                Arc::new(Mutex::new(uci::EngineComm::new())), None);
+            
+            let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
             println!("Found move {} with score {}.", move_str, score);
             board.do_move(B::Move::from_alg(&move_str).unwrap());
             play_game(board);
@@ -204,10 +206,11 @@ fn play_human<B>(mut board : B)
                 play_human(board);
             }
             else {
-                let channel = alpha_beta::start_uci_search(
+                let (handle, channel) = alpha_beta::start_uci_search(
                     board.clone(), uci::TimeRestriction::MoveTime(5000), uci::EngineOptions::new(),
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
-                let (score, move_str) = uci::get_uci_move(channel);
+                
+                let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
                 let best_move = <B as EvalBoard>::Move::from_alg(&move_str);
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move.unwrap());

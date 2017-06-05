@@ -22,12 +22,12 @@ use std::sync::{Arc, Mutex};
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
-                            -> mpsc::Receiver<uci::UciInfo>
+                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
     where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
-    thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
-    receiver
+    let thread = thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
+    (thread, receiver)
 }
 
 
@@ -82,8 +82,17 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 continue;
             }
             let (score, moves, node_count) =
+            // If all moves are preserved, send None to the function
+            // This means the root position will still be hashed correctly
+                if moves_to_search.len() == board.all_legal_moves().len() {
+                    find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
+                                      Some(moves_to_search), &mut table)
+                        // TODO: Give None as parameter
+                }
+            else {
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
-                                  Some(moves_to_search), &mut table);
+                                  Some(moves_to_search), &mut table)
+            };
             best_score = Some(score); 
             best_moves = Some(moves.clone()); 
             best_node_count = Some(node_count.clone());
@@ -158,8 +167,19 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
     {
         use uci::TimeRestriction::*;
         let first_candidate =
-            if let Some(&HashEntry{ref best_move, score, depth: entry_depth }) = table.get(board) {
-                if entry_depth >= depth {
+            if let Some(&HashEntry{ref best_move, score, depth: entry_depth,
+                                   alpha_beta: stored_alpha_beta })
+            = table.get(board) {
+                let maximizing = board.to_move() == White;
+                if entry_depth >= depth &&
+                    (maximizing && alpha > stored_alpha_beta
+                     || !maximizing && beta < stored_alpha_beta)
+                {
+                    debug_assert_eq!(score, find_best_move_ab_rec(
+                        &mut board.clone(), entry_depth, BlackWin(0), WhiteWin(0),
+                        engine_comm, time_restriction.clone(),
+                        &mut NodeCount::new(), None, &mut HashMap::new()).0,
+                                     "Position:\n{:?}", board);
                     return (score, match *best_move {
                         Some(ref mv) => vec![mv.clone()],
                         None => vec![]
@@ -247,7 +267,7 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
             // Score is greater than the minimizer will ever allow OR
             // Score is lower than the maximizer will ever allow
             if (color == White && alpha >= beta) ||
-                (color == Black && beta <= alpha) {
+                (color == Black && alpha >= beta) {
                     break;
                 }
             else {
@@ -288,11 +308,13 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
             else {
                 Val(n)
             }, };
-        if !table.contains_key(board) {
-            // When doing multipv search, the positoin may already be in the hash
+
+        if move_list == None {
+            // When doing multipv search, the position may already be in the hash
             // In that case, do not overwrite it
-            table.insert(board.clone(),
-                         HashEntry {best_move: best_move, score: final_score, depth: depth});
+            let alpha_beta = if board.to_move() == White { alpha } else { beta };
+            table.insert(board.clone(), HashEntry {best_move: best_move, score: final_score,
+                                    alpha_beta: alpha_beta, depth: depth});
         }
          (final_score, best_line)
             
@@ -308,6 +330,7 @@ fn find_best_move_ab<B:> (board : &mut B, depth : u16, engine_comm : &Mutex<uci:
 struct HashEntry<M> {
     best_move: Option<M>, // The best reply. May be none if the position is game over, or if if child positions have not been evaluated yet
     score: Score,
+    alpha_beta: Score,
     depth: u16,
 }
 
