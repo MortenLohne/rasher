@@ -13,5 +13,11 @@ mod mcts_tests;
 #[cfg(test)]
 mod sjadam_move_gen_tests;
 
+#[allow(unused_imports)]
+#[cfg(test)]
+mod tactics_tests;
+
 #[cfg(test)]
 mod sjadam_tactics_tests;
+
+

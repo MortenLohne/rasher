@@ -3,10 +3,8 @@ use board::std_move::ChessMove;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::EvalBoard;
 
-use uci;
 use uci::UciBoard;
 
-use search_algorithms::alpha_beta;
 use super::super::board::std_move_gen::move_gen;
 
 extern crate time;
@@ -15,7 +13,7 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::{Black, White};
 use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
-use std::sync;
+use tests::tactics_tests::basic_tactics_prop;
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
 /// Also assumes that std_board::START_BOARD is correct
@@ -54,19 +52,6 @@ fn test_score () {
     assert!(BlackWin(2) <= BlackWin(3));
     assert!(BlackWin(3) <= BlackWin(3));
     assert!(BlackWin(2) <= WhiteWin(2));
-}
-
-
-#[test]
-fn basic_movement_test() {
-    let all_legal_moves = move_gen::all_legal_moves(&mut ChessBoard::start_board().clone());
-    println!("All {} legal moves at start position: ", all_legal_moves.len());
-    assert_eq!(all_legal_moves.len(), 20);
-    for c_move in all_legal_moves {
-        println!("{}", c_move);
-    }
-    
-
 }
 
 #[test]
@@ -116,55 +101,6 @@ fn respond_to_checks() {
             format!("Error: King should be under attack here:\n{}", board5));
     move_is_available_prop(&mut board6, ChessMove::from_alg("h4g4").unwrap());
     move_is_unavailable_prop(&mut board6, ChessMove::from_alg("f4g3").unwrap());
-}
-
-#[test]
-fn basic_tactics_test() {
-    // Basic knight fork
-    let board1 = ChessBoard::from_fen("r3k3/2p5/8/3N4/1K5P/8/8/8 w - - 0 1").unwrap();
-    let best_move1 = ChessMove::new(Square::from_alg("d5").unwrap(),
-                                Square::from_alg("c7").unwrap());
-    basic_tactics_prop(&board1, best_move1);
-
-    // Checks that white can queen a pawn to mate
-    let board2 = ChessBoard::from_fen("k7/p1P5/8/K7/8/8/8/8 w - - 0 1").unwrap();
-    let best_move2 = ChessMove::new_prom(Square::from_alg("c7").unwrap(),
-                                     Square::from_alg("c8").unwrap(), Queen );
-    basic_tactics_prop(&board2, best_move2);
-
-    // Checks that black can underpromote a pawn to avoid mate
-    let board3 = ChessBoard::from_fen("8/8/8/8/8/5K2/4p2R/5k2 b - - 0 1").unwrap();
-    let best_move3 = ChessMove::new_prom(Square::from_alg("e2").unwrap(),
-                                     Square::from_alg("e1").unwrap(), Knight );
-    basic_tactics_prop(&board3, best_move3);
-
-    // Checks that black can block a pawn to draw an endgame
-    let board4 = ChessBoard::from_fen("1k6/2P5/3K4/8/8/8/8/8 b - - 0 1").unwrap();
-    let best_move4 = ChessMove::new(Square::from_alg("b8").unwrap(),
-                                Square::from_alg("c8").unwrap() );
-
-    basic_tactics_prop(&board4, best_move4);
-
-    let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
-    let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
-    basic_tactics_prop(&board5, best_move5);
-}
-
-/// Checks that the expected move is indeed played in the position
-fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(4),
-        uci::EngineOptions::new(),
-        sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
-    
-    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
-    
-    let game_move = ChessMove::from_alg(&move_str).unwrap();
-    
-    assert_eq!(game_move, best_move,
-               "Best move was {:?} with score {}, expected {:?}, board:\n{}",
-               game_move, score,
-               best_move, board);
 }
 
 #[test]

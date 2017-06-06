@@ -18,9 +18,10 @@ fn promote_pawn_to_mate() {
 
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
-    let (handle, channel) = alpha_beta::start_uci_search(board.clone(), uci::TimeRestriction::Depth(4),
-                                               uci::EngineOptions::new(),
-                                               sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Depth(3),
+        uci::EngineOptions::new(),
+        sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
     
