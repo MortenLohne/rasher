@@ -124,9 +124,30 @@ fn sjadammate15() {
     is_mate_in_one(&board, correct_move);
 }
 
+#[test]
+fn sjadammate16() {
+    let board = SjadamBoard::from_fen("2b3k1/2pp1pp1/1n2p1p1/1rB5/4N3/1P2P3/3PB1PP/KR5R b - - 0 1").unwrap();
+    let correct_move = SjadamMove::from_alg("g6a2a2b1").unwrap();
+    is_mate_in_one(&board, correct_move);
+}
+
+#[test]
+fn sjadammate17() {
+    let board = SjadamBoard::from_fen("1k5r/1bbp1pp1/pp6/3p1N2/1nPBP2p/1P3P2/2PP2R1/1K6 w - - 0 1").unwrap();
+    let correct_move = SjadamMove::from_alg("-e4e5").unwrap();
+    is_mate_in_one(&board, correct_move);
+}
+
+#[test]
+fn sjadammate18() {
+    let board = SjadamBoard::from_fen("7k/1pppp1pr/1pn3P1/8/1rNb2NP/2P1PPP1/1P1PQ3/R6K b - - 0 1").unwrap();
+    let correct_move = SjadamMove::from_alg("d7f7f7g6").unwrap();
+    is_mate_in_one(&board, correct_move);
+}
+
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(4),
+        board.clone(), uci::TimeRestriction::Depth(3),
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
