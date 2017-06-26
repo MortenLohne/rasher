@@ -160,9 +160,9 @@ fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
                game_move, score,
                best_move, board);
     if board.to_move() == Color::White {
-        assert_eq!(score, alpha_beta::Score::WhiteWin(3));
+        assert_eq!(score, alpha_beta::Score::WhiteWin(2));
     }
     else {
-        assert_eq!(score, alpha_beta::Score::BlackWin(3));
+        assert_eq!(score, alpha_beta::Score::BlackWin(2));
     }
 }

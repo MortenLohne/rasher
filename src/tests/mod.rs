@@ -20,4 +20,5 @@ mod tactics_tests;
 #[cfg(test)]
 mod sjadam_tactics_tests;
 
-
+#[cfg(test)]
+mod score_tests;

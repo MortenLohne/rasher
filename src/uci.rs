@@ -292,7 +292,7 @@ pub struct EngineOptions {
 
 impl EngineOptions {
     pub fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 64, multipv: 1 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 128, multipv: 1 }
     }
 }
 
@@ -529,14 +529,16 @@ impl UciInfo {
         use fmt::Write;
         let mut string = String::new();
         if self.pvs.len() == 1 {
-            write!(string, "info depth {} seldepth {} score {} nodes {} time {} nps {} pv {}\n",
+            write!(string, "info depth {} seldepth {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
                    self.depth, self.seldepth, self.pvs[0].0, self.nodes,
+                   (self.hashfull * 1000.0) as i64,
                    self.time, (1000 * self.nodes) as i64 / (self.time + 1), self.pvs[0].1).unwrap();
         } // Add one to self.time to avoid division by zero
         else {
             for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
-                write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} time {} nps {} pv {}\n",
+                write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
                        self.depth, self.seldepth, n, score, self.nodes,
+                       (self.hashfull * 1000.0) as i64,
                        self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
             }
         }

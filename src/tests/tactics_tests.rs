@@ -17,7 +17,7 @@ use std::sync;
 /// Checks that the expected move is indeed played in the position
 pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(4),
+        board.clone(), uci::TimeRestriction::Depth(5),
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
