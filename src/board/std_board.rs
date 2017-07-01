@@ -314,7 +314,6 @@ impl EvalBoard for ChessBoard {
 
     fn game_result(&self) -> Option<board::GameResult> {
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
-        
         if self.all_legal_moves().len() == 0 {            
             if move_gen::is_attacked(self, self.king_pos(self.to_move())) {
                 if self.to_move == White {
@@ -328,7 +327,28 @@ impl EvalBoard for ChessBoard {
                 Some(board::GameResult::Draw)
             }
         }
-        else { None }
+        else {
+            // Force a draw for unwinnable bishop/knight endgames
+            let mut black_material = 0.0;
+            let mut white_material = 0.0;
+            for square in BoardIter::new() {
+                // Games with queens or rooks are always undecided
+                match self[square].0 {
+                    Queen | Rook | Pawn => return None,
+                    Knight | Bishop | King | Empty => (),
+                };
+                match self[square] {
+                    Piece(piece_type, Black) => black_material += piece_type.value(),
+                    Piece(piece_type, White) => white_material += piece_type.value(),
+                };
+            }
+            if black_material <= 3.5 && white_material <= 3.5 {
+                Some(board::GameResult::Draw)
+            }
+            else {
+                None
+            }
+        }
     }
     
     #[inline(never)]
