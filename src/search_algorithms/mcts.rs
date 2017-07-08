@@ -106,8 +106,8 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::get_time();
     let mut rng = rand::weak_rng();
-    loop {
-        for _ in 0..100 {
+    for n in 1.. {
+        for _ in 0..100 * (n as f64).sqrt() as usize {
             use std::ops::Add;
             let searches = mc_tree.searches;
             //searches_last_print = mc_tree.searches;
@@ -207,8 +207,8 @@ pub fn search_position<B>(board: &mut B)
     let mut total_depth : u64 = 0;
     let mut searches_last_print = 0;
     
-    while time::get_time() < start_time + time::Duration::seconds(10800) {
-        for _ in 0..10 {
+    for n in 1.. {
+        for _ in 0..((5*n) as f64).sqrt() as usize {
             use std::ops::Add;
             let searches = mc_tree.searches;
             //searches_last_print = mc_tree.searches;
@@ -586,11 +586,10 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
         
         let value = [(child1, rng.clone()),
                      (child2, rng.clone())].into_par_iter()
-            .weight_max()
             .map(|&mut(ref mut child, ref mut new_rng)| {
 
                 if child.is_fully_expanded {
-                    if depth > 3 {
+                    if depth > 4 {
                         Score::from_game_result(&child.select(new_rng,
                                                               total_searches, &mut search_data.clone()))
                     }
