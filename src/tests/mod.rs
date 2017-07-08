@@ -22,3 +22,6 @@ mod sjadam_tactics_tests;
 
 #[cfg(test)]
 mod score_tests;
+
+#[cfg(test)]
+mod board_tests;

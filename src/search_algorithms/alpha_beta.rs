@@ -69,8 +69,8 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
     for depth in 1..(max_depth + 1) {
         
-        let mut pvs = vec![];
-        let mut pv_moves = vec![];
+        let mut pvs : Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
+        let mut pv_moves : Vec<B::Move> = vec![]; // Moves that have been searched
         for _ in 0..options.multipv {
             
             let mut moves_to_search = if move_list.is_some() {
@@ -79,10 +79,11 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             else {
                 board.all_legal_moves()
             };
-            moves_to_search.retain(|mv| !pv_moves.iter().any(|mv2| mv == mv2));
+            moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
             if moves_to_search.is_empty() {
                 continue;
             }
+
             let (score, moves, node_count) =
             // If all moves are preserved, send None to the function
             // This means the root position will still be hashed correctly
@@ -91,7 +92,8 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                                       None, &mut table)
                 }
             else {
-                table.remove(&board);
+                table.hash_table.clear();
+                //table.remove(&board);
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                   Some(moves_to_search), &mut table)
             };
@@ -166,7 +168,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                   -> (Score, Vec<B::Move>)
         where B: EvalBoard + fmt::Debug + Hash + Eq
     {
-        assert!(!(alpha > beta));
+        debug_assert!(alpha <= beta, "alpha={}, beta={}, depth={}, board:\n{:?}",
+                      alpha, beta, depth, board); 
         use uci::TimeRestriction::*;
         let first_candidate =
             if let Some(&HashEntry{ref best_line, score: (ordering, score), depth: entry_depth })
@@ -174,26 +177,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 if entry_depth >= depth && (
                     ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
                 {
-                    
-                    match score {
-                        BlackWin(i) if board.to_move() == Black =>
-                            assert_eq!(best_line.len() as u16, i * 2 - 1,
-                                       "{:?}\nMoves: {:?}, score: {}, ordering: {:?}, depth: {}, entry depth: {}",
-                                       board, best_line, score, ordering, depth, entry_depth),
-                        BlackWin(i) =>
-                            assert_eq!(best_line.len() as u16, i * 2,
-                                       "{:?}\nMoves: {:?}, score: {}, ordering: {:?}, depth: {}, entry depth: {}",
-                                       board, best_line, score, ordering, depth, entry_depth),
-                        WhiteWin(i) if board.to_move() == White =>
-                            assert_eq!(best_line.len() as u16, i * 2 - 1,
-                                       "{:?}\nMoves: {:?}, score: {}, ordering: {:?}, depth: {}, entry depth: {}",
-                                       board, best_line, score, ordering, depth, entry_depth),
-                        WhiteWin(i) =>
-                            assert_eq!(best_line.len() as u16, i * 2,
-                                       "{:?}\nMoves: {:?}, score: {}, ordering: {:?}, depth: {}, entry depth: {}",
-                                       board, best_line, score, ordering, depth, entry_depth),
-                        _ => (),
-                    }
                     return (score, best_line.clone())
                 }
                 else {
@@ -225,8 +208,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             node_counter.leaf += 1;
             node_counter.total += 1;
             let eval = board.eval_board();
-            //let hash_entry = HashEntry::new_bottom_move(eval);
-            //table.insert(board.clone(), hash_entry);
             return (Val(eval), vec![]);
         }
         else {
@@ -247,15 +228,10 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             Infinite => (),
         };
         
-        /*if board.half_move_clock > 50 {
-            return (Draw(0), vec![]);
-        }*/
-        // TODO: Add this back, preferably by adding is_game_over() to the trait
-        
         // Helpful alias
         let color = board.to_move();
-        let mut best_move = None;
         let mut best_line = vec![];
+        let mut best_score = None;
         
         let mut legal_moves = if move_list.is_some() {
             move_list.take().unwrap()
@@ -273,17 +249,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 legal_moves.swap(0, position);
             }
         }
-        
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR
             // Score is lower than the maximizer will ever allow
-            if alpha >= beta {
-                break;
-            }
+            
             let old_board = board.clone();
             let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
             let new_alpha = decrement_score(alpha, board, depth);
             let new_beta = decrement_score(beta, board, depth);
+
             let (tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
                                       new_alpha,
@@ -293,31 +267,30 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             board.undo_move(undo_move);
             debug_assert_eq!(board, &old_board,
                              "Failed to restore board after move {:?}", c_move);
-            if best_move.is_none() {
-                best_move = Some(c_move.clone());
+            if best_score.is_none() {
+                best_score = Some(tried_score);
                 best_line = tried_line.clone();
+                best_line.push(c_move.clone());
             }
-            if color == White && tried_score >= alpha {
+            if color == White && tried_score > alpha {
                 alpha = tried_score;
-                best_line = tried_line;
-                best_move = Some(c_move);
+                best_line = tried_line.clone();
+                best_line.push(c_move.clone());
+                best_score = Some(tried_score);
             }
             else if color == Black && tried_score < beta {
                 beta = tried_score;
-                best_line = tried_line;
-                best_move = Some(c_move);
+                best_line = tried_line.clone();
+                best_line.push(c_move.clone());
+                best_score = Some(tried_score);
+            }
+            if alpha >= beta {
+                break; 
             }
         }
-        if let Some(ref c_move) = best_move {
-            best_line.push(c_move.clone());
-        }
-        let score = if color == White { alpha } else { beta };
-        let final_score = increment_score(score, board, depth);
-        match final_score {
-            //BlackWin(i) if i > 10 => println!("Black wins in {}", i),
-            //WhiteWin(i) if i > 10 => println!("White wins in {}", i),
-            _ => (),
-        };
+
+        let score = increment_score(best_score.unwrap(), board, depth);
+        
         if move_list == None {
             // When doing multipv search, the position may already be in the hash
             // In that case, do not overwrite it
@@ -325,20 +298,12 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 White => Ordering::Greater,
                 Black => Ordering::Less,
             };
-            match final_score {
-                BlackWin(i) | WhiteWin(i) =>
-                    debug_assert!(best_line.len() as u16 >= if i == 0 { 0 } else { i * 2 - 1 },
-                            "{:?}\nMoves: {:?}, depth: {}, score: {}, alpha: {}, beta: {}, i * 2 - 1: {}",
-                            board, best_line, depth, final_score,
-                            increment_score(alpha, board, depth),
-                            increment_score(beta, board, depth), i),
-                _ => (),
-            };
+
             table.insert(board.clone(), HashEntry {
-                best_line: best_line.clone(), score: (ordering, final_score), depth: depth
-            });
+            best_line: best_line.clone(), score: (ordering, score), depth: depth
+        });
         }
-         (final_score, best_line)
+        (score, best_line)
             
     };
     let mut node_counter = NodeCount { intern: 0, leaf: 0, total: 0 };
@@ -369,7 +334,8 @@ fn decrement_score<B: EvalBoard>(score: Score, board: &B, depth: u16) -> Score {
         WhiteWin(i) if board.to_move() == White && i > 0 => WhiteWin(i - 1),
         WhiteWin(i) if i > 0 => WhiteWin(i),
         WhiteWin(i) => WhiteWin(i),
-        Draw(i) => Draw(i - 1),
+        Draw(i) if i > 0 => Draw(i - 1),
+        Draw(i) => Draw(i),
         Val(n) if depth == 1 => Val(n * 2.0 - board.eval_board()),
         Val(n) => Val(n),
     }
@@ -386,23 +352,32 @@ struct HashEntry<M> {
 /// size in memory. 
 struct Table<B, M> {
     hash_table: HashMap<B, HashEntry<M>>,
+    hits: u64, // Total hits in table
+    lookups: u64, // Total lookups in table
     mem_usage: usize,
     max_memory: usize,
 }
 
 impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
     pub fn new(max_memory: usize) -> Table<B, M> {
-        Table { hash_table: HashMap::new(), mem_usage: 0, max_memory: max_memory }
+        Table { hash_table: HashMap::new(), hits: 0, lookups: 0,
+                mem_usage: 0, max_memory: max_memory }
     }
         
-    pub fn get(&self, key: &B) -> Option<&HashEntry<M>> {
-        self.hash_table.get(key)
+    pub fn get(&mut self, key: &B) -> Option<&HashEntry<M>> {
+        self.lookups += 1;
+        let result = self.hash_table.get(key);
+        if result.is_some() {
+            self.hits += 1;
+            //println!("Hit cache after {} lookups, {}% hit rate", self.lookups,
+            //         100.0 * self.hits as f64 / self.lookups as f64);
+        }
+        result
     }
 
     pub fn insert(&mut self, key: B, mut value: HashEntry<M>) {
         value.best_line.shrink_to_fit();
-        let extra_mem = mem::size_of::<HashEntry<M>>() + mem::size_of::<B>()
-            + value.best_line.len() * mem::size_of::<M>();
+        let extra_mem = Self::value_mem_usage(&value);
         if self.mem_usage + extra_mem <= (self.max_memory / 10) * 6 {
             self.mem_usage += extra_mem;
             self.hash_table.insert(key, value);
@@ -411,8 +386,7 @@ impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
 
     pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>> {
         self.hash_table.remove(key).map(|value| {
-            self.mem_usage -= mem::size_of::<HashEntry<M>>() + mem::size_of::<B>()
-                + value.best_line.len() * mem::size_of::<M>();
+            self.mem_usage -= Self::value_mem_usage(&value);
             value
         })
     }

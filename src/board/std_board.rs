@@ -102,10 +102,8 @@ impl Square {
             let (file, rank) = (alg.chars().nth(0).unwrap(), alg.chars().nth(1).unwrap());
             let (file_u8, rank_u8) = (file as u8 - 'a' as u8,
                                       8 - (rank as u8 - '0' as u8));
-
             let square = rank_u8 * 8 + file_u8;
-            
-            // println!("file_u8: {}, rank_u8: {}: {} = {}", file_u8, rank_u8, alg, square);
+
             if square > 64 { None } else { Some(Square(square)) }
         }
     }
@@ -313,6 +311,9 @@ impl EvalBoard for ChessBoard {
     }
 
     fn game_result(&self) -> Option<board::GameResult> {
+        if self.half_move_clock > 50 {
+            return Some(board::GameResult::Draw);
+        }
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
         if self.all_legal_moves().len() == 0 {            
             if move_gen::is_attacked(self, self.king_pos(self.to_move())) {
@@ -332,7 +333,7 @@ impl EvalBoard for ChessBoard {
             let mut black_material = 0.0;
             let mut white_material = 0.0;
             for square in BoardIter::new() {
-                // Games with queens or rooks are always undecided
+                // Games with queens, rooks or pawns are always undecided
                 match self[square].0 {
                     Queen | Rook | Pawn => return None,
                     Knight | Bishop | King | Empty => (),
@@ -414,27 +415,34 @@ impl EvalBoard for ChessBoard {
         // It will castle regardless of whether it is legal to do so
         if piece_moved == King &&
             (file_from as i8 - file_to as i8).abs() == 2 {
-
+                debug_assert_eq!(file_from, 4, "Tried to castle from the {}th file", file_from);
+                
                 // Simple helper closure that moves a piece, emptying the square it came from
                 // Checks nothing, not even if the square has a piece. Use carefully.
-                let mut do_simple_move = |f_from, r_from, f_to, r_to| {
-                    self.board[r_to as usize][f_to as usize]
-                        = self.board[r_from as usize][f_from as usize];
-                    self.board[r_from as usize][f_from as usize] = Piece(Empty, White);
+                let do_simple_move = |board : &mut Self, f_from, r_from, f_to, r_to| {
+                    board.board[r_to as usize][f_to as usize]
+                        = board.board[r_from as usize][f_from as usize];
+                    board.board[r_from as usize][f_from as usize] = Piece(Empty, White);
                 };
                 // Assume castling is legal, and move the king and rook to where they should go
                 match (color, file_to) {
-                    (White, 2) => { do_simple_move(4, 7, 2, 7);
-                                    do_simple_move(0, 7, 3, 7);
+                    (White, 2) => {
+                        debug_assert_eq!(self[Square::from_alg("a1").unwrap()], Piece(Rook, White),
+                                         "Tried to do {} on \n{:?}", c_move, self);
+                        do_simple_move(self, 4, 7, 2, 7);
+                        do_simple_move(self, 0, 7, 3, 7);
                     },
-                    (White, 6) => { do_simple_move(4, 7, 6, 7);
-                                    do_simple_move(7, 7, 5, 7);
+                    (White, 6) => {
+                        debug_assert_eq!(self[Square::from_alg("h1").unwrap()], Piece(Rook, White),
+                                         "Tried to do {} on \n{:?}", c_move, self);
+                        do_simple_move(self, 4, 7, 6, 7);
+                        do_simple_move(self, 7, 7, 5, 7);
                     },
-                    (Black, 2) => { do_simple_move(4, 0, 2, 0);
-                                    do_simple_move(0, 0, 3, 0);
+                    (Black, 2) => { do_simple_move(self, 4, 0, 2, 0);
+                                    do_simple_move(self, 0, 0, 3, 0);
                     },
-                    (Black, 6) => { do_simple_move(4, 0, 6, 0);
-                                    do_simple_move(7, 0, 5, 0);
+                    (Black, 6) => { do_simple_move(self, 4, 0, 6, 0);
+                                    do_simple_move(self, 7, 0, 5, 0);
                     },
                     (_, _) => panic!(format!(
                         "Error: Tried to castle to the {}th file. ", file_to)),

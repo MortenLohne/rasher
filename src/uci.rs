@@ -218,7 +218,7 @@ pub fn get_uci_move (rx: mpsc::Receiver<UciInfo>) -> (Score, String) {
 pub fn get_uci_move_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
                              -> Result<(Score, String), (Option<(Score, String)>, String)> {
     let mut last_info = None;
-    loop {
+    loop { // The channel will return error when closed
         match rx.recv() {
             Ok(uci_info) => last_info = Some(uci_info),
             Err(_) => {
@@ -234,6 +234,44 @@ pub fn get_uci_move_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<
                         return Err((Some((score, pv_string)), format!("{:?}", err)))
                     }
                     return Ok((score, pv_string))
+                }
+                else {
+                    return Err((None, "Engine returned no output".to_string()));
+                }
+            },
+        }
+    }
+}
+
+pub fn get_uci_multipv_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>,
+                                multipv: u32)
+                             -> Result<Vec<(Score, String)>, (Option<Vec<(Score, String)>>, String)> {
+    let mut last_info = None;
+    loop { // The channel will return error when closed
+        match rx.recv() {
+            Ok(uci_info) => last_info = Some(uci_info),
+            Err(_) => {
+                if let Some(uci_info) = last_info {
+                    if uci_info.pvs.is_empty() {
+                        return Err((None, "Engine returned 0 moves".to_string()));
+                    }
+                    let results = uci_info.pvs.iter()
+                        .map(|&(score, ref moves_string)| {
+                            let pv_string = moves_string
+                                .split_whitespace()
+                                .next().unwrap().to_string();
+                            (score, pv_string)
+                        })
+                        .collect::<Vec<_>>();
+                    if results.len() as u32 != multipv {
+                        return Err((Some(results.clone()),
+                                    format!("Engine returned {} moves, expected {}",
+                                            results.len() as u32, multipv)))
+                    }
+                    if let Err(err) = handle.join() {
+                        return Err((Some(results), format!("{:?}", err)))
+                    }
+                    return Ok(results)
                 }
                 else {
                     return Err((None, "Engine returned no output".to_string()));
@@ -538,7 +576,7 @@ impl UciInfo {
         else {
             for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
                 write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                       self.depth, self.seldepth, n, score, self.nodes,
+                       self.depth, self.seldepth, n + 1, score, self.nodes,
                        (self.hashfull * 1000.0) as i64,
                        self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
             }

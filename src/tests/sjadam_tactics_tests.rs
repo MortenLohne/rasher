@@ -98,7 +98,7 @@ fn sjadammate11() {
 
 #[test]
 fn sjadammate12() {
-    let board = SjadamBoard::from_fen("rn1qk3/ppp1p1pp/3p1b2/6P1/2R1b3/3P4/PPpPPRP1/3QKB2 w KQkq - 0 2").unwrap();
+    let board = SjadamBoard::from_fen("rn1qk3/ppp1p1pp/3p1b2/6P1/2R1b3/3P4/PPpPPRP1/3QKB2 w q - 0 2").unwrap();
     let correct_move = SjadamMove::from_alg("d1f3f3g4").unwrap();
     is_mate_in_one(&board, correct_move);
 }

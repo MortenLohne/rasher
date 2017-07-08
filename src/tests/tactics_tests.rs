@@ -7,6 +7,8 @@ use board::std_move::ChessMove;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::alpha_beta;
+use search_algorithms::alpha_beta::Score;
+use search_algorithms::alpha_beta::Score::*;
 
 use uci;
 use uci::UciBoard;
@@ -17,7 +19,7 @@ use std::sync;
 /// Checks that the expected move is indeed played in the position
 pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(5),
+        board.clone(), uci::TimeRestriction::Depth(4),
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
@@ -58,12 +60,66 @@ fn basic_tactics_test() {
 
     basic_tactics_prop(&board4, best_move4);
 
+    // Check that white can capture a queen to promote to a winning position
     let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
     let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
     basic_tactics_prop(&board5, best_move5);
 }
 
 #[test]
+fn mate_in_two_test() {
+    let board = ChessBoard::from_fen("2krr3/pp3ppp/8/2b2P2/5B2/2P3NP/PP2pnP1/R3K2R b - - 4 4").unwrap();
+    let best_move = ChessMove::from_alg("d8d1").unwrap();
+    basic_tactics_prop(&board, best_move);
+    
+}
+
+#[test]
 fn multipv_mates_test() {
     let board = ChessBoard::from_fen("NrB5/pp1R4/kp5R/3P2p1/K7/8/1P6/8 w - - 0 1").unwrap();
+    let mut options = uci::EngineOptions::new();
+    options.multipv = 4;
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Depth(5),
+        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
+    
+    let results = uci::get_uci_multipv_checked(handle, channel, 4).unwrap();
+    assert_eq!(results[0].0, Score::WhiteWin(1));
+    assert_eq!(results[1].0, Score::WhiteWin(2));
+    assert_eq!(results[2].0, Score::WhiteWin(3));
+    assert_eq!(results[3].0, Score::WhiteWin(3));
+}
+
+#[test]
+#[ignore]
+fn multipv_mates_test_long() {
+    let board = ChessBoard::from_fen("NrB5/pp1R4/kp5R/3P2p1/K7/8/1P6/8 w - - 0 1").unwrap();
+    let mut options = uci::EngineOptions::new();
+    options.multipv = 6;
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Depth(7),
+        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
+    
+    let results = uci::get_uci_multipv_checked(handle, channel, 6).unwrap();
+    assert_eq!(results[0].0, Score::WhiteWin(1));
+    assert_eq!(results[1].0, Score::WhiteWin(2));
+    assert_eq!(results[2].0, Score::WhiteWin(3));
+    assert_eq!(results[3].0, Score::WhiteWin(3));
+    assert_eq!(results[4].0, Score::WhiteWin(4));
+}
+
+#[test]
+fn multipv_mates_test2() {
+    let board = ChessBoard::from_fen("8/8/8/8/4b3/7k/r4PNP/7K b - - 2 5").unwrap();
+    let mut options = uci::EngineOptions::new();
+    options.multipv = 4;
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Depth(5),
+        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
+    
+    let results = uci::get_uci_multipv_checked(handle, channel, 4).unwrap();
+    assert_eq!(results[0].0, Score::BlackWin(1));
+    assert_eq!(results[1].0, Score::BlackWin(2));
+    assert_eq!(results[2].0, Score::BlackWin(3));
+    assert_eq!(results[3].0, Score::BlackWin(3));
 }
