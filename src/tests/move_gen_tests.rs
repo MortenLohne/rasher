@@ -364,20 +364,15 @@ fn correct_move_gen_test7() {
 
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
-fn legal_moves_after_plies(board : &mut ChessBoard, n : u8) -> u64 {
+pub fn legal_moves_after_plies<B: EvalBoard>(board : &mut B, n : u8) -> u64
+{
     if n == 0 { 1 }
     else {
         let mut total_moves = 0;
-        for c_move in move_gen::all_legal_moves(board) {
-            let mut old_board = board.clone();
-            
-            let undo_move = board.do_move(c_move);
+        for c_move in board.all_legal_moves() {            
+            let undo_move = board.do_move(c_move.clone());
             total_moves += legal_moves_after_plies(board, n - 1);
             board.undo_move(undo_move);
-
-            debug_assert!(&mut old_board == board,
-                          format!("Board was not the same after undoing move {}:\nOld:{}New:{}",
-                                  c_move, old_board, board));
         }
         total_moves
     }
