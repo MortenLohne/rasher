@@ -15,7 +15,6 @@ pub struct SjadamUndoMove {
     pub from: Square,
     pub sjadam_square: Square,
     pub to: Square,
-    pub prom: bool,
     pub piece_moved: PieceType,
     pub capture: PieceType,
     pub old_castling_en_passant: u8, // Not used if chess_move is present
@@ -24,14 +23,19 @@ pub struct SjadamUndoMove {
 
 impl SjadamUndoMove {
     /// Extract the underlying chess undo move
-    pub fn chess_move(&self, _: &SjadamBoard) -> Option<ChessUndoMove> {
+    /// Assumes the move has not been undone on the board
+    pub fn chess_move(&self, board: &SjadamBoard) -> Option<ChessUndoMove> {
         if self.sjadam_square == self.to {
             None
         }
         else {
             Some(ChessUndoMove {
                 from: self.sjadam_square, to: self.to, capture: self.capture,
-                prom: self.prom,
+                prom: self.piece_moved == PieceType::Pawn && {
+                    let (_, rank) = self.to.file_rank();
+                    board.to_move() == Black && rank == 7
+                        || board.to_move() == White && rank == 0
+                } ,
                 old_castling_en_passant: self.old_castling_en_passant,
                 old_half_move_clock: self.old_half_move_clock
             })
@@ -44,17 +48,16 @@ pub struct SjadamMove {
     pub from: Square,
     pub sjadam_square: Square,
     pub to: Square,
-    pub prom: bool,
 }
 
 impl SjadamMove {
     /// Creates a Sjadam Move with only a regular move
     pub fn from_chess_move(mv: &ChessMove) -> Self {
-        SjadamMove { from: mv.from, sjadam_square: mv.from, to: mv.to, prom: mv.prom.is_some() }
+        SjadamMove { from: mv.from, sjadam_square: mv.from, to: mv.to}
     }
 
     pub fn from_sjadam_move(from: Square, to: Square) -> Self {
-        SjadamMove { from: from, sjadam_square: to, to: to, prom: false }
+        SjadamMove { from: from, sjadam_square: to, to: to }
     }
 
     pub fn from_to_squares(&self) -> (Square, Square) {
@@ -97,11 +100,11 @@ impl Move for SjadamMove {
             let from = try!(Square::from_alg(&alg[0..2]).ok_or("Illegal square"));
             let to = try!(Square::from_alg(&alg[2..4]).ok_or("Illegal square"));
             if alg.chars().nth(4).unwrap() == '-' {
-                Ok(SjadamMove { from: from, sjadam_square: to, to: to, prom: false })
+                Ok(SjadamMove { from: from, sjadam_square: to, to: to })
             }
             else {
-                let ChessMove { to: chess_to, prom, .. } = ChessMove::from_alg(&alg[4..])?;
-                Ok(SjadamMove { from: from, sjadam_square: to, to: chess_to, prom: prom.is_some() })
+                let ChessMove { to: chess_to, .. } = ChessMove::from_alg(&alg[4..])?;
+                Ok(SjadamMove { from: from, sjadam_square: to, to: chess_to })
             }
         }
     }

@@ -32,7 +32,6 @@ impl EvalBoard for SjadamBoard {
         let undo_move = SjadamUndoMove {
             from: mv.from, sjadam_square: mv.sjadam_square,
             capture: self.base_board[mv.to].0,
-            prom: mv.prom,
             to: mv.to, piece_moved: self.base_board[mv.from].0,
             old_castling_en_passant: self.base_board.castling_en_passant,
             old_half_move_clock: self.base_board.half_move_clock };

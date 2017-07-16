@@ -152,7 +152,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     }
     let mut combined_moves = chess_moves.iter()
         .map(|mv| SjadamMove
-             { from: square, sjadam_square: mv.from, to: mv.to, prom: mv.prom.is_some() })
+             { from: square, sjadam_square: mv.from, to: mv.to })
         .collect::<Vec<_>>();
     combined_moves.append(&mut pure_sjadam_moves);
     let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
