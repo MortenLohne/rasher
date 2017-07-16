@@ -19,6 +19,7 @@ use search_algorithms::mcts;
 
 use std::sync::{Arc, Mutex};
 use std::io;
+use std::io::Write;
 use std::fmt;
 use std::hash::Hash;
 
@@ -44,7 +45,9 @@ fn init_log() -> Result<(), Box<std::error::Error>> {
 extern crate lazy_static;
 extern crate itertools;
 fn main() {
-    init_log().unwrap();
+    init_log().unwrap_or_else(|err| {
+        let _ = writeln!(&mut io::stderr(), "Failed to open log file: {}", err);
+    });
     let mut stdin = io::BufReader::new(io::stdin());
     info!("Opened log");
     loop {
