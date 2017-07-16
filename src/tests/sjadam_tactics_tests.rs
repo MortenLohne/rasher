@@ -23,7 +23,7 @@ fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
+    let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
     
     let game_move = SjadamMove::from_alg(&move_str).unwrap();
     
@@ -151,7 +151,7 @@ fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
+    let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
     
     let game_move = SjadamMove::from_alg(&move_str).unwrap();
     

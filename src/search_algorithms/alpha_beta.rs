@@ -92,6 +92,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                                       None, &mut table)
                 }
             else {
+                // TODO: Clearing the hash table loses a ton of performance in multipv mode
                 table.hash_table.clear();
                 //table.remove(&board);
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
@@ -384,6 +385,7 @@ impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>> {
         self.hash_table.remove(key).map(|value| {
             self.mem_usage -= Self::value_mem_usage(&value);

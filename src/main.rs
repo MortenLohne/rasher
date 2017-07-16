@@ -162,7 +162,7 @@ fn play_game<B> (mut board : B)
                 uci::EngineOptions::new(),
                 Arc::new(Mutex::new(uci::EngineComm::new())), None);
             
-            let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
+            let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
             println!("Found move {} with score {}.", move_str, score);
             board.do_move(B::Move::from_alg(&move_str).unwrap());
             play_game(board);
@@ -213,7 +213,7 @@ fn play_human<B>(mut board : B)
                     board.clone(), uci::TimeRestriction::MoveTime(5000), uci::EngineOptions::new(),
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 
-                let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
+                let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
                 let best_move = <B as EvalBoard>::Move::from_alg(&move_str);
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move.unwrap());

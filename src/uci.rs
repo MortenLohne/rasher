@@ -192,30 +192,12 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
     }
 }
 
-/// Given a receiving channel for uci info, wait until the transmitter closes it
-/// and then return the best score and move
-pub fn get_uci_move (rx: mpsc::Receiver<UciInfo>) -> (Score, String) {
-    let mut last_info = None;
-    loop {
-        match rx.recv() {
-            Ok(uci_info) => last_info = Some(uci_info),
-            Err(_) => {
-                let uci_info = last_info.unwrap();
-                assert!(!uci_info.pvs.is_empty());
-                let (score, ref moves_string) = uci_info.pvs[0];
-                return (score, moves_string
-                        .split_whitespace()
-                        .next().unwrap().to_string())
-            },
-        }
-    }
-}
-//*
-/// A version of `get_uci_move` that checks for more error conditions, and never panics.
+/// Given a receiving channel for uci info and an engine thread, wait until the transmitter closes the handle and the thread exits
+/// Then return the best score and move
 /// For the function to return ok, the engine must have terminated successfully
 /// If the engine crashes, the error value will contain the last move the engine
 /// sent, if any.
-pub fn get_uci_move_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
+pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
                              -> Result<(Score, String), (Option<(Score, String)>, String)> {
     let mut last_info = None;
     loop { // The channel will return error when closed
@@ -243,7 +225,8 @@ pub fn get_uci_move_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<
     }
 }
 
-pub fn get_uci_multipv_checked (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>,
+#[allow(dead_code)]
+pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>,
                                 multipv: u32)
                              -> Result<Vec<(Score, String)>, (Option<Vec<(Score, String)>>, String)> {
     let mut last_info = None;

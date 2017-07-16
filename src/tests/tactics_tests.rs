@@ -23,7 +23,7 @@ pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move_checked(handle, channel).unwrap();
+    let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
     
     let game_move = ChessMove::from_alg(&move_str).unwrap();
     
@@ -83,7 +83,7 @@ fn multipv_mates_test() {
         board.clone(), uci::TimeRestriction::Depth(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv_checked(handle, channel, 4).unwrap();
+    let results = uci::get_uci_multipv(handle, channel, 4).unwrap();
     assert_eq!(results[0].0, Score::WhiteWin(1));
     assert_eq!(results[1].0, Score::WhiteWin(2));
     assert_eq!(results[2].0, Score::WhiteWin(3));
@@ -100,7 +100,7 @@ fn multipv_mates_test_long() {
         board.clone(), uci::TimeRestriction::Depth(7),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv_checked(handle, channel, 6).unwrap();
+    let results = uci::get_uci_multipv(handle, channel, 6).unwrap();
     assert_eq!(results[0].0, Score::WhiteWin(1));
     assert_eq!(results[1].0, Score::WhiteWin(2));
     assert_eq!(results[2].0, Score::WhiteWin(3));
@@ -117,7 +117,7 @@ fn multipv_mates_test2() {
         board.clone(), uci::TimeRestriction::Depth(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv_checked(handle, channel, 4).unwrap();
+    let results = uci::get_uci_multipv(handle, channel, 4).unwrap();
     assert_eq!(results[0].0, Score::BlackWin(1));
     assert_eq!(results[1].0, Score::BlackWin(2));
     assert_eq!(results[2].0, Score::BlackWin(3));
