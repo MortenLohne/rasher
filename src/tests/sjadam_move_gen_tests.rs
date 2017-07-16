@@ -87,7 +87,7 @@ fn castling_en_passant_perf_test() {
     board.do_move(SjadamMove::from_alg("-d7d5").unwrap());
     board.do_move(SjadamMove::from_alg("c1a3-").unwrap());
     board.do_move(SjadamMove::from_alg("-b7b5").unwrap());
-    for (n, &moves) in (1..4).zip([160, 26_959, 4_259_956].iter()) {
+    for (n, &moves) in (1..4).zip([160, 26_959, 4_259_773].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);

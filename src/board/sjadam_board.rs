@@ -41,45 +41,47 @@ impl EvalBoard for SjadamBoard {
         if mv.from != mv.sjadam_square {
             self.base_board[mv.from] = Piece::empty();
         }
+
+        // Remove castling priviledges on king moves
+        if undo_move.piece_moved == PieceType::King {
+            let color = self.to_move();
+            self.base_board.disable_castling(color);
+        }
+        
+        // Remove castling priviledges if anything moves from or to a corner
+
+        let a1 = Square::from_alg("a1").unwrap();
+        let h1 = Square::from_alg("h1").unwrap();
+        let a8 = Square::from_alg("a8").unwrap();
+        let h8 = Square::from_alg("h8").unwrap();
+        match mv.from {
+            square if square == a1 =>
+                self.base_board.disable_castling_queenside(White),
+            square if square == h1 =>
+                self.base_board.disable_castling_kingside(White),
+            square if square == a8 =>
+                self.base_board.disable_castling_queenside(Black),
+            square if square == h8 =>
+                self.base_board.disable_castling_kingside(Black),
+            _ => (),
+        }
+
+        match mv.to {
+            square if square == a1 =>
+                self.base_board.disable_castling_queenside(White),
+            square if square == h1 =>
+                self.base_board.disable_castling_kingside(White),
+            square if square == a8 =>
+                self.base_board.disable_castling_queenside(Black),
+            square if square == h8 =>
+                self.base_board.disable_castling_kingside(Black),
+            _ => (),
+        }
         
         let chess_move = mv.chess_move(self);
+
         match chess_move {
             None => {
-                // Remove castling priviledges on king moves
-                if undo_move.piece_moved == PieceType::King {
-                    let color = self.to_move();
-                    self.base_board.disable_castling(color);
-                }
-                
-                // Remove castling priviledges if anything moves from or to a corner
-
-                let a1 = Square::from_alg("a1").unwrap();
-                let h1 = Square::from_alg("h1").unwrap();
-                let a8 = Square::from_alg("a8").unwrap();
-                let h8 = Square::from_alg("h8").unwrap();
-                match mv.from {
-                    square if square == a1 =>
-                        self.base_board.disable_castling_queenside(White),
-                    square if square == h1 =>
-                        self.base_board.disable_castling_kingside(White),
-                    square if square == a8 =>
-                        self.base_board.disable_castling_queenside(Black),
-                    square if square == h8 =>
-                        self.base_board.disable_castling_kingside(Black),
-                    _ => (),
-                }
-                match mv.to {
-                    square if square == a1 =>
-                        self.base_board.disable_castling_queenside(White),
-                    square if square == h1 =>
-                        self.base_board.disable_castling_kingside(White),
-                    square if square == a8 =>
-                        self.base_board.disable_castling_queenside(Black),
-                    square if square == h8 =>
-                        self.base_board.disable_castling_kingside(Black),
-                    _ => (),
-                }
-                
                 if undo_move.piece_moved != PieceType::Pawn {
                     self.base_board.half_move_clock += 1; // Pure sjadam moves are never captures
                 }

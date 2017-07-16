@@ -438,11 +438,17 @@ impl EvalBoard for ChessBoard {
                         do_simple_move(self, 4, 7, 6, 7);
                         do_simple_move(self, 7, 7, 5, 7);
                     },
-                    (Black, 2) => { do_simple_move(self, 4, 0, 2, 0);
-                                    do_simple_move(self, 0, 0, 3, 0);
+                    (Black, 2) => {
+                        debug_assert_eq!(self[Square::from_alg("a8").unwrap()], Piece(Rook, Black),
+                                         "Tried to do {} on \n{:?}", c_move, self);
+                        do_simple_move(self, 4, 0, 2, 0);
+                        do_simple_move(self, 0, 0, 3, 0);
                     },
-                    (Black, 6) => { do_simple_move(self, 4, 0, 6, 0);
-                                    do_simple_move(self, 7, 0, 5, 0);
+                    (Black, 6) => {
+                        debug_assert_eq!(self[Square::from_alg("h8").unwrap()], Piece(Rook, Black),
+                                         "Tried to do {} on \n{:?}", c_move, self);
+                        do_simple_move(self, 4, 0, 6, 0);
+                        do_simple_move(self, 7, 0, 5, 0);
                     },
                     (_, _) => panic!(format!(
                         "Error: Tried to castle to the {}th file. ", file_to)),
