@@ -448,7 +448,7 @@ pub fn parse_go (input : &str)
     loop {
         match tokens_it.next() {
             Some("moves_to_go") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
-            
+            Some("movestogo") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
             Some("btime") => black_time = Some(try!(parse_int(tokens_it.next()))),
             Some("wtime") => {
                 white_time = Some(try!(parse_int(tokens_it.next())));
