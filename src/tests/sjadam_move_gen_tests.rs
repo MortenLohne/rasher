@@ -1,7 +1,6 @@
 use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
 use board::sjadam_move::SjadamMove;
-use board::std_board::*;
 use search_algorithms::game_move::Move;
 use search_algorithms::board::{GameResult, EvalBoard};
 use tests::move_gen_tests;
@@ -44,11 +43,7 @@ fn can_take_king_while_checked() {
     if board.game_result() != Some(GameResult::WhiteWin) { 
         let moves = board.all_legal_moves();
         
-        let correct_move = SjadamMove {
-            from: Square::from_alg("c5").unwrap(),
-            sjadam_square: Square::from_alg("e5").unwrap(),
-            to: Square::from_alg("g6").unwrap(),
-            prom: false } ;
+        let correct_move = SjadamMove::from_alg("c5e5e5g6").unwrap();
         assert!(board.all_legal_moves().contains(&correct_move),
                 "White couldn't take king on board:\n{:?}Moves: {:?}",
                 board, moves);
