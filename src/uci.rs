@@ -341,6 +341,9 @@ fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), Stri
             "sjadam" => options.variant = ChessVariant::Sjadam,
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
+        "uci_standard" => options.variant = ChessVariant::Standard,
+        "uci_crazyhouse" => options.variant = ChessVariant::Crazyhouse,
+        "uci_sjadam" => options.variant = ChessVariant::Sjadam,
         "threads" => {
             let threads = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
             options.threads = threads;
