@@ -56,15 +56,7 @@ fn main() {
 	    let tokens : Vec<&str> = input.split_whitespace().collect();
 
             match tokens[0] {
-                "uci" => {
-                    match uci::choose_variant(&mut stdin) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            error!("Engine front terminated unexpectedly with \"{}\"", e);
-                        },
-                    }
-                    return;
-                },
+                "uci" => uci::connect_engine(&mut stdin).unwrap(),
                 "isready" => {
                     info!("received isready from GUI");
                     uci::uci_send("readyok");

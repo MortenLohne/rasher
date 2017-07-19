@@ -1,11 +1,10 @@
 use board::std_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
+use board::crazyhouse_board::CrazyhouseBoard;
 use board::std_board::TimeInfo;
 
-use board::crazyhouse_board::CrazyhouseBoard;
-
 use search_algorithms::board;
-use search_algorithms::game_move;
+use search_algorithms::game_move::Move;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
@@ -16,9 +15,7 @@ use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
-use std::io::Read;
 use std::str::FromStr;
-use std::hash::Hash;
 
 pub trait UciBoard : Sized {
     fn from_fen(&str) -> Result<Self, String>;
@@ -30,50 +27,23 @@ pub trait UciMove : Sized {
     fn to_alg(&self) -> String;
 }
 
-pub fn choose_variant(stdin : &mut io::BufRead) -> Result<(), String> {
+/// Connects the engine to a GUI using UCI. 
+/// Assumes "uci has already been sent"
+pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
 
     // Do the standard handshake with the GUI
     info!("Received uci command from GUI");
     uci_send("id name rasher");
 
     //uci_send("option name Write Debug Log type check default true");
-    //uci_send("option name Variant type string");
     uci_send("option name Hash type spin default 128 min 0 max 32768");
     uci_send("option name Threads type spin default 1 min 1 max 16");
     uci_send("option name MultiPV type spin default 1 min 1 max 64");
+    uci_send("option name UCI_Variant type combo default Chess var Chess var Sjadam");
     
     uci_send("uciok");
-
-    let input : String = get_engine_input(stdin)?;
-    let tokens = input.split_whitespace().collect::<Vec<_>>();
-    if tokens.len() < 1 {
-        warn!("Unrecognized variant string \"{}\", continuing normally", input);
-        //continue; TODO: Go to connect_engine
-    }
-    if tokens[0] == "variant" {
-        match tokens[1] {
-            "standard" => connect_engine::<ChessBoard>(stdin),
-            "crazyhouse" => connect_engine::<CrazyhouseBoard>(stdin),
-            "sjadam" => connect_engine::<SjadamBoard>(stdin),
-            _ => Err(format!("Unrecognized chess variant {}.", tokens[1])),
-        }
-    }
-    else {
-        let mut input_with_newline = input.clone();
-        input_with_newline.push_str("\n");
-        connect_engine::<ChessBoard>(&mut io::Cursor::new(input_with_newline)
-                                     .chain(stdin))
-    }
-}
-
-/// Connects the engine to a GUI using UCI. 
-/// Assumes "uci has already been sent"
-pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String> 
-    where Board : 'static + board::EvalBoard + UciBoard + Send + fmt::Debug + Hash + Eq,
-<Board as board::EvalBoard>::Move: Sync + Send
-{
     
-    let mut board : Option<Board> = None;
+    let mut board_string : String = "position startpos".to_string();
     let mut engine_string = "minimax".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
     let mut engine_options = EngineOptions::new();
@@ -90,17 +60,8 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
             "isready" => uci_send("readyok"),
             "quit" => { info!("Quitting..."); return Ok(()); },
             "ucinewgame" => (), // Ignore this for now
-            "position" => board = Some(try!(parse_position::<Board>(&input))),
-            "setoption" => { 
-                // If the board has not been sent, we are in init mode,
-                // which means init options can still be changed
-                if board == None { 
-                    try!(parse_setoption_init(&input, &mut engine_options))
-                }
-                else {
-                    try!(parse_setoption(&input))
-                }
-            },
+            "position" => board_string = input.to_string(),
+            "setoption" => parse_setoption(&input, &mut engine_options)?,
             "engine" =>
                 if tokens.len() >= 2 {
                     engine_string = tokens[1].to_string(); }
@@ -137,23 +98,72 @@ pub fn connect_engine<Board>(stdin : &mut io::BufRead) -> Result<(), String>
                     }
                     
                 }
-                let board = try!(board.clone()
-                                 .ok_or("Received go without receiving a position first. Exiting..."));
                 let (time_restriction, searchmoves_input) = parse_go(&input)?;
-                let searchmoves = searchmoves_input.map(
-                    |moves|
-                    moves.iter()
-                        .map(|move_string| <Board::Move as game_move::Move>::from_alg(move_string))
-                        .map(Result::unwrap)
-                        .collect::<Vec<_>>()
-                );
-                let (_, rx) = match engine_string.as_str() {
-                    "minimax" => alpha_beta::start_uci_search(board, time_restriction,
-                                                              engine_options.clone(),
-                                                              engine_comm.clone(), searchmoves),
-                    "mcts" => start_mcts_engine(board, time_restriction, engine_options.clone(),
-                                                engine_comm.clone()),
-                    _ => panic!(),
+                
+                let (_, rx) = match engine_options.variant {
+                    ChessVariant::Standard => {
+                        match engine_string.as_str() {
+                            "minimax" => alpha_beta::start_uci_search(
+                                parse_position::<ChessBoard>(&board_string)?,
+                                time_restriction,
+                                engine_options.clone(),
+                                engine_comm.clone(), searchmoves_input
+                                    .clone()
+                                    .map(|moves|
+                                         moves.iter()
+                                         .map(|move_string| <<ChessBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(Result::unwrap)
+                                         .collect::<Vec<_>>()
+                                         )),
+                            "mcts" => start_mcts_engine(
+                                parse_position::<ChessBoard>(&board_string)?,
+                                time_restriction, engine_options.clone(),
+                                engine_comm.clone()),
+                            _ => panic!("Unknown engine {}", engine_string),
+                        }
+                    },
+                    ChessVariant::Crazyhouse => {
+                        match engine_string.as_str() {
+                            "minimax" => alpha_beta::start_uci_search(
+                                parse_position::<CrazyhouseBoard>(&board_string)?,
+                                time_restriction,
+                                engine_options.clone(),
+                                engine_comm.clone(), searchmoves_input
+                                    .clone()
+                                    .map(|moves|
+                                         moves.iter()
+                                         .map(|move_string| <<CrazyhouseBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(Result::unwrap)
+                                         .collect::<Vec<_>>()
+                                         )),
+                            "mcts" => start_mcts_engine(
+                                parse_position::<CrazyhouseBoard>(&board_string)?,
+                                time_restriction, engine_options.clone(),
+                                engine_comm.clone()),
+                            _ => panic!("Unknown engine {}", engine_string),
+                        }
+                    },
+                    ChessVariant::Sjadam => {
+                        match engine_string.as_str() {
+                            "minimax" => alpha_beta::start_uci_search(
+                                parse_position::<SjadamBoard>(&board_string)?,
+                                time_restriction,
+                                engine_options.clone(),
+                                engine_comm.clone(), searchmoves_input
+                                    .clone()
+                                    .map(|moves|
+                                         moves.iter()
+                                         .map(|move_string| <<SjadamBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(Result::unwrap)
+                                         .collect::<Vec<_>>()
+                                         )),
+                            "mcts" => start_mcts_engine(
+                                parse_position::<SjadamBoard>(&board_string)?,
+                                time_restriction, engine_options.clone(),
+                                engine_comm.clone()),
+                            _ => panic!("Unknown engine {}", engine_string),
+                        }
+                    }
                 };
                 thread::spawn(move || {
                     // Last info that has been received, if any
@@ -301,6 +311,7 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
 pub enum ChessVariant {
     Standard,
     Crazyhouse,
+    Sjadam,
 }
 
 // Options set in the UCI engine
@@ -318,16 +329,16 @@ impl EngineOptions {
     }
 }
 
-// Parse "setoption" strings from the GUI. Some options (# of cores etc) can only
-// be changed during engine initialization, these should be set here
-fn parse_setoption_init (input: &str, options: &mut EngineOptions) -> Result<(), String> {
+// Parse "setoption" strings from the GUI. 
+fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), String> {
 
     let (option_name, value) = try!(parse_setoption_data(input));
 
     match &option_name.to_lowercase()[..] {
-        "variant" => match &value.to_lowercase()[..] {
+        "variant" | "uci_variant" => match &value.to_lowercase()[..] {
             "standard" => options.variant = ChessVariant::Standard,
             "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
+            "sjadam" => options.variant = ChessVariant::Sjadam,
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
         "threads" => {
@@ -343,20 +354,6 @@ fn parse_setoption_init (input: &str, options: &mut EngineOptions) -> Result<(),
             let multipv = u32::from_str(&value).map_err(|e|format!("{:?}", e))?;
             options.multipv = multipv;
         }
-        // If no init-only option matches, try the other ones
-        _ => parse_setoption(input)?,
-    }
-    Ok(())
-}
-
-// Parse "setoption" strings from the GUI. Most options (# of cores etc) can only
-// be changed during engine initialization.
-// A few, like debug logs, can be toggled while the engine is running
-fn parse_setoption (input : &str) -> Result<(), String> {
-    
-    let (option_name, value) = try!(parse_setoption_data(input));
-
-    match &option_name.to_lowercase()[..] {
         "write debug log" => {
             match &value.to_lowercase()[..] {
                 "true" => (),
