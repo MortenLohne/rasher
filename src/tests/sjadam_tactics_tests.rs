@@ -36,7 +36,7 @@ fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
 #[test]
 fn sjadammate1() {
     let board = SjadamBoard::from_fen("r2q2n1/p5pp/2p3k1/1p1R4/8/5P2/P1P1P3/2B3K1 w - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("d5b7b7g7").unwrap();
+    let correct_move = SjadamMove::from_alg("d5b7g7").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
@@ -57,14 +57,14 @@ fn sjadammate3() {
 #[test]
 fn sjadammate6() {
     let board = SjadamBoard::from_fen("1b3rk1/pp4pp/3p3P/3p3B/6RK/2N2p1P/PP3R2/8 b - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("b8b6b6d8").unwrap();
+    let correct_move = SjadamMove::from_alg("b8b6d8").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
 #[test]
 fn sjadammate7() {
     let board = SjadamBoard::from_fen("3k3r/1pppppp1/8/p1P5/PP2PPn1/2b3Kp/3PR2R/8 w - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("f4b2b2c3").unwrap();
+    let correct_move = SjadamMove::from_alg("f4b2c3").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
@@ -78,14 +78,14 @@ fn sjadammate8() {
 #[test]
 fn sjadammate9() {
     let board = SjadamBoard::from_fen("2kr1br1/5ppp/1pB1n3/2P2n2/4p3/2P3P1/PP1NNP2/R4R1K b - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("c8e8e8e7").unwrap();
+    let correct_move = SjadamMove::from_alg("c8e8e7").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
 #[test]
 fn sjadammate10() {
     let board = SjadamBoard::from_fen("r1b2bkr/ppp1p1pp/P1n2n2/8/4Pp1R/3NB3/2PP2PP/4RK2 w - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("d3d5d5f6").unwrap();
+    let correct_move = SjadamMove::from_alg("d3d5f6").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
@@ -99,7 +99,7 @@ fn sjadammate11() {
 #[test]
 fn sjadammate12() {
     let board = SjadamBoard::from_fen("rn1qk3/ppp1p1pp/3p1b2/6P1/2R1b3/3P4/PPpPPRP1/3QKB2 w q - 0 2").unwrap();
-    let correct_move = SjadamMove::from_alg("d1f3f3g4").unwrap();
+    let correct_move = SjadamMove::from_alg("d1f3g4").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
@@ -120,14 +120,14 @@ fn sjadammate14() {
 #[test]
 fn sjadammate15() {
     let board = SjadamBoard::from_fen("r1bqkb1r/2ppp1pp/p1n3n1/4P3/1NpP1p2/4P3/P2NP1PP/R1BQKB1R w KQkq - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("d4f6f6f7").unwrap();
+    let correct_move = SjadamMove::from_alg("d4f6f7").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
 #[test]
 fn sjadammate16() {
     let board = SjadamBoard::from_fen("2b3k1/2pp1pp1/1n2p1p1/1rB5/4N3/1P2P3/3PB1PP/KR5R b - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("g6a2a2b1").unwrap();
+    let correct_move = SjadamMove::from_alg("g6a2b1").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 
@@ -141,7 +141,7 @@ fn sjadammate17() {
 #[test]
 fn sjadammate18() {
     let board = SjadamBoard::from_fen("7k/1pppp1pr/1pn3P1/8/1rNb2NP/2P1PPP1/1P1PQ3/R6K b - - 0 1").unwrap();
-    let correct_move = SjadamMove::from_alg("d7f7f7g6").unwrap();
+    let correct_move = SjadamMove::from_alg("d7f7g6").unwrap();
     is_mate_in_one(&board, correct_move);
 }
 

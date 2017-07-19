@@ -43,7 +43,7 @@ fn can_take_king_while_checked() {
     if board.game_result() != Some(GameResult::WhiteWin) { 
         let moves = board.all_legal_moves();
         
-        let correct_move = SjadamMove::from_alg("c5e5e5g6").unwrap();
+        let correct_move = SjadamMove::from_alg("c5e5g6").unwrap();
         assert!(board.all_legal_moves().contains(&correct_move),
                 "White couldn't take king on board:\n{:?}Moves: {:?}",
                 board, moves);
@@ -81,7 +81,7 @@ fn castling_en_passant_perf_test() {
     let mut board = SjadamBoard::start_board();
     board.do_move(SjadamMove::from_alg("g1e3-").unwrap());
     board.do_move(SjadamMove::from_alg("g8e6-").unwrap());
-    board.do_move(SjadamMove::from_alg("f1d3d3c4").unwrap());
+    board.do_move(SjadamMove::from_alg("f1d3c4").unwrap());
     board.do_move(SjadamMove::from_alg("e8g8-").unwrap());
     board.do_move(SjadamMove::from_alg("-c2c3").unwrap());
     board.do_move(SjadamMove::from_alg("-d7d5").unwrap());

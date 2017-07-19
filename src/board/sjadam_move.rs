@@ -86,26 +86,23 @@ impl SjadamMove {
 impl Move for SjadamMove {
     fn from_alg(input: &str) -> Result<Self, String> {
         let mut chars = input.chars().peekable();
-        
-        if *try!(chars.peek().ok_or("Empty move notation")) == '-' {
+        if input.len() < 5 {
+            return Err(format!("Move \"{}\" was too short to parse", input))
+        }
+        if *chars.peek().unwrap() == '-' {
             chars.next().unwrap();
-            let chess_move = try!(ChessMove::from_alg(&chars.collect::<String>()));
-            Ok(SjadamMove::from_chess_move(&chess_move))
+            let chess_move = ChessMove::from_alg(&chars.collect::<String>())?;
+            return Ok(SjadamMove::from_chess_move(&chess_move))
+        }
+        let alg : String = chars.by_ref().collect();
+        let from = Square::from_alg(&alg[0..2]).ok_or("Illegal square")?;
+        let sjadam = Square::from_alg(&alg[2..4]).ok_or("Illegal square")?;
+        if alg.chars().last().unwrap() == '-' {
+            Ok(SjadamMove::from_sjadam_move(from, sjadam))
         }
         else {
-            let alg : String = chars.collect();
-            if alg.len() < 5 {
-                return Err(format!("Notation too short, couldn't parse: {}.", input))
-            }
-            let from = try!(Square::from_alg(&alg[0..2]).ok_or("Illegal square"));
-            let to = try!(Square::from_alg(&alg[2..4]).ok_or("Illegal square"));
-            if alg.chars().nth(4).unwrap() == '-' {
-                Ok(SjadamMove { from: from, sjadam_square: to, to: to })
-            }
-            else {
-                let ChessMove { to: chess_to, .. } = ChessMove::from_alg(&alg[4..])?;
-                Ok(SjadamMove { from: from, sjadam_square: to, to: chess_to })
-            }
+            let to = Square::from_alg(&alg[4..]).ok_or("Illegal square")?;
+            Ok(SjadamMove { from: from, sjadam_square: sjadam, to: to })
         }
     }
     fn to_alg(&self) -> String {
@@ -115,18 +112,19 @@ impl Move for SjadamMove {
 
 impl fmt::Debug for SjadamMove {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}",
+        write!(f, "{}{}{}",
                if self.from == self.sjadam_square {
                    "-".to_string()
                }
                else {
-                   format!("{}{}", self.from, self.sjadam_square)
+                    self.from.to_string()
                },
+               self.sjadam_square,
                if self.sjadam_square == self.to {
                    "-".to_string()
                }
                else {
-                   format!("{}{}", self.sjadam_square, self.to)
+                   self.to.to_string()
                })
     }
 }
