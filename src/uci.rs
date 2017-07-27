@@ -178,10 +178,11 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                 // If the channel has hung up,
                                 // send final data as well as bestmove command
                                 match last_info {
-                                    None => uci_send("bestmove none"),
+                                    None => uci_send("bestmove null"),
                                     Some(uci_info) => {
+                                        assert!(!uci_info.pvs.is_empty(),
+                                                "UCI info {:?} was sent with no PVs", uci_info);
                                         uci_send(&uci_info.to_info_string());
-                                        assert!(!uci_info.pvs.is_empty());
                                         let (_, ref moves_string) = uci_info.pvs[0];
                                         println!("bestmove {}",
                                                  moves_string

@@ -84,7 +84,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 continue;
             }
 
-            let (score, moves, node_count) =
+            let (score, mut moves, node_count) =
             // If all moves are preserved, send None to the function
             // This means the root position will still be hashed correctly
                 if moves_to_search.len() == board.all_legal_moves().len() {
@@ -96,8 +96,13 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 table.hash_table.clear();
                 //table.remove(&board);
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
-                                  Some(moves_to_search), &mut table)
+                                  Some(moves_to_search.clone()), &mut table)
             };
+            // If no moves were found, return a random move
+            // This usually means that the position on the board is won, or already a draw
+            if moves.is_empty() {
+                moves.push(moves_to_search[0].clone());
+            }
             best_score = Some(score); 
             best_moves = Some(moves.clone()); 
             best_node_count = Some(node_count.clone());
@@ -250,6 +255,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 legal_moves.swap(0, position);
             }
         }
+        debug_assert!(!legal_moves.is_empty());
         for c_move in legal_moves {
             // Score is greater than the minimizer will ever allow OR
             // Score is lower than the maximizer will ever allow
@@ -275,13 +281,13 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             }
             if color == White && tried_score > alpha {
                 alpha = tried_score;
-                best_line = tried_line.clone();
+                best_line = tried_line;
                 best_line.push(c_move.clone());
                 best_score = Some(tried_score);
             }
             else if color == Black && tried_score < beta {
                 beta = tried_score;
-                best_line = tried_line.clone();
+                best_line = tried_line;
                 best_line.push(c_move.clone());
                 best_score = Some(tried_score);
             }
