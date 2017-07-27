@@ -537,6 +537,7 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 }
 
 /// Trait representing an algorithm returning uci-compatible output
+#[derive(Debug, PartialEq, Clone)]
 pub struct UciInfo {
     pub depth: u16,
     pub seldepth: u16,
