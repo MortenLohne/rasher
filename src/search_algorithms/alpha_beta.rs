@@ -262,8 +262,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             
             let old_board = board.clone();
             let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
-            let new_alpha = decrement_score(alpha, board, depth);
-            let new_beta = decrement_score(beta, board, depth);
+            let new_alpha = decrement_score(alpha, board);
+            let new_beta = decrement_score(beta, board);
 
             let (tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
@@ -296,7 +296,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             }
         }
 
-        let score = increment_score(best_score.unwrap(), board, depth);
+        let score = increment_score(best_score.unwrap(), board);
         
         if move_list == None {
             // When doing multipv search, the position may already be in the hash
@@ -321,19 +321,18 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     (score, moves, node_counter)
 }
 
-fn increment_score<B: EvalBoard>(score: Score, board: &B, depth: u16) -> Score {
+fn increment_score<B: EvalBoard>(score: Score, board: &B) -> Score {
     match score {
         BlackWin(i) if board.to_move() == Black => BlackWin(i + 1),
         BlackWin(i) => BlackWin(i),
         WhiteWin(i) if board.to_move() == White => WhiteWin(i + 1),
         WhiteWin(i) => WhiteWin(i),
         Draw(i) => Draw(i + 1),
-        Val(n) if depth == 1 => Val((n + board.eval_board()) / 2.0),
         Val(n) => Val(n),
     }
 }
 
-fn decrement_score<B: EvalBoard>(score: Score, board: &B, depth: u16) -> Score {
+fn decrement_score<B: EvalBoard>(score: Score, board: &B) -> Score {
     match score {
         BlackWin(i) if board.to_move() == Black && i > 0 => BlackWin(i - 1),
         BlackWin(i) if i > 0 => BlackWin(i),
@@ -343,7 +342,6 @@ fn decrement_score<B: EvalBoard>(score: Score, board: &B, depth: u16) -> Score {
         WhiteWin(i) => WhiteWin(i),
         Draw(i) if i > 0 => Draw(i - 1),
         Draw(i) => Draw(i),
-        Val(n) if depth == 1 => Val(n * 2.0 - board.eval_board()),
         Val(n) => Val(n),
     }
 }
