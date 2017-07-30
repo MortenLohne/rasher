@@ -56,7 +56,10 @@ fn main() {
 	    let tokens : Vec<&str> = input.split_whitespace().collect();
 
             match tokens[0] {
-                "uci" => uci::connect_engine(&mut stdin).unwrap(),
+                "uci" => {
+                    uci::connect_engine(&mut stdin).unwrap();
+                    return;
+                },
                 "isready" => {
                     info!("received isready from GUI");
                     uci::uci_send("readyok");
