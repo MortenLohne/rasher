@@ -196,6 +196,10 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 });
             }
+            "sjadam" => engine_options.variant = ChessVariant::Sjadam,
+            "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
+            "hash1G" => engine_options.hash_memory = 1024,
+            "multipv5" => engine_options.multipv = 5,
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 warn!("Unrecognized input \"{}\". Ignoring.", input);
             },
