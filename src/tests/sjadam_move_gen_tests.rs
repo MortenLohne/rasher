@@ -110,3 +110,13 @@ fn perf_test_3() {
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
     }
 }
+
+#[test]
+fn perf_test_4() {
+    let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1").unwrap();
+    for (n, &moves) in (1..4).zip([144, 18_152, 2_750_259].iter()) {
+        let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
+        assert_eq!(result, moves,
+                   "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
+    }
+}
