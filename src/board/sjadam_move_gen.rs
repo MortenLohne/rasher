@@ -67,6 +67,45 @@ impl fmt::Debug for BitBoard {
     }
 }
 
+/// Represents the positions of all the pieces
+struct PieceBitBoards {
+    bitboards: [[BitBoard; 2]; 6],
+}
+
+struct SjadamBitBoard {
+    white_pieces: BitBoard,
+    black_pieces: BitBoard,
+    white_pawns: BitBoard,
+    black_pawns: BitBoard,
+    white_knights: BitBoard,
+    black_knights: BitBoard,
+    white_bishops: BitBoard,
+    black_bishops: BitBoard,
+    white_rooks: BitBoard,
+    black_roocks: BitBoard,
+    white_queens: BitBoard,
+    black_queens: BitBoard,
+    white_kings: BitBoard,
+    black_kings: BitBoard,
+}
+
+/*impl Index<Square> for SjadamBitBoard {
+    type Output = Piece;
+    fn index(&self, square: Square) -> Piece {
+        if self.white_pieces.get(square) {
+            if white_pawns.get(square) {
+                
+            }
+        }
+        else if self.black_pieces.get(square) {
+            
+        }
+        else {
+            Piece::empty()
+        }
+    }
+}*/
+
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = vec![];
     for square in BoardIter::new() {
