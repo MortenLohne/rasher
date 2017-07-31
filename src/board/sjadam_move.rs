@@ -1,7 +1,6 @@
 use board::std_move::{ChessMove, ChessUndoMove};
 use board::std_board::Square;
 use board::std_board::PieceType;
-use board::std_board::Piece;
 use board::sjadam_board::SjadamBoard;
 
 use search_algorithms::board::Color::*;
@@ -70,9 +69,9 @@ impl SjadamMove {
         }
         else {
             if (board.base_board.to_move() == White && self.sjadam_square.0 < 8
-                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White))
+                && board.base_board[self.sjadam_square].is_empty())
                 || (board.base_board.to_move() == Black && self.sjadam_square.0 >= 56
-                && board.base_board[self.sjadam_square] == Piece(PieceType::Pawn, White))
+                && board.base_board[self.sjadam_square].is_empty())
             {
                 Some(ChessMove::new_prom(self.sjadam_square, self.to, PieceType::Queen))
             }

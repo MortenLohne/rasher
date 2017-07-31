@@ -31,8 +31,8 @@ impl EvalBoard for SjadamBoard {
 
         let undo_move = SjadamUndoMove {
             from: mv.from, sjadam_square: mv.sjadam_square,
-            capture: self.base_board[mv.to].0,
-            to: mv.to, piece_moved: self.base_board[mv.from].0,
+            capture: self.base_board[mv.to].piece_type(),
+            to: mv.to, piece_moved: self.base_board[mv.from].piece_type(),
             old_castling_en_passant: self.base_board.castling_en_passant,
             old_half_move_clock: self.base_board.half_move_clock };
 
@@ -98,19 +98,13 @@ impl EvalBoard for SjadamBoard {
                 self.base_board.do_move(chess_move);
             },
         }
-        
-        for square in 56..63 {
-            let Piece(piece, color) = self.base_board[Square(square)];
-            if color == Black && piece != PieceType::King && piece != PieceType::Empty{
-                self.base_board[Square(square)] = Piece(PieceType::Queen, Black)
+        if (start_color == White && mv.to.rank() == 0)
+            || (start_color == Black && mv.to.rank() == 7) {
+                debug_assert!(!self.base_board[mv.to].is_empty());
+                if self.base_board[mv.to].piece_type() != PieceType::King {
+                    self.base_board[mv.to] = Piece::new(PieceType::Queen, start_color);
+                }
             }
-        }
-        for square in 0..7 {
-            let Piece(piece, color) = self.base_board[Square(square)];
-            if color == White && piece != PieceType::King && piece != PieceType::Empty {
-                self.base_board[Square(square)] = Piece(PieceType::Queen, White)
-            }
-        }
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.base_board.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         undo_move
@@ -127,8 +121,8 @@ impl EvalBoard for SjadamBoard {
         self.base_board.half_move_clock = mv.old_half_move_clock;
         self.base_board.castling_en_passant = mv.old_castling_en_passant;
 
-        let color = self.base_board[mv.sjadam_square].1;
-        self.base_board[mv.from] = Piece(mv.piece_moved, color); 
+        let color = self.base_board[mv.sjadam_square].color().unwrap();
+        self.base_board[mv.from] = Piece::new(mv.piece_moved, color); 
         // Undo sjadam move
         if mv.from != mv.sjadam_square {
             self.base_board[mv.sjadam_square] = Piece::empty();
@@ -207,10 +201,11 @@ impl SjadamBoard {
         let mut black_king = false;
         let board = &self.base_board;
         for square in std_board::BoardIter::new() {
-            match board[square] {
-                Piece(PieceType::King, White) => white_king = true,
-                Piece(PieceType::King, Black) => black_king = true,
-                _ => (),
+            if board[square].piece_type() == PieceType::King {
+                match board[square].color().unwrap() {
+                    White => white_king = true,
+                    Black => black_king = true,
+                }
             }
         }
         (white_king, black_king)

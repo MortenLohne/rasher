@@ -75,8 +75,8 @@ impl EvalBoard for CrazyhouseBoard {
         // TODO: Make this take into account available pieces
         let score = self.base_board.eval_board();
         0.0 + score -
-            self.black_available_pieces.iter().map(PieceType::value).sum::<f32>() +
-            self.white_available_pieces.iter().map(PieceType::value).sum::<f32>()
+            self.black_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>() +
+            self.white_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>()
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
@@ -95,7 +95,7 @@ impl EvalBoard for CrazyhouseBoard {
             move_gen::is_attacked(&cloned.base_board, king_pos)
         };
         
-        for square in board_iter.filter(|&sq| self.base_board.piece_at(sq).0 == PieceType::Empty) {
+        for square in board_iter.filter(|&sq| self.base_board[sq].is_empty()) {
             let to_move = self.to_move();
             if to_move == White {
                 for piece_type in self.white_available_pieces.iter() {
@@ -130,7 +130,7 @@ impl EvalBoard for CrazyhouseBoard {
     fn do_move(&mut self, mv : Self::Move) -> Self::UndoMove {
         match mv {
             CrazyhouseMove::NormalMove(normal_move) => {
-                let capture = self.base_board[normal_move.to].0;
+                let capture = self.base_board[normal_move.to].piece_type();
                 if capture != PieceType::Empty {
                     if self.to_move() == Black {
                         self.black_available_pieces.push(capture);
@@ -149,7 +149,7 @@ impl EvalBoard for CrazyhouseBoard {
                         .rposition(|&p| p == piecetype) {
                             Some(index) =>
                                 self.base_board.board[rank as usize][file as usize] =
-                                Piece (self.white_available_pieces.remove(index), White),
+                                Piece::new(self.white_available_pieces.remove(index), White),
                             None => panic!("{:?}\nWhite tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.white_available_pieces),
                         }
                 }
@@ -158,7 +158,7 @@ impl EvalBoard for CrazyhouseBoard {
                         .rposition(|&p| p == piecetype) {
                             Some (index) =>
                                 self.base_board.board[rank as usize][file as usize] =
-                                Piece (self.black_available_pieces.remove(index), Black),
+                                Piece::new(self.black_available_pieces.remove(index), Black),
                             None => panic!("{:?}\nBlack tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.black_available_pieces),
                             
                         }
@@ -198,11 +198,11 @@ impl EvalBoard for CrazyhouseBoard {
                 let (file, rank) = square.file_rank();
                 if self.to_move() == Black {
                     self.white_available_pieces.push(piecetype);
-                    self.base_board.board[rank as usize][file as usize] = Piece(PieceType::Empty, White);
+                    self.base_board.board[rank as usize][file as usize] = Piece::empty();
                 }
                 else {
                     self.black_available_pieces.push(piecetype);
-                    self.base_board.board[rank as usize][file as usize] = Piece(PieceType::Empty, White);
+                    self.base_board.board[rank as usize][file as usize] = Piece::empty();
                 }
                 self.base_board.to_move = !self.base_board.to_move;
                 match self.crazyhouse_moves.pop() {
@@ -230,7 +230,7 @@ impl fmt::Debug for CrazyhouseBoard {
 }
 
 impl uci::UciBoard for CrazyhouseBoard {
-    fn from_fen(fen : &str) -> Result<Self,String> {
+    fn from_fen(fen : &str) -> Result<Self, String> {
         
         let fen_split : Vec<&str> = fen.split_whitespace().collect();
         if fen_split.len() < 5 || fen_split.len() > 7 {
@@ -254,15 +254,21 @@ impl uci::UciBoard for CrazyhouseBoard {
         board.base_board = std_board;
         
         for ch in captured_pieces.chars() {
-            match std_board::CHAR_PIECE_MAP.get(&ch) {
-                Some(&Piece(piece, White)) => board.white_available_pieces.push(piece),
-                Some(&Piece(piece, Black)) => board.black_available_pieces.push(piece),
-                None => return Err(format!("Found unknown character {} in available pieces list {} in fen string {}", ch, fen_split[1], fen)),
+            if let Some(piece) = Piece::from_letter(ch) {
+                let piece_type = piece.piece_type();
+                match piece.color() {
+                    Some(White) => board.white_available_pieces.push(piece_type),
+                    Some(Black) => board.black_available_pieces.push(piece_type),
+                    _ => panic!(),
+                }
+            }
+            else {
+                return Err(format!("Found unknown character {} in available pieces list {} in fen string {}", ch, fen_split[1], fen));
             }
         }
         Ok(board)
     }
-    
+        
     fn to_fen(&self) -> String {
         "".to_string() // TODO: write
     }

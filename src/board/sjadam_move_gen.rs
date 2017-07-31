@@ -36,7 +36,7 @@ impl BitBoard {
         bit_board
     }
     fn all_from_board(board: &ChessBoard) -> Self {
-        Self::from_board(board, |Piece(piece, _)| piece != PieceType::Empty)
+        Self::from_board(board, |piece| !piece.is_empty())
     }
     fn get(&self, idx: Square) -> bool {
         let Square(i) = idx;
@@ -70,9 +70,9 @@ impl fmt::Debug for BitBoard {
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = vec![];
     for square in BoardIter::new() {
-        let Piece(piece, color) = board.base_board[square];
-        if piece != PieceType::Empty && color == board.to_move() {
-            moves.append(&mut legal_moves_for_square(board, square));
+        if !board.base_board[square].is_empty()
+            && board.base_board[square].color().unwrap() == board.to_move() {
+                moves.append(&mut legal_moves_for_square(board, square));
         }
     }
     moves
@@ -80,11 +80,11 @@ pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
 
 pub fn any_legal_moves(board: &mut SjadamBoard) -> bool {
     for square in BoardIter::new() {
-        let Piece(piece, color) = board.base_board[square];
-        if piece != PieceType::Empty && color == board.to_move() {
-            if !legal_moves_for_square(board, square).is_empty() {
-                return true;
-            }
+        if !board.base_board[square].is_empty()
+            && board.base_board[square].color().unwrap() == board.to_move() {
+                if !legal_moves_for_square(board, square).is_empty() {
+                    return true;
+                }
         }
     }
     false
@@ -95,12 +95,13 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     sjadam_squares.set(square);
     let friendly_pieces =
         BitBoard::from_board(&board.base_board,
-                             |Piece(piece_type, color)| color == board.to_move()
-                             && piece_type != PieceType::Empty);
+                             |piece| !piece.is_empty() &&
+                             piece.color().unwrap() == board.to_move());
     let opponent_pieces =
         BitBoard::from_board(&board.base_board,
-                             |Piece(piece_type, color)| color != board.to_move()
-                             && piece_type != PieceType::Empty);
+                             |piece| !piece.is_empty() &&
+                             piece.color().unwrap() != board.to_move());
+    
     let all_pieces = BitBoard::all_from_board(&board.base_board);
     
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
@@ -126,7 +127,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
             board.base_board[chess_move_square] = board.base_board[square];
             board.base_board[square] = Piece::empty();
             old_castling = Some(board.base_board.castling_en_passant);
-            if board.base_board[chess_move_square].0 == PieceType::King {
+            if board.base_board[chess_move_square].piece_type() == PieceType::King {
                 let color = board.to_move();
                 board.base_board.disable_castling(color)
             }
@@ -159,12 +160,12 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         let (from1, to1) = mv1.from_to_squares();
         let (from2, to2) = mv2.from_to_squares();
         to1.cmp(&to2)
-            .then((board.base_board[from1].0).cmp(&board.base_board[from2].0))
+            .then((board.base_board[from1].piece_type()).cmp(&board.base_board[from2].piece_type()))
     };
     let move_eq = |mv1: &mut SjadamMove, mv2: &mut SjadamMove| {
         let (from1, to1) = mv1.from_to_squares();
         let (from2, to2) = mv2.from_to_squares();
-        to1 == to2 && board.base_board[from1].0 == board.base_board[from2].0
+        to1 == to2 && board.base_board[from1].piece_type() == board.base_board[from2].piece_type()
     };
     // Two moves are considered equal if they place the same piece on the same square,
     // and do not castle
@@ -226,12 +227,8 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Adds all moves, also those that put the player in check
 #[inline(never)]
-pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) { 
-    let Piece(piece, color) = board.piece_at(square);
-    
-    debug_assert!(color == board.to_move && piece != Empty,
-                  "Tried to find move for {} at {} at:\n{:?}",
-                  board[square], square, board);
+pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
+    let piece = board[square].piece_type();
     
     match piece {
         King => legal_moves_for_king(board, square, moves),
@@ -271,7 +268,7 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             debug_assert_eq!(file, 4, "Error: King tried to castle from {} on:{}.",
                              square, board);
             let square_checked = Square(square.0 + n);
-            if board.piece_at(square_checked) != Piece(Empty, White)
+            if !board[square_checked].is_empty()
                 || is_attacked(board, square_checked) {
                     can_castle_here = false;
                 }
@@ -291,14 +288,14 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
         for n in &[1, 2] {
             debug_assert_eq!(file, 4, "Error: File is {}.", file);
             let square_checked = Square(square.0 - n);
-            if board.piece_at(square_checked) != Piece(Empty, White) ||
+            if !board.piece_at(square_checked).is_empty() ||
                 is_attacked(board, square_checked)
                  {
                     can_castle_here = false;
                 }
         }
         // Check that the knight-square is empty
-        if board.piece_at(Square(square.0 - 3)) != Piece(Empty, White) {
+        if !board.piece_at(Square(square.0 - 3)).is_empty() {
             can_castle_here = false;
         }
         if can_castle_here {
@@ -315,20 +312,18 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
                 (j == 0 && i == 0) {
                     continue;
                 }
-            let new_pos = ((rank + j) * 8 + file + i) as u8;
+            let new_pos = Square(((rank + j) * 8 + file + i) as u8);
 
-            
             // Check that the square is not occupied by a friendly piece
-            let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-            let c_move = ChessMove::new(square, Square(new_pos));
+            let c_move = ChessMove::new(square, new_pos);
 
-            if piece_to == Empty {
+            if board[new_pos].is_empty() {
                 let old_piece = board[square];
                 board[square] = Piece::empty();
                 moves.push(c_move);
                 board[square] = old_piece;
             }
-            else if color_to != board.to_move {
+            else if board[new_pos].color().unwrap() != board.to_move {
                 moves.push(c_move);
             }
         }
@@ -345,12 +340,11 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
-        let new_pos = ((rank + j) * 8 + file + i) as u8;
+        let new_pos = Square(((rank + j) * 8 + file + i) as u8);
         
-        let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-        let c_move = ChessMove::new(square, Square(new_pos));
+        let c_move = ChessMove::new(square, new_pos);
 
-        if piece_to == Empty || color_to != board.to_move {
+        if board[new_pos].is_empty() || board[new_pos].color().unwrap() != board.to_move {
             //println!("Knight can move to {}, onto a {} {}, on: {}",
             //             Square(new_pos), color_to, piece_to, board);
             moves.push(c_move);
@@ -374,8 +368,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     // including en passant capture
     if file > 0 {
         let take_square = Square((pos + direction * 8) as u8 - 1);
-        let Piece(piece, color) = board.piece_at(take_square);
-        if piece != Empty && color != board.to_move {
+        if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
                 for piece_type in &[Queen, Rook, Bishop, Knight] {
                     let c_move = ChessMove::new_prom(square, take_square, *piece_type);
@@ -397,8 +390,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     // Ditto, but to the right
     if file < 7 {
         let take_square = Square((pos + direction * 8) as u8 + 1);
-        let Piece(piece, color) = board.piece_at(take_square);
-        if piece != Empty && color != board.to_move {
+        if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
                 for piece_type in &[Queen, Rook, Bishop, Knight] {
                     let c_move = ChessMove::new_prom(square, take_square, *piece_type);
@@ -442,10 +434,11 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
 
 /// Returns whether a square is under attack by the side not to move
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
-    if board.piece_at(square).0 != Empty {
-        debug_assert_eq!(board.to_move(), board.piece_at(square).1,
+    if !board.piece_at(square).is_empty() {
+        debug_assert_eq!(board.to_move(), board.piece_at(square).color().unwrap(),
                          "{:?}\n Tried to check if {} {} at {} was attacked.",
-                         board,  board.piece_at(square).1, board.piece_at(square).0, square);
+                         board,  board.piece_at(square).color().unwrap(),
+                         board.piece_at(square).piece_type(), square);
     }
     // Direction enemy pawns are coming from
     let pawn_direction = if board.to_move == White { -1 } else { 1 };
@@ -456,16 +449,15 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     if file > 0 {
         if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
             let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
-            let Piece(piece, color) = board.piece_at(pawn_square);
-            if piece == Pawn && color != board.to_move { return true; }
+            
+            if board[pawn_square] == Piece::new(Pawn, !board.to_move) { return true; }
         }
     }
     if file < 7 {
         if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
             let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
             
-            let Piece(piece, color) = board.piece_at(pawn_square);
-            if piece == Pawn && color != board.to_move { return true; }
+            if board[pawn_square] == Piece::new(Pawn, !board.to_move) { return true; }
         }
     }
 
@@ -485,10 +477,9 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
-        let new_pos = ((rank + j) * 8 + file + i) as u8;
+        let new_pos = Square(((rank + j) * 8 + file + i) as u8);
         
-        let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-        if piece_to == Knight && color_to != board.to_move {
+        if board[new_pos] == Piece::new(Knight, !board.to_move) {
             return true;
         }
     }
@@ -498,11 +489,10 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
                 (j == 0 && i == 0) {
                     continue;
                 }
-            let new_pos = ((rank + j) * 8 + file + i) as u8;
+            let new_pos = Square(((rank + j) * 8 + file + i) as u8);
 
             // Check that there is no enemy king around
-            let Piece(piece_to, color_to) = board.piece_at(Square(new_pos));
-            if piece_to == King && color_to != board.to_move {
+            if board[new_pos] == Piece::new(King, !board.to_move) {
                 return true;
             }
         }
@@ -521,18 +511,15 @@ fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Squ
         if file < 0 || rank < 0 || file >= 8 || rank >= 8 {
             return false;
         }
-        match board.piece_at(Square::from_ints(file as u8, rank as u8)) {
-            Piece(Empty, _) => continue,
-            Piece(piece, color) => {
-                if color == board.to_move { return false; }
-                for threat in threats {
-                    if piece == *threat {
-                        return true;
-                    }
-                }
-                return false;
-            },
+        let piece = board[Square::from_ints(file as u8, rank as u8)];
+        if piece.is_empty() { continue }
+        if piece.color().unwrap() == board.to_move { return false; }
+        for threat in threats {
+            if piece.piece_type() == *threat {
+                return true;
+            }
         }
+        return false;
     }
 }
 
@@ -561,19 +548,17 @@ fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
             break;
         }
         let target_square = Square::from_ints(file as u8, rank as u8);
-        let piece_to = board.piece_at(target_square);
+        let piece_to = board[target_square];
 
         let c_move = ChessMove::new(square, target_square);
-        match piece_to {
-            Piece(Empty, _) => {
-                moves.push(c_move);
-                continue; },
-            
-            Piece(_, color) => {
-                if color != board.to_move {
-                    moves.push(c_move);
-                }
-                break; }, // Break after finding a piece, friend or foe
+        if piece_to.is_empty() {
+            moves.push(c_move);
+            continue;
         }
+        if piece_to.color().unwrap() != board.to_move {
+            moves.push(c_move);
+        }
+        break;  // Break after finding a piece, friend or foe
+        
     }
 }

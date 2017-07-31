@@ -31,11 +31,11 @@ fn test_piece_at () {
     
     println!("e1: {}", e1);
 
-    assert_eq!(start_board.piece_at(d1), Piece(Queen, White));
-    assert_eq!(start_board.piece_at(e1), Piece(King, White));
-    assert_eq!(start_board.piece_at(a1), Piece(Rook, White));
-    assert_eq!(start_board.piece_at(h8), Piece(Rook, Black));
-    assert_eq!(start_board.piece_at(e4), Piece(Empty, White));
+    assert_eq!(start_board.piece_at(d1), Piece::new(Queen, White));
+    assert_eq!(start_board.piece_at(e1), Piece::new(King, White));
+    assert_eq!(start_board.piece_at(a1), Piece::new(Rook, White));
+    assert_eq!(start_board.piece_at(h8), Piece::new(Rook, Black));
+    assert_eq!(start_board.piece_at(e4), Piece::new(Empty, White));
 }
 
 #[test]
@@ -155,12 +155,12 @@ fn is_pinned_prop(board : &ChessBoard, pinee_pos : Square, pinner_pos : Square, 
     if is_pinned {
         assert!(move_gen::is_pinned_to_piece(&board, pinee_pos, pinner_pos),
                format!("{} should be pinned to {}, but isn't. Board:\n{}",
-                       board.piece_at(pinee_pos).0, board.piece_at(pinner_pos).0, board));
+                       board[pinee_pos].piece_type(), board[pinner_pos].piece_type(), board));
     }
     else {
         assert!(!move_gen::is_pinned_to_piece(&board, pinee_pos, pinner_pos),
                format!("{} should not be pinned to {}. Board:\n{}",
-                       board.piece_at(pinee_pos).0, board.piece_at(pinner_pos).0, board));
+                       board[pinee_pos].piece_type(), board[pinner_pos].piece_type(), board));
     }
 }
 
@@ -377,6 +377,7 @@ pub fn legal_moves_after_plies<B: EvalBoard>(board : &mut B, n : u8) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 pub fn perf_prop<B: EvalBoard>(board: &mut B, n: u8) -> Vec<(B::Move, u64)> {
     let mut results = vec![];
     for c_move in board.all_legal_moves() {

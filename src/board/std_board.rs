@@ -5,27 +5,28 @@ use search_algorithms::board::EvalBoard;
 use board::std_move_gen::move_gen;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
+use ::uci::UciBoard;
 
 use std::ops;
-use std::hash;
-use std::collections::HashMap;
+use std::ascii::AsciiExt;
 use std::fmt;
+use std::mem;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-    Empty,
+    Empty = 0,
+    Pawn = 1,
+    Knight = 2,
+    Bishop = 3,
+    Rook = 4,
+    Queen = 5,
+    King = 6,
 }
 
 impl PieceType {
-    pub fn value(&self) -> f32 {
-        match *self {
+    pub fn value(self) -> f32 {
+        match self {
             Pawn => 1.0,
             Knight => 3.0,
             Bishop => 3.0,
@@ -33,6 +34,29 @@ impl PieceType {
             Queen => 9.0,
             King => 0.0,
             Empty => 0.0,
+        }
+    }
+    pub fn letter(self) -> char {
+        match self {
+            Empty => ' ',
+            Pawn => 'P',
+            Knight => 'N',
+            Bishop => 'B',
+            Rook => 'R',
+            Queen => 'Q',
+            King => 'K',
+        }
+    }
+    pub fn from_letter(ch: char) -> Option<Self> {
+        match ch.to_ascii_uppercase() {
+            ' ' => Some(Empty),
+            'P' => Some(Pawn),
+            'N' => Some(Knight),
+            'B' => Some(Bishop),
+            'R' => Some(Rook),
+            'Q' => Some(Queen),
+            'K' => Some(King),
+            _ => None,
         }
     }
 }
@@ -54,29 +78,86 @@ impl fmt::Display for PieceType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Piece (pub PieceType, pub Color);
+//pub struct Piece (pub PieceType, pub Color);
+#[allow(dead_code)]
+pub enum Piece {
+    Empty = 0,
+    WhitePawn = 2,
+    BlackPawn = 3,
+    WhiteKnight = 4,
+    BlackKnight = 5,
+    WhiteBishop = 6,
+    BlackBishop = 7,
+    WhiteRook = 8,
+    BlackRook = 9,
+    WhiteQueen = 10,
+    BlackQueen = 11,
+    WhiteKing = 12,
+    BlackKing = 13,
+    
+}
 
 impl fmt::Display for Piece {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let _ = fmt.write_str(&format!("{}", PIECE_CHAR_MAP.get(self).unwrap()));
-        Ok(())
+        write!(fmt, "{}", match self.color().unwrap_or(White) {
+            White => self.piece_type().letter(),
+            Black => self.piece_type().letter().to_ascii_lowercase(),
+        })
     }
 }
 
 impl Piece {
-    #[inline]
-    pub fn value(&self) -> f32 {
-        let &Piece(piece_type, piece_color) = self;
-        if piece_color == White {
-            piece_type.value()
+    pub fn from_letter(ch: char) -> Option<Self> {
+        match (PieceType::from_letter(ch), ch.is_lowercase()) {
+            (Some(Empty), _) => Some(Piece::Empty),
+            (Some(piece_type), true) => Some(Self::new(piece_type, Black)),
+            (Some(piece_type), false) => Some(Self::new(piece_type, White)),
+            (None, _) => None,
         }
-        else { piece_type.value() * -1.0 }
     }
-    pub fn is_empty(&self) -> bool {
-        self.0 == Empty
+    
+    pub fn new(piece_type: PieceType, color: Color) -> Self {
+        if piece_type == Empty {
+            Piece::Empty
+        }
+        else {
+            unsafe {
+                match color {
+                    White => mem::transmute::<u8, Piece>((piece_type as u32 as u8) << 1),
+                    Black => mem::transmute::<u8, Piece>(((piece_type as u32 as u8) << 1) + 1),
+                }
+            }
+        }
+    }
+    pub fn value(self) -> f32 {
+        if self.is_empty() { 0.0 }
+        else {
+            let abs_value = self.piece_type().value();
+            match self.color().unwrap() {
+                White => abs_value,
+                Black => -1.0 * abs_value,
+            }
+        }
+    }
+    pub fn piece_type(self) -> PieceType {
+        unsafe {
+            mem::transmute::<u8, PieceType>((self as u32 >> 1) as u8)
+        }
+    }
+    pub fn color(self) -> Option<Color> {
+        match self {
+            Piece::Empty => None,
+            _ => match self as u32 % 2 == 0 {
+                true => Some(White),
+                false => Some(Black),
+            },
+        }
+    }
+    pub fn is_empty(self) -> bool {
+        self == Piece::Empty
     }
     pub fn empty() -> Self {
-        Piece(Empty, White)
+        Piece::Empty
     }
 }
 
@@ -111,8 +192,14 @@ impl Square {
         debug_assert!(file < 8 && rank < 8);
         Square((rank << 3) | file)
     }
-    pub fn file_rank (&self) -> (u8, u8) {
-        (self.0 & 0b0000_0111, self.0 >> 3)
+    pub fn file_rank (self) -> (u8, u8) {
+        (self.file(), self.rank())
+    }
+    pub fn file(self) -> u8 {
+        self.0 & 0b0000_0111
+    }
+    pub fn rank(self) -> u8 {
+        self.0 >> 3
     }
 }
 
@@ -186,7 +273,7 @@ impl IntoIterator for ChessBoard {
 // Parses the first token in a FEN string, which describes the positions
 /// of the pieces
 fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
-    let mut board = [[Piece(Empty, White); 8]; 8];
+    let mut board = [[Piece::empty(); 8]; 8];
     let ranks : Vec<&str> = fen_board.split("/").collect();
     if ranks.len() != 8 {
         return Err(format!("Invalid FEN board string \"{}\": Had {} ranks instead of 8",
@@ -195,22 +282,22 @@ fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
     for i in 0..8 {
         let mut cur_rank : Vec<Piece> = Vec::new();
         for c in ranks[i].chars() {
-            match CHAR_PIECE_MAP.get(&c) {
-                Some(piece) => cur_rank.push(*piece),
+            match Piece::from_letter(c) {
+                Some(piece) => cur_rank.push(piece),
                 None => match c.to_digit(10) {
                     Some(mut i) => {
                         while i > 0 {
-                            cur_rank.push(Piece(Empty, White));
+                            cur_rank.push(Piece::empty());
                             i -= 1;
                         }
                     },
                     None => return Err(format!("Invalid FEN string: Illegal character {}", c)),
                 },
-            }   
+            }
         }
         if cur_rank.len() != 8 {
-            return Err(format!("Invalid FEN string: Specified {} pieces on rank {}.",
-                               cur_rank.len(), i))
+            return Err(format!("Invalid FEN string \"{}\": Specified {} pieces on rank {}.",
+                               fen_board, cur_rank.len(), i))
         }
         else {
             for j in 0..8 {
@@ -248,7 +335,7 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
     Ok(())
 }
 
-impl ::uci::UciBoard for ChessBoard {    
+impl UciBoard for ChessBoard {    
     fn from_fen(fen : &str) -> Result<Self, String> {
         let fen_split : Vec<&str> = fen.split(" ").collect();
         if fen_split.len() < 4 || fen_split.len() > 6 {
@@ -256,7 +343,8 @@ impl ::uci::UciBoard for ChessBoard {
                                fen, fen_split.len()));
         }
 
-        let mut board = Self::start_board();
+        let mut board = ChessBoard { board: [[Piece::empty(); 8]; 8], to_move: White,
+                                     castling_en_passant: 15, half_move_clock: 0, move_num: 0 };
         board.board = try!(parse_fen_board(fen_split[0]));
         
         if fen_split[1].len() != 1 {
@@ -334,13 +422,15 @@ impl EvalBoard for ChessBoard {
             let mut white_material = 0.0;
             for square in BoardIter::new() {
                 // Games with queens, rooks or pawns are always undecided
-                match self[square].0 {
+                match self[square].piece_type() {
                     Queen | Rook | Pawn => return None,
                     Knight | Bishop | King | Empty => (),
                 };
-                match self[square] {
-                    Piece(piece_type, Black) => black_material += piece_type.value(),
-                    Piece(piece_type, White) => white_material += piece_type.value(),
+                match (self[square].piece_type(), self[square].color()) {
+                    (piece_type, Some(Black)) => black_material += piece_type.value(),
+                    (piece_type, Some(White)) => white_material += piece_type.value(),
+                    (Empty, None) => (),
+                    (_, _) => unreachable!(),
                 };
             }
             if black_material <= 3.5 && white_material <= 3.5 {
@@ -366,28 +456,30 @@ impl EvalBoard for ChessBoard {
         let mut value = 0.0;
         for rank in 0..8 {
             for file in 0..8 {
-                let piece_val = self.board[rank][file].value();
+                let piece = self.board[rank][file];
+                let piece_val = piece.value();
                 let pos_val = POS_VALS[rank][file] as f32 *
-                    match self.board[rank][file] {
-                        Piece(Bishop, White) => 0.15,
-                        Piece(Bishop, Black) => -0.15,
-                        Piece(Knight, White) => 0.3,
-                        Piece(Knight, Black) => -0.3,
-                        Piece(Queen, White) => 0.3,
-                        Piece(Queen, Black) => -0.3,
-                        Piece(Pawn, White) => 0.00,
-                        Piece(Pawn, Black) => -0.00,
-                        Piece(Rook, Black) => -0.1,
-                        Piece(Rook, White) => 0.1,
+                    if piece.color() == None { 0.0 }
+                else {
+                    match (piece.piece_type(), piece.color().unwrap()) {
+                        (Bishop, White) => 0.15,
+                        (Bishop, Black) => -0.15,
+                        (Knight, White) => 0.3,
+                        (Knight, Black) => -0.3,
+                        (Queen, White) => 0.3,
+                        (Queen, Black) => -0.3,
+                        (Pawn, White) => 0.00,
+                        (Pawn, Black) => -0.00,
+                        (Rook, Black) => -0.1,
+                        (Rook, White) => 0.1,
                         _ => 0.0,
-                    };
-                let pawn_val = match self.board[rank][file] {
-                    Piece(Pawn, _) => (rank as f32 - 3.5) * -0.1,
+                    }
+                };
+                let pawn_val = match self.board[rank][file].piece_type() {
+                    Pawn => (rank as f32 - 3.5) * -0.1,
                     _ => 0.0,
                 };
                 value += piece_val + pos_val + pawn_val;
-                //println!("Value at {} is {}, {}, total: {}",
-                //         Square::from_ints(file as u8, rank as u8), piece_val, pos_val, value);
             }
         }
         value
@@ -398,12 +490,12 @@ impl EvalBoard for ChessBoard {
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
         let color = self.to_move;
-        let piece_moved = self.piece_at(c_move.from).0;
-        let captured_piece : PieceType = self[c_move.to].0;
+        let piece_moved = self.piece_at(c_move.from).piece_type();
+        let captured_piece : PieceType = self[c_move.to].piece_type();
         let undo_move = std_move::ChessUndoMove::from_move(c_move, self);
         
         // Increment or reset the half-move clock
-        match (piece_moved, self.piece_at(c_move.to).0) {
+        match (piece_moved, self.piece_at(c_move.to).piece_type()) {
             (Pawn, _) => self.half_move_clock = 0,
             (_, Empty) => self.half_move_clock += 1,
             (_, _) => self.half_move_clock = 0,
@@ -422,31 +514,23 @@ impl EvalBoard for ChessBoard {
                 let do_simple_move = |board : &mut Self, f_from, r_from, f_to, r_to| {
                     board.board[r_to as usize][f_to as usize]
                         = board.board[r_from as usize][f_from as usize];
-                    board.board[r_from as usize][f_from as usize] = Piece(Empty, White);
+                    board.board[r_from as usize][f_from as usize] = Piece::empty();
                 };
                 // Assume castling is legal, and move the king and rook to where they should go
                 match (color, file_to) {
                     (White, 2) => {
-                        debug_assert_eq!(self[Square::from_alg("a1").unwrap()], Piece(Rook, White),
-                                         "Tried to do {} on \n{:?}", c_move, self);
                         do_simple_move(self, 4, 7, 2, 7);
                         do_simple_move(self, 0, 7, 3, 7);
                     },
                     (White, 6) => {
-                        debug_assert_eq!(self[Square::from_alg("h1").unwrap()], Piece(Rook, White),
-                                         "Tried to do {} on \n{:?}", c_move, self);
                         do_simple_move(self, 4, 7, 6, 7);
                         do_simple_move(self, 7, 7, 5, 7);
                     },
                     (Black, 2) => {
-                        debug_assert_eq!(self[Square::from_alg("a8").unwrap()], Piece(Rook, Black),
-                                         "Tried to do {} on \n{:?}", c_move, self);
                         do_simple_move(self, 4, 0, 2, 0);
                         do_simple_move(self, 0, 0, 3, 0);
                     },
                     (Black, 6) => {
-                        debug_assert_eq!(self[Square::from_alg("h8").unwrap()], Piece(Rook, Black),
-                                         "Tried to do {} on \n{:?}", c_move, self);
                         do_simple_move(self, 4, 0, 6, 0);
                         do_simple_move(self, 7, 0, 5, 0);
                     },
@@ -460,8 +544,8 @@ impl EvalBoard for ChessBoard {
                 self.board[rank_to as usize][file_to as usize]
                     = self.board[rank_from as usize][file_from as usize];
 
-                self.board[rank_from as usize][file_to as usize] = Piece(Empty, White);
-                self.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
+                self.board[rank_from as usize][file_to as usize] = Piece::empty();
+                self.board[rank_from as usize][file_from as usize] = Piece::empty();
                 
                 
             }
@@ -470,12 +554,12 @@ impl EvalBoard for ChessBoard {
             // Does the move, depending on whether the move promotes or not
             match c_move.prom {
                 Some(piece_type) => self.board[rank_to as usize][file_to as usize]
-                    = Piece(piece_type, self.to_move()),
+                    = Piece::new(piece_type, self.to_move()),
                 None => self.board[rank_to as usize][file_to as usize]
                     = self.board[rank_from as usize][file_from as usize],
                 
             }
-            self.board[rank_from as usize][file_from as usize] = Piece(Empty, White);
+            self.board[rank_from as usize][file_from as usize] = Piece::empty();
         }
             
         // Remove any en passant square. If it was available to this player,
@@ -527,7 +611,7 @@ impl EvalBoard for ChessBoard {
         
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
-        let piece_moved = self.piece_at(c_move.to).0;
+        let piece_moved = self.piece_at(c_move.to).piece_type();
         let color = !self.to_move;
 
         if piece_moved == King &&
@@ -538,7 +622,7 @@ impl EvalBoard for ChessBoard {
             let mut do_simple_move = |f_from, r_from, f_to, r_to| {
                 self.board[r_to as usize][f_to as usize]
                     = self.board[r_from as usize][f_from as usize];
-                self.board[r_from as usize][f_from as usize] = Piece(Empty, White);
+                self.board[r_from as usize][f_from as usize] = Piece::empty();
             };
             // Assume castling is legal, and move the king and rook to where they should go
             match (color, file_to) {
@@ -563,17 +647,17 @@ impl EvalBoard for ChessBoard {
         else if piece_moved == Pawn && file_from != file_to && c_move.capture == Empty {
             self.board[rank_from as usize][file_from as usize] =
                 self.board[rank_to as usize][file_to as usize];
-            self.board[rank_to as usize][file_to as usize] =Piece(Empty, White);
+            self.board[rank_to as usize][file_to as usize] = Piece::empty();
             
             match color {
-                Black => self.board[rank_to as usize - 1][file_to as usize] = Piece(Pawn, White),
-                White => self.board[rank_to as usize + 1][file_to as usize] = Piece(Pawn, Black),
+                Black => self.board[rank_to as usize - 1][file_to as usize] = Piece::new(Pawn, White),
+                White => self.board[rank_to as usize + 1][file_to as usize] = Piece::new(Pawn, Black),
             }
         }
         else {
             if c_move.prom {
                 self.board[rank_from as usize][file_from as usize] = 
-                    Piece(Pawn, color);
+                    Piece::new(Pawn, color);
             }
             else {
                 self.board[rank_from as usize][file_from as usize] =
@@ -583,10 +667,10 @@ impl EvalBoard for ChessBoard {
             if c_move.capture != Empty
             {
                 self.board[rank_to as usize][file_to as usize] =
-                    Piece(c_move.capture, self.to_move);
+                    Piece::new(c_move.capture, self.to_move);
             }
             else {
-                self.board[rank_to as usize][file_to as usize] = Piece(Empty, White);
+                self.board[rank_to as usize][file_to as usize] = Piece::empty();
             }
         }
         self.castling_en_passant = c_move.old_castling_en_passant;
@@ -597,19 +681,7 @@ impl EvalBoard for ChessBoard {
     }
     
     fn start_board() -> Self {
-        let mut board = [[Piece(Empty, White); 8]; 8];
-        board[0] = [Piece(Rook, Black), Piece(Knight, Black), Piece(Bishop, Black),
-                    Piece(Queen, Black), Piece(King, Black), Piece(Bishop, Black),
-                    Piece(Knight, Black), Piece(Rook, Black)];
-        board[1] = [Piece(Pawn, Black); 8];
-        board[6] = [Piece(Pawn, White); 8];
-        for i in 0..board[0].len() {
-            let Piece(p_type, _) = board[0][i];
-            board[7][i] = Piece(p_type, White);
-        }
-        ChessBoard {board : board, to_move : White, castling_en_passant : 0b0000_1111,
-                    half_move_clock : 0, move_num : 0}
-        
+        Self::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 }
 
@@ -659,7 +731,7 @@ impl ChessBoard {
     }
 
     pub fn king_pos(&self, color: Color) -> Square {
-        match self.pos_of(Piece(King, color)) {
+        match self.pos_of(Piece::new(King, color)) {
             Some(square) => square,
             None => panic!("Error: There is no king on the board:\n{}", self),
         }
@@ -744,7 +816,7 @@ pub struct TimeInfo {
     pub moves_to_go : Option<u16>, // Number of moves to the next time control
 }
 
-lazy_static! {
+/*lazy_static! {
     
     pub static ref PIECE_CHAR_MAP : HashMap<Piece, char> = {
         let mut map = HashMap::new();
@@ -777,3 +849,4 @@ fn rev_map<K, V> (in_map : HashMap<V, K>) -> HashMap<K, V>
     }
     new_map
 }
+*/
