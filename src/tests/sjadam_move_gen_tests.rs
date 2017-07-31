@@ -80,6 +80,7 @@ fn startpos_perf_test() {
 #[ignore]
 fn startpos_perf_test_long() {
     let mut board = SjadamBoard::start_board();
+    println!("{:?}", move_gen_tests::perf_prop(&mut board, 4));
     assert_eq!(move_gen_tests::legal_moves_after_plies(&mut board, 4), 500_951_687);
 }
 
@@ -135,6 +136,16 @@ fn perf_test_5() {
 fn perf_test_6() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/2K5/8/PPPPPPPP/RNBQ1BNR b kq - 0 1").unwrap();
     for (n, &moves) in (1..4).zip([140, 24_826, 3_714_605].iter()) {
+        let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
+        assert_eq!(result, moves,
+                   "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
+    }
+}
+
+#[test]
+fn perf_test_7() {
+    let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/1N6/8/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1").unwrap();
+    for (n, &moves) in (1..4).zip([145, 21_335, 3_193_604].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
