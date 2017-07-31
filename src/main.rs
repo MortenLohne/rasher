@@ -5,7 +5,7 @@ mod search_algorithms;
 
 #[macro_use]
 extern crate log;
-
+extern crate itertools;
 extern crate time;
 extern crate rand;
 extern crate ordered_float;
@@ -41,9 +41,6 @@ fn init_log() -> Result<(), Box<std::error::Error>> {
     Ok(())
 }
 
-#[macro_use]
-extern crate lazy_static;
-extern crate itertools;
 fn main() {
     init_log().unwrap_or_else(|err| {
         let _ = writeln!(&mut io::stderr(), "Failed to open log file: {}", err);
