@@ -183,6 +183,10 @@ impl EvalBoard for SjadamBoard {
     fn eval_board(&self) -> f32 {
         self.base_board.eval_board()
     }
+
+    fn branch_factor() -> u64 {
+        80
+    }
 }
 
 impl UciBoard for SjadamBoard {
