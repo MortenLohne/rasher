@@ -129,19 +129,20 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
             pvs: pvs };
         channel.send(uci_info).unwrap();
-
         match time_restriction {
-            uci::TimeRestriction::GameTime(info) => { 
-                if (board.to_move() == Black && 
-                    ms_taken as u32 > info.black_inc / 5 + info.black_time / 100) ||
-                    (board.to_move() == White && 
-                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 100)
-                {
-                    break;
-                }
+            uci::TimeRestriction::GameTime(info) => {
+                let (time, inc) = match board.to_move() {
+                    White => (info.white_time, info.white_inc),
+                    Black => (info.black_time, info.black_inc),
+                };
                 
-            },
-            uci::TimeRestriction::MoveTime(time) => if ms_taken > time / 4 { break },
+                if ms_taken as u32 > inc / (B::branch_factor() as u32 / 5)
+                    + time / (B::branch_factor() as u32 * 5) {
+                        break;
+                    }
+            }
+            
+            uci::TimeRestriction::MoveTime(time) => if ms_taken > time / (B::branch_factor() as i64 / 5) { break },
             
             _ => (),
             
