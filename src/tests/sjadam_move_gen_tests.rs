@@ -71,7 +71,7 @@ fn no_moves_on_back_rank() {
 #[test]
 fn startpos_perf_test() {
     let mut board = SjadamBoard::start_board();
-    for (n, &moves) in (1..4).zip([146, 21_469, 3_268_163].iter()) {
+    for (n, &moves) in (1..4).zip([146, 21_469, 3_266_294].iter()) {
         assert_eq!(move_gen_tests::legal_moves_after_plies(&mut board, n), moves);
     }
 }
@@ -94,7 +94,7 @@ fn castling_en_passant_perf_test() {
     board.do_move(SjadamMove::from_alg("-d7d5").unwrap());
     board.do_move(SjadamMove::from_alg("c1a3-").unwrap());
     board.do_move(SjadamMove::from_alg("-b7b5").unwrap());
-    for (n, &moves) in (1..4).zip([160, 26_959, 4_259_773].iter()) {
+    for (n, &moves) in (1..4).zip([158, 26_471, 4_139_102].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -104,7 +104,7 @@ fn castling_en_passant_perf_test() {
 #[test]
 fn perf_test_3() {
     let mut board = SjadamBoard::from_fen("1nbqkb1r/pppppppp/4r3/8/8/4N3/PPPPPPPP/RNBQ1RK1 b k - 0 1").unwrap();
-    for (n, &moves) in (1..4).zip([144, 22_645, 3_368_765].iter()) {
+    for (n, &moves) in (1..4).zip([143, 22_490, 3_323_085].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -114,7 +114,7 @@ fn perf_test_3() {
 #[test]
 fn perf_test_4() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1").unwrap();
-    for (n, &moves) in (1..4).zip([144, 18_152, 2_750_259].iter()) {
+    for (n, &moves) in (1..4).zip([144, 18_152, 2_748_664].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -124,7 +124,7 @@ fn perf_test_4() {
 #[test]
 fn perf_test_5() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 1 1").unwrap();
-    for (n, &moves) in (1..4).zip([145, 25_359, 3_865_242].iter()) {
+    for (n, &moves) in (1..4).zip([145, 25_337, 3_859_438].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -134,7 +134,7 @@ fn perf_test_5() {
 #[test]
 fn perf_test_6() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/2K5/8/PPPPPPPP/RNBQ1BNR b kq - 0 1").unwrap();
-    for (n, &moves) in (1..4).zip([140, 24_826, 3_714_605].iter()) {
+    for (n, &moves) in (1..4).zip([140, 24_826, 3_712_181].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -144,7 +144,7 @@ fn perf_test_6() {
 #[test]
 fn perf_test_7() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/1N6/8/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1").unwrap();
-    for (n, &moves) in (1..4).zip([145, 21_335, 3_193_604].iter()) {
+    for (n, &moves) in (1..4).zip([145, 21_335, 3_191_471].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
@@ -154,7 +154,7 @@ fn perf_test_7() {
 #[test]
 fn perf_test_8() {
     let mut board = SjadamBoard::from_fen("rnbqkbnr/pppppppp/8/8/6P1/8/PPPPPP1P/RNBQKBNR b KQkq - 0 1").unwrap();
-    for (n, &moves) in (1..4).zip([146, 23_337, 3_588_947].iter()) {
+    for (n, &moves) in (1..4).zip([146, 23_331, 3_585_837].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);

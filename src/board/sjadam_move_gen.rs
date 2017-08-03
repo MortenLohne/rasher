@@ -129,11 +129,11 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
                 board.base_board.disable_castling(color)
             }
         }
-
+        
         debug_assert!(!board.base_board[chess_move_square].is_empty(),
                       "Square {} is empty on \n{:?}, but is marked in {:?}",
                       chess_move_square, board.base_board, sjadam_squares);
-
+        // Generate the chess part of the move
         legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
         if chess_move_square != square {
             pure_sjadam_moves.push(sjadam_move.clone());
@@ -149,6 +149,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     let mut combined_moves = chess_moves.iter()
         .map(|mv| SjadamMove
              { from: square, sjadam_square: mv.from, to: mv.to })
+        .filter(|mv| mv.from != mv.to)
         .collect::<Vec<_>>();
     combined_moves.append(&mut pure_sjadam_moves);
     let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
