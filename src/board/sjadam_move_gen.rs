@@ -113,11 +113,8 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
     
     for chess_move_square in BoardIter::new()
-        .filter(|&i| sjadam_squares.get(i))
-        
+        .filter(|&i| sjadam_squares.get(i))   
     {
-        // TODO: Currently only checks if player is in regular check, not in sjadam.
-
         let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
         let old_board = board.clone();
         let mut old_castling = None;
@@ -146,8 +143,6 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
             board.base_board[square] = board.base_board[chess_move_square];
             board.base_board[chess_move_square] = Piece::empty();
             board.base_board.castling_en_passant = old_castling.unwrap();
-            //board.undo_move(undo_move.unwrap());
-            //board.base_board.to_move = !board.base_board.to_move;
             debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
         }
     }
