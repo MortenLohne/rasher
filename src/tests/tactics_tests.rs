@@ -80,7 +80,7 @@ fn multipv_mates_test() {
     let mut options = uci::EngineOptions::new();
     options.multipv = 4;
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(5),
+        board.clone(), uci::TimeRestriction::Mate(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let results = uci::get_uci_multipv(handle, channel, 4).unwrap();
@@ -97,7 +97,7 @@ fn multipv_mates_test_long() {
     let mut options = uci::EngineOptions::new();
     options.multipv = 6;
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(7),
+        board.clone(), uci::TimeRestriction::Mate(7),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let results = uci::get_uci_multipv(handle, channel, 6).unwrap();
@@ -114,7 +114,7 @@ fn multipv_mates_test2() {
     let mut options = uci::EngineOptions::new();
     options.multipv = 4;
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(5),
+        board.clone(), uci::TimeRestriction::Mate(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let results = uci::get_uci_multipv(handle, channel, 4).unwrap();

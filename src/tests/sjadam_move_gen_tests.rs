@@ -80,7 +80,7 @@ fn startpos_perf_test() {
 #[ignore]
 fn startpos_perf_test_long() {
     let mut board = SjadamBoard::start_board();
-    assert_eq!(move_gen_tests::legal_moves_after_plies(&mut board, 4), 500_953_935);
+    assert_eq!(move_gen_tests::legal_moves_after_plies(&mut board, 4), 500_381_489);
 }
 
 #[test]

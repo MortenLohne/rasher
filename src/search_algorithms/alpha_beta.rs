@@ -55,7 +55,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
     let max_depth : u16 = match time_restriction {
         uci::TimeRestriction::Depth(d) => d,
-        uci::TimeRestriction::Mate(d) => d as u16,
+        uci::TimeRestriction::Mate(d) => d,
         _ => 128,
     };
     debug_assert!(max_depth > 1);
@@ -309,7 +309,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
             table.insert(board.clone(), HashEntry {
             best_line: best_line.clone(), score: (ordering, score), depth: depth
-        });
+            });
         }
         (score, best_line)
             

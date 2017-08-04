@@ -147,7 +147,7 @@ fn sjadammate18() {
 
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
     let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(3),
+        board.clone(), uci::TimeRestriction::Mate(3),
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
