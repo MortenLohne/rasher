@@ -59,6 +59,10 @@ pub trait EvalBoard : PartialEq + Clone {
 
     fn all_legal_moves(&self) -> Vec<Self::Move>;
 
+    fn active_moves(&self) -> Vec<Self::Move> {
+        vec![]
+    }
+
     /// Returns the result if the game is decided, otherwise returns None.
     /// This function should return quickly if the game is not decided yet.
     /// If the game is over, it must be the losing player's turn,
@@ -71,7 +75,7 @@ pub trait EvalBoard : PartialEq + Clone {
         let moves = self.all_legal_moves();
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
     }
-
+    
     fn branch_factor() -> u64 {
         20
     }

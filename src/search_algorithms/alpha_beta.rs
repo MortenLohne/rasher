@@ -8,6 +8,7 @@ use std::cmp::PartialOrd;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::cmp::Ordering;
+use std::f32;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::EvalBoard;
@@ -221,8 +222,24 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         if depth == 0 {
             node_counter.leaf += 1;
             node_counter.total += 1;
-            let eval = board.eval_board();
-            return (Val(eval), vec![]);
+            if let (Val(alpha_val), Val(beta_val)) = (alpha, beta) {
+                if let Mate(_) = time_restriction {
+                    return (Val(board.eval_board()), vec![]);
+                }
+                let score = quiescence_search(board, alpha_val, beta_val);
+                let ordering = match board.to_move() {
+                    White => Ordering::Greater,
+                    Black => Ordering::Less,
+                };
+                
+                table.insert(board.clone(), HashEntry {
+                    best_reply: None, score: (ordering, Val(score)), depth: depth
+                });
+                return (Val(score), vec![]);
+            }
+            else {
+                return (Val(board.eval_board()), vec![]);
+            }
         }
         else {
             node_counter.intern += 1;
@@ -327,6 +344,32 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                               time_restriction, &mut node_counter, move_list, table);
     moves.reverse();
     (score, moves, node_counter)
+}
+
+fn quiescence_search<B: EvalBoard + fmt::Debug>(board: &mut B, mut alpha: f32, beta: f32) -> f32 {
+    //println!("Evaling board {:?}", board);
+    let stand_pat = match board.game_result() {
+        Some(GameResult::WhiteWin) => return f32::INFINITY,
+        Some(GameResult::BlackWin) => return f32::NEG_INFINITY,
+        Some(GameResult::Draw) => 0.0,
+        None => board.eval_board(),
+    };
+    if stand_pat >= beta {
+        return stand_pat;
+    }
+    if alpha < stand_pat {
+        alpha = stand_pat;
+    }
+    let captures = board.active_moves();
+    for mv in captures {
+        //println!("Doing quiescent move {:?} on {:?}", mv, board);
+        let undo_move = board.do_move(mv);
+        let score = quiescence_search(board, -beta, -alpha);
+        board.undo_move(undo_move);
+        if score >= beta { return beta; }
+        if score > alpha { alpha = score }
+    }
+    alpha
 }
 
 fn increment_score<B: EvalBoard>(score: Score, board: &B) -> Score {

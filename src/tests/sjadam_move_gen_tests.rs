@@ -1,4 +1,5 @@
 use board::sjadam_board::SjadamBoard;
+use board::sjadam_move::SjadamMove;
 use uci::UciBoard;
 use search_algorithms::board::{GameResult, EvalBoard};
 use tests::move_gen_tests;
@@ -125,26 +126,6 @@ fn castling_en_passant_perf_test_2() {
     board.do_move(board2.from_alg("b7b5").unwrap());
     board.do_move(board2.from_alg("c3b6").unwrap());
     for (n, &moves) in (1..4).zip([176, 30_653, 5_116_707].iter()) {
-        let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
-        assert_eq!(result, moves,
-                   "Expected {} moves, found {} on board:\n{:?}\n{:?}.",
-                   moves, result, board, board.all_legal_moves());
-    }
-}
-
-#[test]
-fn castling_en_passant_perf_test_2() {
-    let mut board = SjadamBoard::start_board();
-    board.do_move(SjadamMove::from_alg("g1e3-").unwrap());
-    board.do_move(SjadamMove::from_alg("g8e6-").unwrap());
-    board.do_move(SjadamMove::from_alg("f1d3c4").unwrap());
-    board.do_move(SjadamMove::from_alg("e8g8-").unwrap());
-    board.do_move(SjadamMove::from_alg("-c2c3").unwrap());
-    board.do_move(SjadamMove::from_alg("-d7d5").unwrap());
-    board.do_move(SjadamMove::from_alg("c1a3-").unwrap());
-    board.do_move(SjadamMove::from_alg("-b7b5").unwrap());
-    board.do_move(SjadamMove::from_alg("c3c5b6").unwrap());
-    for (n, &moves) in (1..4).zip([176, 30_479, 5_090_324].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}\n{:?}.",
