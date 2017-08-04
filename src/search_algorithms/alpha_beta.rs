@@ -93,7 +93,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 }
             else {
                 // TODO: Clearing the hash table loses a ton of performance in multipv mode
-                table.hash_table.clear();
+                table.clear();
                 //table.remove(&board);
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                   Some(moves_to_search.clone()), &mut table)
@@ -179,15 +179,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                       alpha, beta, depth, board); 
         use uci::TimeRestriction::*;
         let first_candidate =
-            if let Some(&HashEntry{ref best_line, score: (ordering, score), depth: entry_depth })
+            if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
             = table.get(board) {
                 if entry_depth >= depth && (
                     ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
                 {
-                    return (score, best_line.clone())
+                    return (score, match best_reply.clone() { Some(v) => vec![v], None => vec![], })
                 }
                 else {
-                    if best_line.is_empty() { None } else { Some(best_line[0].clone()) }
+                    best_reply.clone()
                 }
             }
         else {
@@ -308,7 +308,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             };
 
             table.insert(board.clone(), HashEntry {
-            best_line: best_line.clone(), score: (ordering, score), depth: depth
+                best_reply: best_line.get(0).map(Clone::clone), score: (ordering, score), depth: depth
             });
         }
         (score, best_line)
@@ -348,7 +348,7 @@ fn decrement_score<B: EvalBoard>(score: Score, board: &B) -> Score {
 }
 
 struct HashEntry<M> {
-    best_line: Vec<M>, // The best reply. May be none if the position is game over, or if if child positions have not been evaluated yet
+    best_reply: Option<M>,
     score: (Ordering, Score),
     depth: u16,
 }
@@ -366,7 +366,8 @@ struct Table<B, M> {
 
 impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
     pub fn new(max_memory: usize) -> Table<B, M> {
-        Table { hash_table: HashMap::new(), hits: 0, lookups: 0,
+        Table { hash_table: HashMap::with_capacity(6 * max_memory / (10 * Self::value_mem_usage())),
+                hits: 0, lookups: 0,
                 mem_usage: 0, max_memory: max_memory }
     }
         
@@ -375,16 +376,13 @@ impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
         let result = self.hash_table.get(key);
         if result.is_some() {
             self.hits += 1;
-            //println!("Hit cache after {} lookups, {}% hit rate", self.lookups,
-            //         100.0 * self.hits as f64 / self.lookups as f64);
         }
         result
     }
 
-    pub fn insert(&mut self, key: B, mut value: HashEntry<M>) {
-        value.best_line.shrink_to_fit();
-        let extra_mem = Self::value_mem_usage(&value);
-        if self.mem_usage + extra_mem <= (self.max_memory / 10) * 6 {
+    pub fn insert(&mut self, key: B, value: HashEntry<M>) {
+        let extra_mem = Self::value_mem_usage();
+        if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
             self.mem_usage += extra_mem;
             self.hash_table.insert(key, value);
         }
@@ -393,14 +391,18 @@ impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
     #[allow(dead_code)]
     pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>> {
         self.hash_table.remove(key).map(|value| {
-            self.mem_usage -= Self::value_mem_usage(&value);
+            self.mem_usage -= Self::value_mem_usage();
             value
         })
     }
 
-    fn value_mem_usage(value: &HashEntry<M>) -> usize {
-        mem::size_of::<HashEntry<M>>() + mem::size_of::<B>()
-            + value.best_line.len() * mem::size_of::<M>()
+    pub fn clear(&mut self) {
+        self.hash_table.clear();
+        self.mem_usage = 0;
+    }
+
+    fn value_mem_usage() -> usize {
+        mem::size_of::<HashEntry<M>>() + mem::size_of::<B>() + mem::size_of::<u64>()
     }
 }
 
