@@ -36,10 +36,10 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
     uci_send("id name rasher");
 
     //uci_send("option name Write Debug Log type check default true");
-    uci_send("option name Hash type spin default 128 min 0 max 32768");
-    uci_send("option name Threads type spin default 1 min 1 max 16");
-    uci_send("option name MultiPV type spin default 1 min 1 max 64");
-    uci_send("option name UCI_Variant type combo default Chess var Chess var Sjadam");
+    uci_send("option name Hash type spin default 256 min 0 max 32768");
+    uci_send("option name Threads type spin default 1 min 1 max 128");
+    uci_send("option name MultiPV type spin default 1 min 1 max 128");
+    uci_send("option name UCI_Variant type combo default Chess var Chess var Sjadam var Crazyhouse");
     
     uci_send("uciok");
     
