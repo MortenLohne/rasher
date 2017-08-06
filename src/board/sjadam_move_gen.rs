@@ -16,7 +16,6 @@ use std::fmt;
 lazy_static! {
     static ref ROOK_TABLE : [[u8; 256]; 32] = {
         let mut table = [[0; 256]; 32];
-        let rank = 0;
         for sjadam_squares in (0..256)
             .filter(|i| i & 0b1010_1010 == 0 || i & 0b0101_0101 == 0)
             .map(BitBoard::from_u64)
@@ -24,30 +23,30 @@ lazy_static! {
             for all_pieces in (0..256).map(BitBoard::from_u64) {
                 let mut target_squares = sjadam_squares.clone();
                 for file in 0..8 {
-                    if sjadam_squares.get(Square::from_ints(file, rank)) {
+                    if sjadam_squares.get(Square(file)) {
                         let mut cur_file = file.overflowing_sub(1).0;
                         while cur_file < 8 {
-                            target_squares.set(Square(rank * 8 + cur_file));
-                            if all_pieces.get(Square(rank * 8 + cur_file)) {
+                            target_squares.set(Square(cur_file));
+                            if all_pieces.get(Square(cur_file)) {
                                 break;
                             }
                             cur_file = cur_file.overflowing_sub(1).0;
                         }
                         cur_file = file + 1;
                         while cur_file < 8 {
-                            target_squares.set(Square(rank * 8 + cur_file));
-                            if all_pieces.get(Square(rank * 8 + cur_file)) {
+                            target_squares.set(Square(cur_file));
+                            if all_pieces.get(Square(cur_file)) {
                                 break;
                             }
                             cur_file += 1;
                         }
                     }
                 }
-                debug_assert_eq!(table[sjadam_lookup_index(sjadam_squares.rank(rank))]
-                                 [all_pieces.rank(rank) as usize], 0);
-                table[sjadam_lookup_index(sjadam_squares.rank(rank))]
-                    [all_pieces.rank(rank) as usize]
-                    = target_squares.rank(rank);
+                debug_assert_eq!(table[sjadam_lookup_index(sjadam_squares.rank(0))]
+                                 [all_pieces.rank(0) as usize], 0);
+                table[sjadam_lookup_index(sjadam_squares.rank(0))]
+                    [all_pieces.rank(0) as usize]
+                    = target_squares.rank(0);
             }
         }
         table
@@ -387,45 +386,6 @@ fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
 
     let target_rank = ROOK_TABLE
         [sjadam_lookup_index(rank_bits)][all_pieces.rank(rank) as usize];
-    /*
-    let mut target_squares = *sjadam_squares;
-    for file in 0..8 {
-        if sjadam_squares.get(Square::from_ints(file, rank)) {
-            let mut cur_file = file.overflowing_sub(1).0;
-            while cur_file < 8 {
-                target_squares.set(Square(rank * 8 + cur_file));
-                if all_pieces.get(Square(rank * 8 + cur_file)) {
-                    break;
-                }
-                cur_file = cur_file.overflowing_sub(1).0;
-            }
-            cur_file = file + 1;
-            while cur_file < 8 {
-                target_squares.set(Square(rank * 8 + cur_file));
-                if all_pieces.get(Square(rank * 8 + cur_file)) {
-                    break;
-                }
-                cur_file += 1;
-            }
-        }
-    }
-     
-    //println!("Looked up rook move");
-    /*
-    assert_eq!(target_squares.rank(rank),
-               BitBoard::from_u64(target_rank as u64 | (sjadam_squares.board)).rank(rank),
-               "Rook moves lookup was incorrect on rank {} ({:b}) with pieces\n{:?}Sjadam squares:\n{:?}Correct targets: {:b}",
-               rank, all_pieces.rank(rank), all_pieces, sjadam_squares, target_squares.rank(rank));
-*/
-    assert_eq!(sjadam_squares.board | target_squares.board,
-               sjadam_squares.board | ((target_rank as u64) << (8 * rank as u64)),
-               "\nOld:\n{:?}Correct:\n{:?}Wrong:\n{:?}Rank #{}, contains {:b}, stored rank {:b}",
-               sjadam_squares,
-               BitBoard::from_u64(sjadam_squares.board | target_squares.board),
-               BitBoard::from_u64(sjadam_squares.board | ((target_rank as u64) << (8 * rank as u64))),
-               rank, target_squares.rank(rank), target_rank);
-*/
-    //sjadam_squares.board |= target_squares.board;
     sjadam_squares.board |= (target_rank as u64) << (8 * rank as u64);
 }
     
