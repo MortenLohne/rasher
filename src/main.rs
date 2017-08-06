@@ -5,6 +5,8 @@ mod search_algorithms;
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 extern crate itertools;
 extern crate time;
 extern crate rand;

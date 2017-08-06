@@ -3,6 +3,7 @@ name = "rasher"
 version = "0.1.0"
 dependencies = [
  "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log4rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordered-float 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",

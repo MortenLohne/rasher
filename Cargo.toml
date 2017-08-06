@@ -11,7 +11,7 @@ ordered-float = "0.4.*"
 rayon = "0.8.*"
 log = "0.3.*"
 log4rs = "0.7.*"
-
+lazy_static = "0.2.8"
 
 [profile.release]
 debug = true

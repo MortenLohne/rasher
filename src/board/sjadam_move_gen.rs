@@ -11,9 +11,48 @@ use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
 use board::sjadam_board::SjadamBoard;
 
-// use board::std_move_gen::move_gen;
-
 use std::fmt;
+
+lazy_static! {
+    static ref ROOK_TABLE : [[u8; 256]; 32] = {
+        let mut table = [[0; 256]; 32];
+        let rank = 0;
+        for sjadam_squares in (0..256)
+            .filter(|i| i & 0b1010_1010 == 0 || i & 0b0101_0101 == 0)
+            .map(BitBoard::from_u64)
+        {
+            for all_pieces in (0..256).map(BitBoard::from_u64) {
+                let mut target_squares = sjadam_squares.clone();
+                for file in 0..8 {
+                    if sjadam_squares.get(Square::from_ints(file, rank)) {
+                        let mut cur_file = file.overflowing_sub(1).0;
+                        while cur_file < 8 {
+                            target_squares.set(Square(rank * 8 + cur_file));
+                            if all_pieces.get(Square(rank * 8 + cur_file)) {
+                                break;
+                            }
+                            cur_file = cur_file.overflowing_sub(1).0;
+                        }
+                        cur_file = file + 1;
+                        while cur_file < 8 {
+                            target_squares.set(Square(rank * 8 + cur_file));
+                            if all_pieces.get(Square(rank * 8 + cur_file)) {
+                                break;
+                            }
+                            cur_file += 1;
+                        }
+                    }
+                }
+                debug_assert_eq!(table[sjadam_lookup_index(sjadam_squares.rank(rank))]
+                                 [all_pieces.rank(rank) as usize], 0);
+                table[sjadam_lookup_index(sjadam_squares.rank(rank))]
+                    [all_pieces.rank(rank) as usize]
+                    = target_squares.rank(rank);
+            }
+        }
+        table
+    };
+}
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct BitBoard {
@@ -59,7 +98,7 @@ impl BitBoard {
         self.board &= !(1<<i);
     }
     pub fn rank(self, rank: u8) -> u8 {
-        (self.board << rank) as u8
+        (self.board >> (rank * 8)) as u8
     }
     pub fn file(self, file: u8) -> u8 {
         let mut rotated = self.clone();
@@ -67,10 +106,7 @@ impl BitBoard {
         rotated.rank(file)
     }
     pub fn rotate(&mut self) {
-        //let temp : i64 = (((self.board as i64 >> 3) | ((self.board as i64) << 3)) & 63) ^ 56;
-        //println!("{}", temp);
-        //self.board = ((self.board as u64 * 0x20800000) >> 26) ^ 56; // unsigned 32-bit shift
-        self.flip_horizontal();
+        self.flip_vertical();
         self.flip_diagonal();
     }
     pub fn flip_horizontal(&mut self) {
@@ -82,6 +118,9 @@ impl BitBoard {
         x = ((x >> 2) & k2) +  4*(x & k2);
         x = ((x >> 4) & k4) + 16*(x & k4);
         self.board = x;
+    }
+    pub fn flip_vertical(&mut self) {
+        self.board = self.board.swap_bytes();
     }
 
     pub fn flip_diagonal(&mut self) {
@@ -340,33 +379,15 @@ fn rook_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
     sjadam_squares.board |= sjadam_squares_rotated.board;
 }
 
-const ROOK_TABLE : [[u8; 256]; 16] = [[0; 256]; 16];
-
 /// Take the index of a rank, and a bitboard of available sjadam squares,
 /// and set all available rook moves on the rank
 /// Also sets captures of own pieces
 fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
     let rank_bits = sjadam_squares.rank(rank);
 
-    fn sjadam_lookup_index(rank_bits: u8) -> u8 {
-        let mut index = 0;
-        if rank_bits.leading_zeros() % 2 == 0 {
-            index |= (rank_bits & 2) >> 1;
-            index |= (rank_bits & 8) >> 3;
-            index |= (rank_bits & 32) >> 5;
-            index |= (rank_bits & 128) >> 7;
-        }
-        else {
-            index |= rank_bits & 1;
-            index |= (rank_bits & 4) >> 2;
-            index |= (rank_bits & 16) >> 4;
-            index |= (rank_bits & 64) >> 6;
-        }
-        debug_assert!(index < 16);
-        index
-    }
     let target_rank = ROOK_TABLE
-        [sjadam_lookup_index(rank_bits) as usize][all_pieces.rank(rank) as usize];
+        [sjadam_lookup_index(rank_bits)][all_pieces.rank(rank) as usize];
+    /*
     let mut target_squares = *sjadam_squares;
     for file in 0..8 {
         if sjadam_squares.get(Square::from_ints(file, rank)) {
@@ -388,10 +409,45 @@ fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
             }
         }
     }
-    sjadam_squares.board |= target_squares.board;
-    //sjadam_squares.board |= (target_rank as u64) << (8 * rank as u64);
+     
+    //println!("Looked up rook move");
+    /*
+    assert_eq!(target_squares.rank(rank),
+               BitBoard::from_u64(target_rank as u64 | (sjadam_squares.board)).rank(rank),
+               "Rook moves lookup was incorrect on rank {} ({:b}) with pieces\n{:?}Sjadam squares:\n{:?}Correct targets: {:b}",
+               rank, all_pieces.rank(rank), all_pieces, sjadam_squares, target_squares.rank(rank));
+*/
+    assert_eq!(sjadam_squares.board | target_squares.board,
+               sjadam_squares.board | ((target_rank as u64) << (8 * rank as u64)),
+               "\nOld:\n{:?}Correct:\n{:?}Wrong:\n{:?}Rank #{}, contains {:b}, stored rank {:b}",
+               sjadam_squares,
+               BitBoard::from_u64(sjadam_squares.board | target_squares.board),
+               BitBoard::from_u64(sjadam_squares.board | ((target_rank as u64) << (8 * rank as u64))),
+               rank, target_squares.rank(rank), target_rank);
+*/
+    //sjadam_squares.board |= target_squares.board;
+    sjadam_squares.board |= (target_rank as u64) << (8 * rank as u64);
 }
     
+fn sjadam_lookup_index(rank_bits: u8) -> usize {
+    let mut index;
+    if rank_bits.leading_zeros() % 2 == 0 {
+        index = 16;
+        index |= (rank_bits & 2) >> 1;
+        index |= (rank_bits & 8) >> 2;
+        index |= (rank_bits & 32) >> 3;
+        index |= (rank_bits & 128) >> 4;
+    }
+    else {
+        index = 0;
+        index |= rank_bits & 1;
+        index |= (rank_bits & 4) >> 1;
+        index |= (rank_bits & 16) >> 2;
+        index |= (rank_bits & 64) >> 3;
+    }
+    debug_assert!(index < 32);
+    index as usize
+}
 
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Adds all moves, also those that put the player in check
