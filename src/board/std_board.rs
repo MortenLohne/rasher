@@ -59,6 +59,10 @@ impl PieceType {
             _ => None,
         }
     }
+    pub fn from_disc(disc: u32) -> Option<Self> {
+        if disc > 6 { None }
+        else { Some(unsafe { mem::transmute(disc as u8) }) }
+    }
 }
 
 impl fmt::Display for PieceType {

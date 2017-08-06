@@ -107,7 +107,8 @@ fn perf_test_3() {
     for (n, &moves) in (1..4).zip([143, 22_490, 3_323_085].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
-                   "Expected {} moves, found {} on board:\n{:?}.", moves, result, board);
+                   "Expected {} moves, found {} on board:\n{:?}\nMoves:{:?}",
+                   moves, result, board, board.all_legal_moves());
     }
 }
 

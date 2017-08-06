@@ -15,18 +15,21 @@ use board::sjadam_board::SjadamBoard;
 
 use std::fmt;
 
-#[derive(PartialEq, Eq, Clone)]
-struct BitBoard {
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct BitBoard {
     board: u64,
 }
 
 impl BitBoard {
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         BitBoard { board: 0 }
+    }
+    pub fn from_u64(n: u64) -> Self {
+        BitBoard { board: n }
     }
     /// Returns a bitboard representation of the board, with all bits set
     /// where f(piece) is true for the piece on the square
-    fn from_board<F: Fn(Piece) -> bool> (board: &ChessBoard, f: F) -> Self {
+    pub fn from_board<F: Fn(Piece) -> bool> (board: &ChessBoard, f: F) -> Self {
         let mut bit_board = BitBoard::empty();
         for square in BoardIter::new() {
             if f(board[square]) {
@@ -35,26 +38,64 @@ impl BitBoard {
         }
         bit_board
     }
-    fn all_from_board(board: &ChessBoard) -> Self {
+    pub fn all_from_board(board: &ChessBoard) -> Self {
         Self::from_board(board, |piece| !piece.is_empty())
     }
-    fn get(&self, idx: Square) -> bool {
+    pub fn get(&self, idx: Square) -> bool {
         let Square(i) = idx;
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
         self.board & (1<<i) != 0
     }
     // Sets the square to true
-    fn set(&mut self, idx: Square) {
+    pub fn set(&mut self, idx: Square) {
         let Square(i) = idx;
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
         self.board |= 1<<i;
     }
-    #[allow(dead_code)]
     // Sets the square to false
-    fn clear(&mut self, idx: Square) {
+    pub fn clear(&mut self, idx: Square) {
         let Square(i) = idx;
         debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
         self.board &= !(1<<i);
+    }
+    pub fn rank(self, rank: u8) -> u8 {
+        (self.board << rank) as u8
+    }
+    pub fn file(self, file: u8) -> u8 {
+        let mut rotated = self.clone();
+        rotated.rotate();
+        rotated.rank(file)
+    }
+    pub fn rotate(&mut self) {
+        //let temp : i64 = (((self.board as i64 >> 3) | ((self.board as i64) << 3)) & 63) ^ 56;
+        //println!("{}", temp);
+        //self.board = ((self.board as u64 * 0x20800000) >> 26) ^ 56; // unsigned 32-bit shift
+        self.flip_horizontal();
+        self.flip_diagonal();
+    }
+    pub fn flip_horizontal(&mut self) {
+        let k1 = 0x5555555555555555;
+        let k2 = 0x3333333333333333;
+        let k4 = 0x0f0f0f0f0f0f0f0f;
+        let mut x = self.board;
+        x = ((x >> 1) & k1) +  2*(x & k1);
+        x = ((x >> 2) & k2) +  4*(x & k2);
+        x = ((x >> 4) & k4) + 16*(x & k4);
+        self.board = x;
+    }
+
+    pub fn flip_diagonal(&mut self) {
+        let k1 = 0x5500550055005500;
+        let k2 = 0x3333000033330000;
+        let k4 = 0x0f0f0f0f00000000;
+        let mut x = self.board;
+        let mut t = k4 & (x ^ (x << 28));
+        x ^=       t ^ (t >> 28) ;
+        t  = k2 & (x ^ (x << 14));
+        x ^=       t ^ (t >> 14) ;
+        t  = k1 & (x ^ (x <<  7));
+        x ^=       t ^ (t >>  7) ;
+        self.board = x;
     }
 }
 
@@ -75,36 +116,40 @@ struct PieceBitBoards {
 struct SjadamBitBoard {
     white_pieces: BitBoard,
     black_pieces: BitBoard,
-    white_pawns: BitBoard,
-    black_pawns: BitBoard,
-    white_knights: BitBoard,
-    black_knights: BitBoard,
-    white_bishops: BitBoard,
-    black_bishops: BitBoard,
-    white_rooks: BitBoard,
-    black_roocks: BitBoard,
-    white_queens: BitBoard,
-    black_queens: BitBoard,
-    white_kings: BitBoard,
-    black_kings: BitBoard,
+    bitboards: [BitBoard; 12],
 }
+impl SjadamBitBoard {
+    fn get_piece(&self, piece: Piece) -> BitBoard {
+        self.bitboards[piece as u32 as usize - 2]
+    }
 
-/*impl Index<Square> for SjadamBitBoard {
-    type Output = Piece;
-    fn index(&self, square: Square) -> Piece {
+    fn get_square(&self, square: Square) -> Piece {
         if self.white_pieces.get(square) {
-            if white_pawns.get(square) {
-                
-            }
+            self.bitboards.iter()
+                .take(6)
+                .enumerate()
+                .find(|&(_, bitboard)| bitboard.get(square))
+                .map(|(i, _)| Piece::new(PieceType::from_disc(i as u32 + 1).unwrap(), White))
+                .unwrap()
         }
         else if self.black_pieces.get(square) {
-            
+            self.bitboards.iter()
+                .skip(6)
+                .enumerate()
+                .find(|&(_, bitboard)| bitboard.get(square))
+                .map(|(i, _)| Piece::new(PieceType::from_disc(i as u32 + 1).unwrap(), Black))
+                .unwrap()
         }
         else {
             Piece::empty()
         }
     }
-}*/
+
+    fn set_square(&mut self, square: Square, piece: Piece) {
+        debug_assert!(!piece.is_empty());
+        self.bitboards[piece as u8 as usize - 2].set(square);
+    }
+}
 
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = vec![];
@@ -150,39 +195,50 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
 
     let mut chess_moves = vec![]; // Moves with both
     let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
-    
-    for chess_move_square in BoardIter::new()
-        .filter(|&i| sjadam_squares.get(i))   
-    {
-        let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
-        let old_board = board.clone();
-        let mut old_castling = None;
-        if chess_move_square != square {
-            // "Do" the pure sjadam part of the move, but keep the same player to move
-            // Also do not promote pieces
-            board.base_board[chess_move_square] = board.base_board[square];
-            board.base_board[square] = Piece::empty();
-            old_castling = Some(board.base_board.castling_en_passant);
-            if board.base_board[chess_move_square].piece_type() == PieceType::King {
-                let color = board.to_move();
-                board.base_board.disable_castling(color)
-            }
-        }
-        
-        debug_assert!(!board.base_board[chess_move_square].is_empty(),
-                      "Square {} is empty on \n{:?}, but is marked in {:?}",
-                      chess_move_square, board.base_board, sjadam_squares);
-        // Generate the chess part of the move
-        legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
-        if chess_move_square != square {
-            pure_sjadam_moves.push(sjadam_move.clone());
-        }
 
-        if chess_move_square != square {
-            board.base_board[square] = board.base_board[chess_move_square];
-            board.base_board[chess_move_square] = Piece::empty();
-            board.base_board.castling_en_passant = old_castling.unwrap();
-            debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
+    if board.base_board[square].piece_type() == PieceType::Rook {
+        let mut rook_destinations = sjadam_squares.clone();
+        debug_assert!(sjadam_squares.get(square));
+        rook_moves(&mut rook_destinations, friendly_pieces, all_pieces);
+        for chess_move_square in BoardIter::new()
+            .filter(|&i| rook_destinations.get(i)) {
+                chess_moves.push(ChessMove::new(square, chess_move_square));
+            }
+    }
+    else {
+        for chess_move_square in BoardIter::new()
+            .filter(|&i| sjadam_squares.get(i))   
+        {
+            let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
+            let old_board = board.clone();
+            let mut old_castling = None;
+            if chess_move_square != square {
+                // "Do" the pure sjadam part of the move, but keep the same player to move
+                // Also do not promote pieces
+                board.base_board[chess_move_square] = board.base_board[square];
+                board.base_board[square] = Piece::empty();
+                old_castling = Some(board.base_board.castling_en_passant);
+                if board.base_board[chess_move_square].piece_type() == PieceType::King {
+                    let color = board.to_move();
+                    board.base_board.disable_castling(color)
+                }
+            }
+            
+            debug_assert!(!board.base_board[chess_move_square].is_empty(),
+                          "Square {} is empty on \n{:?}, but is marked in {:?}",
+                          chess_move_square, board.base_board, sjadam_squares);
+            // Generate the chess part of the move
+            legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
+            if chess_move_square != square {
+                pure_sjadam_moves.push(sjadam_move.clone());
+            }
+
+            if chess_move_square != square {
+                board.base_board[square] = board.base_board[chess_move_square];
+                board.base_board[chess_move_square] = Piece::empty();
+                board.base_board.castling_en_passant = old_castling.unwrap();
+                debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
+            }
         }
     }
     let mut combined_moves = chess_moves.iter()
@@ -258,6 +314,60 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
         }
     }
 }
+
+fn rook_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) {
+    let mut sjadam_squares_rotated = sjadam_squares.clone();
+    let mut all_pieces_rotated = all_pieces.clone();
+    all_pieces_rotated.rotate();
+    sjadam_squares_rotated.rotate();
+    
+    for file in 0..8 {
+        lookup_rook(file, &mut sjadam_squares_rotated, all_pieces_rotated);
+    }
+    sjadam_squares_rotated.rotate();
+    sjadam_squares_rotated.rotate();
+    sjadam_squares_rotated.rotate();
+    
+    sjadam_squares_rotated.board &= !friendly_pieces.board;
+    for rank in 0..8 {
+        lookup_rook(rank, sjadam_squares, all_pieces);
+    }
+    sjadam_squares.board &= !friendly_pieces.board;
+    sjadam_squares.board |= sjadam_squares_rotated.board;
+}
+
+const ROOK_TABLE : [[[u8; 8]; 256]; 16] = [[[0; 8]; 256]; 16];
+
+/// Take the index of a rank, and a bitboard of available sjadam squares,
+/// and set all available rook moves on the rank
+/// Also sets captures of own pieces
+fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
+    let rank_bits = sjadam_squares.rank(rank);
+    let mut target_squares = *sjadam_squares;
+    for file in 0..8 {
+        if sjadam_squares.get(Square::from_ints(file, rank)) {
+            let mut cur_file = file.overflowing_sub(1).0;
+            while cur_file < 8 {
+                target_squares.set(Square(rank * 8 + cur_file));
+                if all_pieces.get(Square(rank * 8 + cur_file)) {
+                    break;
+                }
+                cur_file = cur_file.overflowing_sub(1).0;
+            }
+            cur_file = file + 1;
+            while cur_file < 8 {
+                target_squares.set(Square(rank * 8 + cur_file));
+                if all_pieces.get(Square(rank * 8 + cur_file)) {
+                    break;
+                }
+                cur_file += 1;
+            }
+        }
+    }
+    sjadam_squares.board |= target_squares.board;
+}
+    
 
 /// Adds all the legal moves for the piece in this position, to the input vector
 /// Adds all moves, also those that put the player in check
