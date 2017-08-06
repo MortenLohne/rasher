@@ -121,8 +121,7 @@ impl EvalBoard for SjadamBoard {
         self.base_board.half_move_clock = mv.old_half_move_clock;
         self.base_board.castling_en_passant = mv.old_castling_en_passant;
 
-        let color = self.base_board[mv.sjadam_square].color()
-            .expect(&format!("Couldn't undo {:?} on\n{:?}", mv, self));
+        let color = self.base_board[mv.sjadam_square].color().unwrap();
         self.base_board[mv.from] = Piece::new(mv.piece_moved, color); 
         // Undo sjadam move
         if mv.from != mv.sjadam_square {
