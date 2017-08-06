@@ -196,13 +196,15 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     let mut chess_moves = vec![]; // Moves with both
     let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
 
+    let mut bitboard_moves = vec![];
+    
     if board.base_board[square].piece_type() == PieceType::Rook {
         let mut rook_destinations = sjadam_squares.clone();
         debug_assert!(sjadam_squares.get(square));
         rook_moves(&mut rook_destinations, friendly_pieces, all_pieces);
         for chess_move_square in BoardIter::new()
-            .filter(|&i| rook_destinations.get(i)) {
-                chess_moves.push(ChessMove::new(square, chess_move_square));
+            .filter(|&i| rook_destinations.get(i) && i != square) {
+                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
             }
     }
     else {
@@ -264,6 +266,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     combined_moves.dedup_by(move_eq);
     // TODO: Here castling and non-castling moves will be considered equal,
     // and may be removed. Fix that
+    combined_moves.append(&mut bitboard_moves);
     combined_moves
 }
 
