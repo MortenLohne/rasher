@@ -234,30 +234,24 @@ impl PartialEq for ChessBoard {
 impl Eq for ChessBoard {}
 
 pub struct BoardIter {
-    current_x: u8,
-    current_y: u8,
+    index: u8,
 }
 
 impl BoardIter {
     pub fn new() -> Self {
-        BoardIter { current_x: 0, current_y: 0 }
+        BoardIter { index: 0 }
     }
 }
 
 impl Iterator for BoardIter {
     type Item = Square;
     fn next(&mut self) -> Option<Square> {
-        if self.current_y >= 8 {
+        if self.index >= 64 {
             None
         }
-        else if self.current_x == 7 {
-            self.current_x = 0;
-            self.current_y += 1;
-            Some(Square::from_ints(7, self.current_y - 1))
-        }
         else {
-            self.current_x += 1;
-            Some(Square::from_ints(self.current_x - 1, self.current_y))
+            self.index += 1;
+            Some(Square(self.index - 1))
         }
     }
 }
