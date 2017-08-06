@@ -340,13 +340,33 @@ fn rook_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
     sjadam_squares.board |= sjadam_squares_rotated.board;
 }
 
-const ROOK_TABLE : [[[u8; 8]; 256]; 16] = [[[0; 8]; 256]; 16];
+const ROOK_TABLE : [[u8; 256]; 16] = [[0; 256]; 16];
 
 /// Take the index of a rank, and a bitboard of available sjadam squares,
 /// and set all available rook moves on the rank
 /// Also sets captures of own pieces
 fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
     let rank_bits = sjadam_squares.rank(rank);
+
+    fn sjadam_lookup_index(rank_bits: u8) -> u8 {
+        let mut index = 0;
+        if rank_bits.leading_zeros() % 2 == 0 {
+            index |= (rank_bits & 2) >> 1;
+            index |= (rank_bits & 8) >> 3;
+            index |= (rank_bits & 32) >> 5;
+            index |= (rank_bits & 128) >> 7;
+        }
+        else {
+            index |= rank_bits & 1;
+            index |= (rank_bits & 4) >> 2;
+            index |= (rank_bits & 16) >> 4;
+            index |= (rank_bits & 64) >> 6;
+        }
+        debug_assert!(index < 16);
+        index
+    }
+    let target_rank = ROOK_TABLE
+        [sjadam_lookup_index(rank_bits) as usize][all_pieces.rank(rank) as usize];
     let mut target_squares = *sjadam_squares;
     for file in 0..8 {
         if sjadam_squares.get(Square::from_ints(file, rank)) {
@@ -369,6 +389,7 @@ fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
         }
     }
     sjadam_squares.board |= target_squares.board;
+    //sjadam_squares.board |= (target_rank as u64) << (8 * rank as u64);
 }
     
 
