@@ -9,4 +9,8 @@ mc_log.txt
 # Old folder for example games #
 games
 
+# Valgrind output
 callgrind.out.*
+
+# Engine's debug log
+rasher.log
