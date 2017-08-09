@@ -13,6 +13,9 @@ use board::sjadam_board::SjadamBoard;
 
 use std::fmt;
 
+const WHITE_SQUARES : BitBoard = BitBoard { board: 0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101 };
+const BLACK_SQUARES : BitBoard = BitBoard{ board: !WHITE_SQUARES.board };
+
 lazy_static! {
     static ref ROOK_TABLE : [[u8; 256]; 32] = {
         let mut table = [[0; 256]; 32];
@@ -108,6 +111,30 @@ impl BitBoard {
         self.flip_vertical();
         self.flip_diagonal();
     }
+    pub fn rotate_270(&mut self) {
+        self.flip_diagonal();
+        self.flip_vertical();
+    }
+    pub fn rotate_45(&mut self) {
+        let k1 = 0xAAAAAAAAAAAAAAAA;
+        let k2 = 0xCCCCCCCCCCCCCCCC;
+        let k4 = 0xF0F0F0F0F0F0F0F0;
+        let mut x = self.board;
+        x ^= k1 & (x ^ x.rotate_right(8));
+        x ^= k2 & (x ^ x.rotate_right(16));
+        x ^= k4 & (x ^ x.rotate_right(32));
+        self.board = x;
+    }
+    pub fn rotate_315(&mut self) {
+        let k1 = 0x5555555555555555;
+        let k2 = 0x3333333333333333;
+        let k4 = 0x0f0f0f0f0f0f0f0f;
+        let mut x = self.board;
+        x ^= k1 & (x ^ x.rotate_right(8));
+        x ^= k2 & (x ^ x.rotate_right(16));
+        x ^= k4 & (x ^ x.rotate_right(32));
+        self.board = x;
+}
     pub fn flip_horizontal(&mut self) {
         let k1 = 0x5555555555555555;
         let k2 = 0x3333333333333333;
@@ -145,7 +172,7 @@ impl fmt::Debug for BitBoard {
         Ok(())
     }
 }
-
+/*
 /// Represents the positions of all the pieces
 struct PieceBitBoards {
     bitboards: [[BitBoard; 2]; 6],
@@ -188,6 +215,7 @@ impl SjadamBitBoard {
         self.bitboards[piece as u8 as usize - 2].set(square);
     }
 }
+*/
 
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = vec![];
@@ -245,6 +273,15 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
                 bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
             }
     }
+    /*else if board.base_board[square].piece_type() == PieceType::Bishop {
+        let mut bishop_destinations = sjadam_squares.clone();
+        debug_assert!(sjadam_squares.get(square));
+        bishop_moves(&mut bishop_destinations, friendly_pieces, all_pieces);
+        for chess_move_square in BoardIter::new()
+            .filter(|&i| bishop_destinations.get(i) && i != square) {
+                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
+            }
+    }*/
     else {
         for chess_move_square in BoardIter::new()
             .filter(|&i| sjadam_squares.get(i))   
@@ -356,6 +393,45 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     }
 }
 
+fn bishop_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
+                all_pieces: BitBoard) {
+    let mut sjadam_squares_45 = sjadam_squares.clone();
+    let mut all_pieces_45 = all_pieces.clone();
+    all_pieces_45.rotate_45();
+    sjadam_squares_45.rotate_45();
+
+    for rank in 0..8 {
+        //lookup_rook(rank, &mut sjadam_squares_45, all_pieces_45);
+        let rank_bits = sjadam_squares_45.rank(rank);
+        let mut target_rank = ROOK_TABLE
+            [sjadam_lookup_index(rank_bits)][all_pieces.rank(rank) as usize];
+
+        //target_rank &= u8::max_value() << rank;
+
+        sjadam_squares_45.board |= (target_rank as u64) << (8 * rank as u64);
+    }
+    for _ in 0..7 {
+        sjadam_squares_45.rotate_45();
+    }
+   
+    sjadam_squares_45.board &= !friendly_pieces.board;
+
+    let mut sjadam_squares_315 = sjadam_squares.clone();
+    let mut all_pieces_315 = all_pieces.clone();
+    all_pieces_315.rotate_315();
+    sjadam_squares_315.rotate_315();
+    
+    for rank in 0..8 {
+        lookup_rook(rank, &mut sjadam_squares_315, all_pieces_315);
+    }
+    for _ in 0..7 {
+        sjadam_squares_315.rotate_315();
+    }
+    sjadam_squares_315.board &= !friendly_pieces.board;
+    sjadam_squares.board |= sjadam_squares_45.board;
+    sjadam_squares.board |= sjadam_squares_315.board;
+}
+
 fn rook_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) {
     let mut sjadam_squares_rotated = sjadam_squares.clone();
@@ -366,9 +442,7 @@ fn rook_moves(sjadam_squares: &mut BitBoard, friendly_pieces: BitBoard,
     for file in 0..8 {
         lookup_rook(file, &mut sjadam_squares_rotated, all_pieces_rotated);
     }
-    sjadam_squares_rotated.rotate();
-    sjadam_squares_rotated.rotate();
-    sjadam_squares_rotated.rotate();
+    sjadam_squares_rotated.rotate_270();
     
     sjadam_squares_rotated.board &= !friendly_pieces.board;
     for rank in 0..8 {

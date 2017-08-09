@@ -62,3 +62,13 @@ fn file() {
     let board = BitBoard::all_from_board(&chess_board);
     assert_eq!(board.file(0), 0b1100_1001);
 }
+
+#[test]
+fn rotate_45() {
+    let mut board = BitBoard::all_from_board(&ChessBoard::start_board());
+    let board2 = BitBoard::all_from_board(&ChessBoard::start_board());
+    for _ in 0..8 {
+        board.rotate_45();
+    }
+    assert_eq!(board, board2);
+}
