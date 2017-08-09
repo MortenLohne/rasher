@@ -2,6 +2,7 @@
 name = "rasher"
 version = "0.1.0"
 authors = ["Morten Lohne"]
+license = "MIT"
 
 [dependencies]
 time = "0.1.*"
