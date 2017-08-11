@@ -78,7 +78,6 @@ impl fmt::Display for PieceType {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-//pub struct Piece (pub PieceType, pub Color);
 #[allow(dead_code)]
 pub enum Piece {
     Empty = 0,
@@ -94,7 +93,6 @@ pub enum Piece {
     BlackQueen = 11,
     WhiteKing = 12,
     BlackKing = 13,
-    
 }
 
 impl fmt::Display for Piece {
@@ -202,10 +200,6 @@ impl Square {
         self.0 >> 3
     }
 }
-
-
-
-// use std::hash::{Hash, Hasher, SipHasher};
 
 #[derive(Clone)]
 pub struct ChessBoard {
@@ -796,8 +790,6 @@ impl ChessBoard {
             None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
         }
     }
-
-   
 }
 
 // Stores time information for the game, in milliseconds
@@ -809,38 +801,3 @@ pub struct TimeInfo {
     pub black_inc : u32,
     pub moves_to_go : Option<u16>, // Number of moves to the next time control
 }
-
-/*lazy_static! {
-    
-    pub static ref PIECE_CHAR_MAP : HashMap<Piece, char> = {
-        let mut map = HashMap::new();
-        map.insert(Piece(Rook, White), 'R');
-        map.insert(Piece(Rook, Black), 'r');
-        map.insert(Piece(Knight, White), 'N');
-        map.insert(Piece(Knight, Black), 'n');
-        map.insert(Piece(Bishop, White), 'B');
-        map.insert(Piece(Bishop, Black), 'b');
-        map.insert(Piece(Queen, White), 'Q');
-        map.insert(Piece(Queen, Black), 'q');
-        map.insert(Piece(King, White), 'K');
-        map.insert(Piece(King, Black), 'k');
-        map.insert(Piece(Pawn, White), 'P');
-        map.insert(Piece(Pawn, Black), 'p');
-        map.insert(Piece(Empty, White), ' ');
-        map.insert(Piece(Empty, Black), '.');
-        map
-    };
-    pub static ref CHAR_PIECE_MAP : HashMap<char, Piece> = {
-        rev_map(PIECE_CHAR_MAP.clone())
-    };
-}
-
-fn rev_map<K, V> (in_map : HashMap<V, K>) -> HashMap<K, V>
-    where K: Eq + Clone + hash::Hash, V: Eq + Clone + hash::Hash {
-    let mut new_map = HashMap::new();
-    for (value, key) in in_map.iter() {
-        new_map.insert(key.clone(), value.clone());
-    }
-    new_map
-}
-*/
