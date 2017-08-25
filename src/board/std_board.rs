@@ -10,6 +10,7 @@ use ::uci::UciBoard;
 use std::ops;
 use std::ascii::AsciiExt;
 use std::fmt;
+use std::fmt::Write;
 use std::mem;
 use std::hash::{Hash, Hasher};
 
@@ -367,9 +368,59 @@ impl UciBoard for ChessBoard {
     
         Ok(board)
     }
-    // TODO: Implement
     fn to_fen(&self) -> String {
-        panic!()
+        let mut string = String::new();
+        for rank in 0..8 {
+            let mut last_piece_file = -1;
+            for file in 0..8 {
+                let square = Square::from_ints(file, rank);
+                if !self[square].is_empty() {
+                    let num_empty = file as i8 - last_piece_file - 1;
+                    last_piece_file = file as i8;
+                    if num_empty > 0 {
+                        write!(string, "{}{}", num_empty, self[square]).unwrap();
+                    }
+                    else {
+                        write!(string, "{}", self[square]).unwrap();
+                    }
+                }
+            }
+            if last_piece_file < 7 {
+                write!(string, "{}", 7 - last_piece_file).unwrap();
+            }
+            string.push('/');
+        }
+        string.pop();
+        match self.to_move() {
+            White => string.push_str(" w"),
+            Black => string.push_str(" b"),
+        }
+        match self.en_passant_square() {
+            Some(square) => {
+                let (file, _) = square.file_rank();
+                write!(string, " {}", file).unwrap();
+            },
+            None => string.push_str(" -"),
+        }
+        string.push(' ');
+        if self.can_castle_kingside(White) {
+            string.push('K');
+        }
+        if self.can_castle_queenside(White) {
+            string.push('Q');
+        }
+        if self.can_castle_kingside(Black) {
+            string.push('k');
+        }
+        if self.can_castle_queenside(Black) {
+            string.push('q');
+        }
+        if string.chars().last() == Some(' ') {
+            string.push('-');
+        }
+        write!(string, " {}", self.half_move_clock).unwrap();
+        write!(string, " {}", self.move_num).unwrap();
+        string
     }
 }
 
