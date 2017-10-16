@@ -9,8 +9,17 @@ use tests::move_gen_tests;
 fn correct_move_gen_start_pos() {
     let start_board = SjadamBoard::start_board().clone();
     let moves = start_board.all_legal_moves();
-    assert_eq!(moves.len(), 146, "Found {} moves: {:?}, expected 146",
-               moves.len(), moves);
+    assert_eq!(moves.len(), 146, "{:?}Found {} moves: {:?}, expected 146",
+               start_board, moves.len(), moves);
+}
+
+#[test]
+fn bishop_moves() {
+    let board = SjadamBoard::from_fen("k7/8/8/8/P7/8/KN6/BN6 w - - 1 1").unwrap();
+    let moves = board.all_legal_moves();
+    assert_eq!(board.all_legal_moves().len(), 43,
+               "Expected 43 legal moves, found {} moves: {:?}\n{:?}",
+               moves.len(), moves, board);
 }
 
 /// Tests whether a pawn is allowed to sjadam over an opponent pawn

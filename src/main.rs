@@ -3,6 +3,9 @@ mod board;
 mod tests;
 mod search_algorithms;
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
 #[macro_use]
 extern crate log;
 #[macro_use]

@@ -13,5 +13,8 @@ log = "0.3.*"
 log4rs = "0.7.*"
 lazy_static = "0.2.8"
 
+[dev-dependencies]
+quickcheck = "0.4"
+
 [profile.release]
 debug = true
