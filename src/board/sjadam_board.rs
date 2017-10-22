@@ -28,14 +28,19 @@ impl EvalBoard for SjadamBoard {
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
         let start_color = self.to_move();
         debug_assert!(mv.from != mv.sjadam_square || mv.sjadam_square != mv.to);
-
+        debug_assert!(!self.base_board[mv.from].is_empty(),
+                      "Tried to do move {} from empty square at \n{:?}", mv, self);
+        
         let undo_move = SjadamUndoMove {
             from: mv.from, sjadam_square: mv.sjadam_square,
             capture: self.base_board[mv.to].piece_type(),
             to: mv.to, piece_moved: self.base_board[mv.from].piece_type(),
             old_castling_en_passant: self.base_board.castling_en_passant,
-            old_half_move_clock: self.base_board.half_move_clock };
-
+            old_half_move_clock: self.base_board.half_move_clock
+        };
+        debug_assert!(undo_move.piece_moved != PieceType::Empty,
+                      "Empty piece_moved when doing {} on \n{:?}", mv, self);
+            
         // Do sjadam move. Has no effect if there is no sjadam jump
         self.base_board[mv.sjadam_square] = self.base_board[mv.from];
         if mv.from != mv.sjadam_square {
@@ -120,7 +125,9 @@ impl EvalBoard for SjadamBoard {
         }
         self.base_board.half_move_clock = mv.old_half_move_clock;
         self.base_board.castling_en_passant = mv.old_castling_en_passant;
-
+        if self.base_board[mv.sjadam_square].color().is_none() {
+            panic!("Couldn't undo move {:?} on board\n{:?}", mv, self);
+        }
         let color = self.base_board[mv.sjadam_square].color().unwrap();
         self.base_board[mv.from] = Piece::new(mv.piece_moved, color); 
         // Undo sjadam move
@@ -128,6 +135,7 @@ impl EvalBoard for SjadamBoard {
             self.base_board[mv.sjadam_square] = Piece::empty();
         }
         debug_assert_ne!(start_color, self.to_move());
+        debug_assert!(!self.base_board[mv.from].is_empty());
         
     }
 

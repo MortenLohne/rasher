@@ -282,7 +282,31 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
 
     let mut bitboard_moves = vec![];
-    
+
+    let moves : BitBoard = match board.base_board[square].piece_type() {
+        PieceType::Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
+        PieceType::Bishop => bishop_moves(sjadam_squares, friendly_pieces, all_pieces),
+        PieceType::Queen => {
+            let mut queen_moves = bishop_moves(sjadam_squares, friendly_pieces, all_pieces);
+            queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
+            queen_moves
+        },
+        PieceType::Pawn if board.to_move() == White => pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces),
+        PieceType::Pawn => pawn_moves_black(sjadam_squares, friendly_pieces, all_pieces),
+        _ => BitBoard::empty(),
+    };
+
+    for chess_move_square in BoardIter::new()
+        .filter(|&i| moves.get(i) && i != square) { // TODO: Remove != square check ?
+            debug_assert!(!board.base_board[square].is_empty());
+            if sjadam_squares.get(chess_move_square) {
+                bitboard_moves.push(SjadamMove::from_sjadam_move(square, chess_move_square));
+            }
+            else {
+                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
+            }
+        }
+    /*
     if board.base_board[square].piece_type() == PieceType::Rook
     {
         //let mut rook_destinations = sjadam_squares.clone();
@@ -310,7 +334,18 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
                 bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
             }
     }
+    else if board.base_board[square].piece_type() == PieceType::Pawn {
+        let pawn_moves = pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces);
+        for chess_move_square in BoardIter::new()
+            .filter(|&i| pawn_moves.get(i) && i != square) {
+                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
+            }
+    }
     else {
+        */
+    if board.base_board[square].piece_type() == PieceType::King ||
+        board.base_board[square].piece_type() == PieceType::Knight
+    {
         for chess_move_square in BoardIter::new()
             .filter(|&i| sjadam_squares.get(i))   
         {
@@ -419,6 +454,26 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
             }
         }
     }
+}
+
+fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) -> BitBoard {
+    let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
+    let left_captures = (sjadam_squares.board << 7) & opponent_pieces.board;
+    let right_captures = (sjadam_squares.board << 9) & opponent_pieces.board;
+    let forward = sjadam_squares.board << 8 & !all_pieces.board;
+    let forward_two = (sjadam_squares.board & (255 << 8)) << 16 & !all_pieces.board & !(all_pieces.board << 8);
+    BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
+}
+
+fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) -> BitBoard {
+    let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
+    let left_captures = (sjadam_squares.board >> 7) & opponent_pieces.board;
+    let right_captures = (sjadam_squares.board >> 9) & opponent_pieces.board;
+    let forward = sjadam_squares.board >> 8 & !all_pieces.board;
+    let forward_two = (sjadam_squares.board & (255 << 48)) >> 16 & !all_pieces.board & !(all_pieces.board >> 8);
+    BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
 
 fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
