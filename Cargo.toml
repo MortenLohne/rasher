@@ -10,8 +10,13 @@ rand = "0.3"
 ordered-float = "0.5.*"
 rayon = "0.8.*"
 log = "0.3.*"
-log4rs = "0.7.*"
+# log4rs = "0.7.*"
 lazy_static = "0.2.*"
+
+[dependencies.log4rs]
+version = "0.7.*"
+default-features = false # do not include the default features
+features = ["file_appender"]
 
 [dev-dependencies]
 quickcheck = "0.4"
