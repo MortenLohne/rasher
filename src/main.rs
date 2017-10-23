@@ -15,6 +15,7 @@ extern crate time;
 extern crate rand;
 extern crate ordered_float;
 extern crate rayon;
+#[cfg(feature = "logging")]
 extern crate log4rs;
 
 use search_algorithms::alpha_beta;
@@ -24,7 +25,6 @@ use search_algorithms::mcts;
 
 use std::sync::{Arc, Mutex};
 use std::io;
-use std::io::Write;
 use std::fmt;
 use std::hash::Hash;
 
@@ -34,8 +34,12 @@ use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use board::sjadam_board::SjadamBoard;
 
+#[cfg(feature = "logging")] 
 use log4rs::config::{Appender, Config, Root};
+#[cfg(feature = "logging")]
+use std::io::Write;
 
+#[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
     let appender = log4rs::append::file::FileAppender::builder().append(true).build("rasher.log")?;
     
@@ -47,6 +51,7 @@ fn init_log() -> Result<(), Box<std::error::Error>> {
 }
 
 fn main() {
+    #[cfg(feature = "logging")]
     init_log().unwrap_or_else(|err| {
         let _ = writeln!(&mut io::stderr(), "Failed to open log file: {}", err);
     });

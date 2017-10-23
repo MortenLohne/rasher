@@ -3,6 +3,10 @@ name = "rasher"
 version = "0.1.0"
 authors = ["Morten Lohne"]
 
+[features]
+default = ["logging"]
+logging = ["log4rs"]
+
 [dependencies]
 time = "0.1.*"
 itertools = "0.7.*"
@@ -10,11 +14,11 @@ rand = "0.3"
 ordered-float = "0.5.*"
 rayon = "0.8.*"
 log = "0.3.*"
-# log4rs = "0.7.*"
 lazy_static = "0.2.*"
 
 [dependencies.log4rs]
 version = "0.7.*"
+optional = true
 default-features = false # do not include the default features
 features = ["file_appender"]
 
@@ -23,3 +27,4 @@ quickcheck = "0.4"
 
 [profile.release]
 debug = true
+
