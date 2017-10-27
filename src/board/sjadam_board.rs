@@ -107,7 +107,7 @@ impl EvalBoard for SjadamBoard {
         }
         else if en_passant {
             // Remove the captured pawn
-            let ep_square_rank = if start_color == Black { mv.to().rank() + 1 } else { mv.to().rank() - 1 };
+            let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
             self.base_board[Square::from_ints(mv.to().file(), ep_square_rank)] = Piece::empty();
         }
         else if (start_color == White && mv.to().rank() == 0)
@@ -135,7 +135,7 @@ impl EvalBoard for SjadamBoard {
         }
         else if mv.en_passant() {
             // Replace the captured pawn
-            let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
+            let ep_square_rank = if start_color == Black { mv.to().rank() + 1 } else { mv.to().rank() - 1 };
             self.base_board[Square::from_ints(mv.to().file(), ep_square_rank)] = Piece::new(PieceType::Pawn, start_color);
         }
         self.base_board.half_move_clock = mv.old_half_move_clock;

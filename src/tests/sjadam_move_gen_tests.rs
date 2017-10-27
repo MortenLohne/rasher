@@ -124,7 +124,7 @@ fn castling_en_passant_perf_test_2() {
     board.do_move(SjadamMove::from_alg("c1a3").unwrap());
     board.do_move(SjadamMove::from_alg("b7b5").unwrap());
     board.do_move(SjadamMove::from_alg("c3b6").unwrap());
-    for (n, &moves) in (1..4).zip([177, 27_541, 4_139_102].iter()) {
+    for (n, &moves) in (1..4).zip([176, 30_479, 5_090_324].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}\n{:?}.",

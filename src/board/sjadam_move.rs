@@ -51,7 +51,9 @@ impl SjadamMove {
         (self.from, self.to)
     }
     pub fn en_passant(&self, board: &SjadamBoard) -> bool {
-        (self.from().file() - self.from().file()) / 2 == 1 && board.base_board[self.to].is_empty()
+        (self.from().file() as i8 - self.to().file() as i8).abs() % 2 == 1
+            && board.base_board[self.to].is_empty()
+            && board.base_board[self.from].piece_type() == PieceType::Pawn
     }
 
     pub fn castling(&self) -> bool {
