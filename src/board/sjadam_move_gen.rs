@@ -54,6 +54,33 @@ lazy_static! {
         }
         table
     };
+    static ref KNIGHT_TABLE : [u64; 256] = {
+        let mut table = [0; 256];
+        let c = 1 << 18;
+        let attacks = c << 17 | c << 15 | c << 10 | c << 6 | c | c >> 6 | c >> 10 | c >> 15 | c >> 17;
+        let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
+        let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
+        for pieces in 0..256 {
+            let mut targets : u64 = 0;
+            for file in 0..2 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= right_side & (attacks >> (2 - file))
+                }
+            }
+            for file in 2..6 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= attacks << (file - 2)
+                }
+            }
+            for file in 6..8 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= left_side & (attacks << (file - 2))
+                }
+            }
+            table[pieces as usize] = targets;
+        }
+        table
+    };
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -280,6 +307,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
             queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
             queen_moves
         },
+        PieceType::Knight => knight_moves(sjadam_squares, friendly_pieces),
         PieceType::Pawn => {
             let mut all_pieces_pawns = all_pieces.clone();
             if let Some(ep_square) = board.base_board.en_passant_square() {
@@ -302,8 +330,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
     }
     
-    if board.base_board[square].piece_type() == PieceType::King ||
-        board.base_board[square].piece_type() == PieceType::Knight
+    if board.base_board[square].piece_type() == PieceType::King
     {
         for chess_move_square in BoardIter::new()
             .filter(|&i| sjadam_squares.get(i))   
@@ -431,6 +458,20 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
             }
         }
     }
+}
+
+#[inline(never)]
+fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+    let mut moves = 0;
+    for rank in 0..2 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KNIGHT_TABLE[index] >> ((- rank * 8) + 16);
+    }
+    for rank in 2..8 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KNIGHT_TABLE[index] << ((rank * 8) - 16);
+    }
+    BitBoard::from_u64(moves & !friendly_pieces.board)
 }
 
 const RIGHT_MASK : u64 = 0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111;
