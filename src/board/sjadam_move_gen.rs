@@ -296,53 +296,12 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     };
 
     for chess_move_square in BoardIter::new()
-        .filter(|&i| moves.get(i) && i != square) { // TODO: Remove != square check ?
-            debug_assert!(!board.base_board[square].is_empty());
-            bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
-            /*if sjadam_squares.get(chess_move_square) {
-                bitboard_moves.push(SjadamMove::from_sjadam_move(square, chess_move_square));
-            }
-            else {
-                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }*/
-        }
-    /*
-    if board.base_board[square].piece_type() == PieceType::Rook
-    {
-        //let mut rook_destinations = sjadam_squares.clone();
-        debug_assert!(sjadam_squares.get(square));
-        let rook_moves = rook_moves(sjadam_squares, friendly_pieces, all_pieces);
-        for chess_move_square in BoardIter::new()
-            .filter(|&i| rook_moves.get(i) && i != square) {
-                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }
+        .filter(|&i| moves.get(i) && i != square)
+    { 
+        debug_assert!(!board.base_board[square].is_empty());
+        bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
     }
     
-    else if board.base_board[square].piece_type() == PieceType::Bishop {
-        debug_assert!(sjadam_squares.get(square));
-        let bishop_destinations = bishop_moves(sjadam_squares, friendly_pieces, all_pieces);
-        for chess_move_square in BoardIter::new()
-            .filter(|&i| bishop_destinations.get(i) && i != square) {
-                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }
-    }
-    else if board.base_board[square].piece_type() == PieceType::Queen {
-        let mut queen_moves = bishop_moves(sjadam_squares, friendly_pieces, all_pieces);
-        queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
-        for chess_move_square in BoardIter::new()
-            .filter(|&i| queen_moves.get(i) && i != square) {
-                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }
-    }
-    else if board.base_board[square].piece_type() == PieceType::Pawn {
-        let pawn_moves = pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces);
-        for chess_move_square in BoardIter::new()
-            .filter(|&i| pawn_moves.get(i) && i != square) {
-                bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }
-    }
-    else {
-        */
     if board.base_board[square].piece_type() == PieceType::King ||
         board.base_board[square].piece_type() == PieceType::Knight
     {

@@ -52,7 +52,6 @@ impl EvalBoard for SjadamBoard {
         }
         
         // Remove castling priviledges if anything moves from or to a corner
-
         let a1 = Square::from_alg("a1").unwrap();
         let h1 = Square::from_alg("h1").unwrap();
         let a8 = Square::from_alg("a8").unwrap();
@@ -83,8 +82,6 @@ impl EvalBoard for SjadamBoard {
 
         // Set en passant square
         let mid_sq = Square::from_ints(mv.to().file(), (mv.from().rank() + mv.to().rank()) / 2);
-        //println!("Piece moved: {}, mv: {}, rankdiff: {}, piece between: {}",
-        //        piece_moved, mv, i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8), self.base_board[mid_sq]);
         if piece_moved == PieceType::Pawn && mv.from().file() == mv.to().file()
             && i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8) == 2
             && self.base_board[mid_sq].is_empty() {
@@ -143,7 +140,7 @@ impl EvalBoard for SjadamBoard {
 
         self.base_board.to_move = !self.to_move();
         debug_assert_ne!(start_color, self.to_move());
-        debug_assert!(!self.base_board[mv.from].is_empty());
+        debug_assert!(!self.base_board[mv.from()].is_empty());
         
     }
 
