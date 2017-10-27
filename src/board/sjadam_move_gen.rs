@@ -236,6 +236,7 @@ impl SjadamBitBoard {
 }
 */
 
+#[inline(never)]
 pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = vec![];
     for square in BoardIter::new() {
@@ -245,18 +246,6 @@ pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
         }
     }
     moves
-}
-
-pub fn any_legal_moves(board: &mut SjadamBoard) -> bool {
-    for square in BoardIter::new() {
-        if !board.base_board[square].is_empty()
-            && board.base_board[square].color().unwrap() == board.to_move() {
-                if !legal_moves_for_square(board, square).is_empty() {
-                    return true;
-                }
-        }
-    }
-    false
 }
 
 fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<SjadamMove> {
@@ -291,20 +280,31 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
             queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
             queen_moves
         },
-        PieceType::Pawn if board.to_move() == White => pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces),
-        PieceType::Pawn => pawn_moves_black(sjadam_squares, friendly_pieces, all_pieces),
+        PieceType::Pawn => {
+            let mut all_pieces_pawns = all_pieces.clone();
+            if let Some(ep_square) = board.base_board.en_passant_square() {
+                all_pieces_pawns.set(ep_square);
+            }
+            if board.to_move() == White {
+                pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces_pawns)
+            }
+            else {
+                pawn_moves_black(sjadam_squares, friendly_pieces, all_pieces_pawns)
+            }
+        },
         _ => BitBoard::empty(),
     };
 
     for chess_move_square in BoardIter::new()
         .filter(|&i| moves.get(i) && i != square) { // TODO: Remove != square check ?
             debug_assert!(!board.base_board[square].is_empty());
-            if sjadam_squares.get(chess_move_square) {
+            bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
+            /*if sjadam_squares.get(chess_move_square) {
                 bitboard_moves.push(SjadamMove::from_sjadam_move(square, chess_move_square));
             }
             else {
                 bitboard_moves.push(SjadamMove::from_chess_move(&ChessMove::new(square, chess_move_square)));
-            }
+            }*/
         }
     /*
     if board.base_board[square].piece_type() == PieceType::Rook
@@ -382,9 +382,12 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         }
     }
     let mut combined_moves = chess_moves.iter()
-        .map(|mv| SjadamMove
-             { from: square, sjadam_square: mv.from, to: mv.to })
-        .filter(|mv| mv.from != mv.to)
+        .map(|mv| {
+            let castling = i8::abs(mv.to.file() as i8 - mv.from.file() as i8) == 2
+                && board.base_board[square].piece_type() == King;
+            SjadamMove::new(square, mv.to, castling)
+        })
+        .filter(|mv| mv.from() != mv.to())
         .collect::<Vec<_>>();
     combined_moves.append(&mut pure_sjadam_moves);
     let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
@@ -408,7 +411,8 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     combined_moves
 }
 
-/// Recursively sets all available sjadam-move squares 
+/// Recursively sets all available sjadam-move squares
+#[inline(never)]
 fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoard,
                          all_pieces: &BitBoard, square: Square) {
     let Square(i) = square;
@@ -431,14 +435,28 @@ fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoa
     }
 }
 
-/// Sets all available opponent sjadam-move squares 
+/// Sets all available opponent sjadam-move squares
+#[inline(never)]
 fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoard,
                          all_pieces: &BitBoard) {
+    let type1_mask = 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101;
+    let type2_mask = 0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010;
+    let type3_mask = 0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000;
+    
+    let color_offset = if type1_mask & sjadam_squares.board != 0 { 0 }
+    else if type2_mask & sjadam_squares.board != 0 { 1 }
+    else if type3_mask & sjadam_squares.board != 0 { 8 }
+    else { 9 };
     let old_sjadam_squares = sjadam_squares.clone();
-    for square in BoardIter::new()
-        .filter(|i|old_sjadam_squares.get(*i))
+    for i in [0, 2, 4, 6, 16, 18, 20, 22, 32, 34, 36, 38, 48, 50, 52, 54].iter()
+        .map(|&i| i + color_offset)
+        .filter(|&i| old_sjadam_squares.get(Square(i)))
     {
-        let Square(i) = square;
+        let square = Square(i);
+    //for square in BoardIter::new()
+    //    .filter(|i|old_sjadam_squares.get(*i))
+    //{
+    //    let Square(i) = square;
         for x in &[-1, 0, 1] {
             for y in &[-1, 0, 1] {
                 let (file, rank) = (square.file_rank().0 as i8, square.file_rank().1 as i8);
@@ -456,26 +474,29 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     }
 }
 
+const RIGHT_MASK : u64 = 0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111;
+const LEFT_MASK : u64 = 0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110;
+#[inline(never)]
 fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
-    let left_captures = (sjadam_squares.board << 7) & opponent_pieces.board;
-    let right_captures = (sjadam_squares.board << 9) & opponent_pieces.board;
+    let left_captures = ((sjadam_squares.board & LEFT_MASK) << 7) & opponent_pieces.board; // & LEFT_MASK;
+    let right_captures = ((sjadam_squares.board & RIGHT_MASK) << 9) & opponent_pieces.board; // & RIGHT_MASK;
     let forward = sjadam_squares.board << 8 & !all_pieces.board;
     let forward_two = (sjadam_squares.board & (255 << 8)) << 16 & !all_pieces.board & !(all_pieces.board << 8);
     BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
-
+#[inline(never)]
 fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
-    let left_captures = (sjadam_squares.board >> 7) & opponent_pieces.board;
-    let right_captures = (sjadam_squares.board >> 9) & opponent_pieces.board;
+    let left_captures = ((sjadam_squares.board & RIGHT_MASK) >> 7) & opponent_pieces.board; // & LEFT_MASK;
+    let right_captures = ((sjadam_squares.board & LEFT_MASK) >> 9) & opponent_pieces.board; // & RIGHT_MASK;
     let forward = sjadam_squares.board >> 8 & !all_pieces.board;
     let forward_two = (sjadam_squares.board & (255 << 48)) >> 16 & !all_pieces.board & !(all_pieces.board >> 8);
     BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
-
+#[inline(never)]
 fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
                 all_pieces: BitBoard) -> BitBoard {
     let mut bishop_moves = sjadam_squares.clone();
@@ -517,7 +538,7 @@ fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
     bishop_moves.board &= !friendly_pieces.board;
     bishop_moves
 }
-
+#[inline(never)]
 fn rook_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let mut sjadam_squares_rotated = sjadam_squares.rotate();

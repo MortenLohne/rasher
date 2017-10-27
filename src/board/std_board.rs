@@ -205,6 +205,14 @@ impl Square {
     pub fn rank(self) -> u8 {
         self.0 >> 3
     }
+    /*
+    pub const G1 : Square = Square(62);
+    pub const E1 : Square = Square(60);
+    pub const C1 : Square = Square(58);
+    pub const G8 : Square = Square(6);
+    pub const E8 : Square = Square(4);
+    pub const C8 : Square = Square(2);
+*/
 }
 
 
@@ -649,7 +657,6 @@ impl EvalBoard for ChessBoard {
         }
         // Undo en passant capture
         else if piece_moved == Pawn && file_from != file_to && c_move.capture == Empty {
-            println!("Undoing en passant capature {:?} at\n{}", c_move, self);
             self.board[rank_from as usize][file_from as usize] =
                 self.board[rank_to as usize][file_to as usize];
             self.board[rank_to as usize][file_to as usize] = Piece::empty();

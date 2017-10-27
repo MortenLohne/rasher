@@ -362,28 +362,42 @@ fn correct_move_gen_test7() {
     assert_eq!(legal_moves_after_plies(&mut board7, 3), 62_379);
 }
 
+use std::fmt;
+
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
-pub fn legal_moves_after_plies<B: EvalBoard>(board : &mut B, n : u8) -> u64 {
+pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n : u8) -> u64
+    where <B as EvalBoard>::Move: fmt::Display
+{
     if n == 0 { 1 }
     else {
         let mut total_moves = 0;
+        let old_board = board.clone();
         for c_move in board.all_legal_moves() {            
             let undo_move = board.do_move(c_move.clone());
             total_moves += legal_moves_after_plies(board, n - 1);
             board.undo_move(undo_move);
+            debug_assert_eq!(old_board, *board,
+                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
+                             c_move, old_board, board);
         }
         total_moves
     }
 }
 
 #[allow(dead_code)]
-pub fn perf_prop<B: EvalBoard>(board: &mut B, n: u8) -> Vec<(B::Move, u64)> {
-    let mut results = vec![];
+    pub fn perf_prop<B: EvalBoard + Eq + fmt::Debug>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
+    where <B as EvalBoard>::Move: fmt::Display
+{
+        let mut results = vec![];
+        let old_board = board.clone();
     for c_move in board.all_legal_moves() {
         let undo_move = board.do_move(c_move.clone());
-        results.push((c_move, legal_moves_after_plies(board, n - 1)));
+        results.push((c_move.clone(), legal_moves_after_plies(board, n - 1)));
         board.undo_move(undo_move);
+        debug_assert_eq!(old_board, *board,
+                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
+                             c_move, old_board, board);
     }
     results
 }

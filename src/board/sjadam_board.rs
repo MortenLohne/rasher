@@ -2,7 +2,6 @@ use board::std_board;
 use board::std_board::{ChessBoard, Piece, PieceType, Square};
 use board::sjadam_move::{SjadamMove, SjadamUndoMove};
 use board::sjadam_move_gen;
-use board::std_move_gen::move_gen;
 
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
@@ -27,26 +26,25 @@ impl EvalBoard for SjadamBoard {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
         let start_color = self.to_move();
-        debug_assert!(mv.from != mv.sjadam_square || mv.sjadam_square != mv.to);
-        debug_assert!(!self.base_board[mv.from].is_empty(),
+        debug_assert_ne!(mv.from(), mv.to());
+        debug_assert!(!self.base_board[mv.from()].is_empty(),
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
-        
+
+        let en_passant = mv.en_passant(&self);
+        let piece_moved = self.base_board[mv.from()].piece_type();
         let undo_move = SjadamUndoMove {
-            from: mv.from, sjadam_square: mv.sjadam_square,
-            capture: self.base_board[mv.to].piece_type(),
-            to: mv.to, piece_moved: self.base_board[mv.from].piece_type(),
+            from: mv.from(), to: mv.to(),
+            castling: mv.castling(), en_passant: en_passant,
+            capture: self.base_board[mv.to()].piece_type(),
+            piece_moved: self.base_board[mv.from()].piece_type(),
             old_castling_en_passant: self.base_board.castling_en_passant,
             old_half_move_clock: self.base_board.half_move_clock
         };
         debug_assert!(undo_move.piece_moved != PieceType::Empty,
                       "Empty piece_moved when doing {} on \n{:?}", mv, self);
-            
-        // Do sjadam move. Has no effect if there is no sjadam jump
-        self.base_board[mv.sjadam_square] = self.base_board[mv.from];
-        if mv.from != mv.sjadam_square {
-            self.base_board[mv.from] = Piece::empty();
-        }
 
+        self.base_board.set_en_passant_square(None);
+        
         // Remove castling priviledges on king moves
         if undo_move.piece_moved == PieceType::King {
             let color = self.to_move();
@@ -59,7 +57,7 @@ impl EvalBoard for SjadamBoard {
         let h1 = Square::from_alg("h1").unwrap();
         let a8 = Square::from_alg("a8").unwrap();
         let h8 = Square::from_alg("h8").unwrap();
-        match mv.from {
+        match mv.from() {
             square if square == a1 =>
                 self.base_board.disable_castling_queenside(White),
             square if square == h1 =>
@@ -71,7 +69,7 @@ impl EvalBoard for SjadamBoard {
             _ => (),
         }
 
-        match mv.to {
+        match mv.to() {
             square if square == a1 =>
                 self.base_board.disable_castling_queenside(White),
             square if square == h1 =>
@@ -81,35 +79,45 @@ impl EvalBoard for SjadamBoard {
             square if square == h8 =>
                 self.base_board.disable_castling_kingside(Black),
             _ => (),
+        }
+
+        // Set en passant square
+        let mid_sq = Square::from_ints(mv.to().file(), (mv.from().rank() + mv.to().rank()) / 2);
+        //println!("Piece moved: {}, mv: {}, rankdiff: {}, piece between: {}",
+        //        piece_moved, mv, i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8), self.base_board[mid_sq]);
+        if piece_moved == PieceType::Pawn && mv.from().file() == mv.to().file()
+            && i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8) == 2
+            && self.base_board[mid_sq].is_empty() {
+                //println!("Mid square: {}", mid_sq);
+                if start_color == White && mv.from().rank() == 6 {
+                    self.base_board.set_en_passant_square(Some(mid_sq));
+                }
+                else if start_color == Black && mv.from().rank() == 1 {
+                    self.base_board.set_en_passant_square(Some(mid_sq));
+                }
         }
         
-        let chess_move = mv.chess_move(self);
-
-        match chess_move {
-            None => {
-                if undo_move.piece_moved != PieceType::Pawn {
-                    self.base_board.half_move_clock += 1; // Pure sjadam moves are never captures
-                }
-                else {
-                    self.base_board.half_move_clock = 0;
-                }
-
-                // Sjadam moves never create en passant 
-                self.base_board.set_en_passant_square(None);
-                self.base_board.to_move = !self.base_board.to_move;
-                
-            }, // TODO: Figure out if anything else needs to be done here
-            Some(chess_move) => {
-                self.base_board.do_move(chess_move);
-            },
+        self.base_board[mv.to()] = self.base_board[mv.from()];
+        self.base_board[mv.from()] = Piece::empty();
+        if mv.castling() {
+            // Move the rook too
+            let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
+            self.base_board[Square::from_ints(rook_to, mv.from().rank())] = self.base_board[Square::from_ints(rook_from, mv.from().rank())];
+            self.base_board[Square::from_ints(rook_from, mv.from().rank())] = Piece::empty();
         }
-        if (start_color == White && mv.to.rank() == 0)
-            || (start_color == Black && mv.to.rank() == 7) {
-                debug_assert!(!self.base_board[mv.to].is_empty());
-                if self.base_board[mv.to].piece_type() != PieceType::King {
-                    self.base_board[mv.to] = Piece::new(PieceType::Queen, start_color);
+        else if en_passant {
+            // Remove the captured pawn
+            let ep_square_rank = if start_color == Black { mv.to().rank() + 1 } else { mv.to().rank() - 1 };
+            self.base_board[Square::from_ints(mv.to().file(), ep_square_rank)] = Piece::empty();
+        }
+        else if (start_color == White && mv.to().rank() == 0)
+            || (start_color == Black && mv.to().rank() == 7) {
+                debug_assert!(!self.base_board[mv.to()].is_empty());
+                if self.base_board[mv.to()].piece_type() != PieceType::King {
+                    self.base_board[mv.to()] = Piece::new(PieceType::Queen, start_color);
                 }
-            }
+}
+        self.base_board.to_move = !self.to_move();
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.base_board.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         undo_move
@@ -117,23 +125,23 @@ impl EvalBoard for SjadamBoard {
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
         let start_color = self.to_move();
-        match mv.chess_move(self) {
-            None => {
-                self.base_board.to_move = !self.base_board.to_move;
-            },
-            Some(chess_move) => self.base_board.undo_move(chess_move),
+        self.base_board[mv.from()] = Piece::new(mv.piece_moved, !start_color);
+        self.base_board[mv.to()] = Piece::new(mv.capture, start_color);
+        if mv.castling() {
+            // Move the rook too
+            let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
+            self.base_board[Square::from_ints(rook_from, mv.from().rank())] = self.base_board[Square::from_ints(rook_to, mv.from().rank())];
+            self.base_board[Square::from_ints(rook_to, mv.from().rank())] = Piece::empty();
+        }
+        else if mv.en_passant() {
+            // Replace the captured pawn
+            let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
+            self.base_board[Square::from_ints(mv.to().file(), ep_square_rank)] = Piece::new(PieceType::Pawn, start_color);
         }
         self.base_board.half_move_clock = mv.old_half_move_clock;
         self.base_board.castling_en_passant = mv.old_castling_en_passant;
-        if self.base_board[mv.sjadam_square].color().is_none() {
-            panic!("Couldn't undo move {:?} on board\n{:?}", mv, self);
-        }
-        let color = self.base_board[mv.sjadam_square].color().unwrap();
-        self.base_board[mv.from] = Piece::new(mv.piece_moved, color); 
-        // Undo sjadam move
-        if mv.from != mv.sjadam_square {
-            self.base_board[mv.sjadam_square] = Piece::empty();
-        }
+
+        self.base_board.to_move = !self.to_move();
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(!self.base_board[mv.from].is_empty());
         
@@ -157,28 +165,8 @@ impl EvalBoard for SjadamBoard {
             (true, false) => Some(GameResult::WhiteWin),
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
-            (true, true) => {
-                // First check if it is attacked by regular moves
-                if !sjadam_move_gen::any_legal_moves(&mut self.clone()) {
-                    if move_gen::is_attacked(&self.base_board, move_gen::king_pos(&self.base_board)) {
-                        match self.to_move() {
-                            Black => Some(GameResult::WhiteWin),
-                            White => Some(GameResult::BlackWin),
-                        }
-                    }
-                    else {
-                        Some(GameResult::Draw)
-                    }
-                }
-                // The king might still be directly captured by a sjadam move next move,
-                // but that is fine
-                else {
-                    if self.base_board.half_move_clock > 50 {
-                        Some(GameResult::Draw)
-                    }
-                    else { None }
-                }
-            },
+            (true, true) if self.base_board.half_move_clock > 50 => Some(GameResult::Draw),
+            (true, true) => None,
         }
     }
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
