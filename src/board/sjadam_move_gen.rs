@@ -77,7 +77,30 @@ lazy_static! {
                     targets |= left_side & (attacks << (file - 2))
                 }
             }
-            table[pieces as usize] = targets;
+            table[pieces] = targets;
+        }
+        table
+    };
+    static ref KING_TABLE : [u64; 256] = {
+        let mut table = [0; 256];
+        let attacks = 0b11100000_11100000_111;
+        let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
+        let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
+
+        for pieces in 0..256 {
+            let mut targets : u64 = 0;
+            if pieces % 2 != 0 {
+                targets |= right_side & (attacks >> 1);
+            }
+            for file in 1..7 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= attacks << (file - 1)
+                }
+            }
+            if (pieces >> 7) % 2 != 0 {
+                targets |= left_side & (attacks << 6);
+            }
+            table[pieces] = targets;
         }
         table
     };
@@ -294,10 +317,10 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
 
     sjadam_opponent_moves(&mut sjadam_squares, &opponent_pieces, &all_pieces);
 
-    let mut chess_moves = vec![]; // Moves with both
-    let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
+    //let mut chess_moves = vec![]; // Moves with both
+    //let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
 
-    let mut bitboard_moves = vec![];
+    let mut bitboard_moves = Vec::with_capacity(200);
 
     let moves : BitBoard = match board.base_board[square].piece_type() {
         PieceType::Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
@@ -320,6 +343,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
                 pawn_moves_black(sjadam_squares, friendly_pieces, all_pieces_pawns)
             }
         },
+        PieceType::King => king_moves(sjadam_squares, friendly_pieces),
         _ => BitBoard::empty(),
     };
 
@@ -329,8 +353,12 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         debug_assert!(!board.base_board[square].is_empty());
         bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
     }
-    
-    if board.base_board[square].piece_type() == PieceType::King
+
+    if board.base_board[square].piece_type() == PieceType::King {
+        king_castling(&board.base_board, square, &mut bitboard_moves);
+    }
+    /*
+    if false // board.base_board[square].piece_type() == PieceType::King
     {
         for chess_move_square in BoardIter::new()
             .filter(|&i| sjadam_squares.get(i))   
@@ -367,6 +395,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
             }
         }
     }
+     
     let mut combined_moves = chess_moves.iter()
         .map(|mv| {
             let castling = i8::abs(mv.to.file() as i8 - mv.from.file() as i8) == 2
@@ -395,6 +424,8 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     // and may be removed. Fix that
     combined_moves.append(&mut bitboard_moves);
     combined_moves
+*/
+    bitboard_moves
 }
 
 /// Recursively sets all available sjadam-move squares
@@ -458,6 +489,20 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
             }
         }
     }
+}
+
+#[inline(never)]
+fn king_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+    let mut moves = 0;
+    for rank in 0..1 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KING_TABLE[index] >> ((- rank * 8) + 8);
+    }
+    for rank in 1..8 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KING_TABLE[index] << ((rank * 8) - 8);
+    }
+    BitBoard::from_u64(moves & !friendly_pieces.board)
 }
 
 #[inline(never)]
@@ -614,6 +659,57 @@ pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &
         Pawn => legal_moves_for_pawn(board, square, moves),
         
         Empty => (),
+    }
+}
+
+#[inline(never)]
+fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>) {
+
+    let file = (square.0 & 0b0000_0111) as i8;
+    let rank = (square.0 >> 3) as i8;
+    
+    // Kingside castling
+    if board.can_castle_kingside(board.to_move) {
+        let mut can_castle_here = !is_attacked(board, square);
+        
+        // Check that the two squares are empty and not in check
+        for n in &[1, 2] {
+            debug_assert_eq!(file, 4, "Error: King tried to castle from {} on:{}.",
+                             square, board);
+            let square_checked = Square(square.0 + n);
+            if !board[square_checked].is_empty()
+                || is_attacked(board, square_checked) {
+                    can_castle_here = false;
+                }
+            
+        }
+        if can_castle_here {
+            moves.push(SjadamMove::new(square, Square(square.0 + 2), true));
+        }
+        
+        
+    }
+    // Queenside castling
+    if board.can_castle_queenside(board.to_move) {
+        let mut can_castle_here = !is_attacked(board, square);
+        
+        // Check that the two squares are empty and not in check
+        for n in &[1, 2] {
+            debug_assert_eq!(file, 4, "Error: File is {}.", file);
+            let square_checked = Square(square.0 - n);
+            if !board.piece_at(square_checked).is_empty() ||
+                is_attacked(board, square_checked)
+            {
+                can_castle_here = false;
+            }
+        }
+        // Check that the knight-square is empty
+        if !board.piece_at(Square(square.0 - 3)).is_empty() {
+            can_castle_here = false;
+        }
+        if can_castle_here {
+            moves.push(SjadamMove::new(square, Square(square.0 - 2), true));
+        }
     }
 }
 

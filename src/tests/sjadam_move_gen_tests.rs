@@ -104,7 +104,7 @@ fn castling_en_passant_perf_test() {
     board.do_move(SjadamMove::from_alg("d7d5").unwrap());
     board.do_move(SjadamMove::from_alg("c1a3").unwrap());
     board.do_move(SjadamMove::from_alg("b7b5").unwrap());
-    for (n, &moves) in (1..4).zip([158, 26_471, 4_139_102].iter()) {
+    for (n, &moves) in (1..4).zip([159, 26_638, 4_184_560].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}\n{:?}.",
@@ -124,7 +124,7 @@ fn castling_en_passant_perf_test_2() {
     board.do_move(SjadamMove::from_alg("c1a3").unwrap());
     board.do_move(SjadamMove::from_alg("b7b5").unwrap());
     board.do_move(SjadamMove::from_alg("c3b6").unwrap());
-    for (n, &moves) in (1..4).zip([176, 30_479, 5_090_324].iter()) {
+    for (n, &moves) in (1..4).zip([176, 30_641, 5_118_212].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}\n{:?}.",
@@ -135,7 +135,7 @@ fn castling_en_passant_perf_test_2() {
 #[test]
 fn perf_test_3() {
     let mut board = SjadamBoard::from_fen("1nbqkb1r/pppppppp/4r3/8/8/4N3/PPPPPPPP/RNBQ1RK1 b k - 0 1").unwrap();
-    for (n, &moves) in (1..4).zip([143, 22_490, 3_323_085].iter()) {
+    for (n, &moves) in (1..4).zip([143, 22_490, 3_325_467].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
                    "Expected {} moves, found {} on board:\n{:?}\nMoves:{:?}",
