@@ -301,6 +301,7 @@ pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
 fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<SjadamMove> {
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
+
     let friendly_pieces =
         BitBoard::from_board(&board.base_board,
                              |piece| !piece.is_empty() &&
@@ -310,7 +311,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
                              |piece| !piece.is_empty() &&
                              piece.color().unwrap() != board.to_move());
     
-    let all_pieces = BitBoard::all_from_board(&board.base_board);
+    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
     
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
                           &all_pieces, square);
@@ -320,7 +321,7 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     //let mut chess_moves = vec![]; // Moves with both
     //let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
 
-    let mut bitboard_moves = Vec::with_capacity(200);
+    let mut bitboard_moves = Vec::with_capacity(300);
 
     let moves : BitBoard = match board.base_board[square].piece_type() {
         PieceType::Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
@@ -677,10 +678,9 @@ fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>
             debug_assert_eq!(file, 4, "Error: King tried to castle from {} on:{}.",
                              square, board);
             let square_checked = Square(square.0 + n);
-            if !board[square_checked].is_empty()
-                || is_attacked(board, square_checked) {
-                    can_castle_here = false;
-                }
+            if !board[square_checked].is_empty() {
+                can_castle_here = false;
+            }
             
         }
         if can_castle_here {
@@ -697,9 +697,7 @@ fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>
         for n in &[1, 2] {
             debug_assert_eq!(file, 4, "Error: File is {}.", file);
             let square_checked = Square(square.0 - n);
-            if !board.piece_at(square_checked).is_empty() ||
-                is_attacked(board, square_checked)
-            {
+            if !board.piece_at(square_checked).is_empty() {
                 can_castle_here = false;
             }
         }
