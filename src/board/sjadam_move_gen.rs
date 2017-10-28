@@ -354,10 +354,32 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         debug_assert!(!board.base_board[square].is_empty());
         bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
     }
-
+    
     if board.base_board[square].piece_type() == PieceType::King {
-        king_castling(&board.base_board, square, &mut bitboard_moves);
+        let castling_rank = if board.to_move() == Black { 0 } else { 7 };
+        if board.to_move() == White {
+            if board.base_board.can_castle_kingside(White)
+                && all_pieces.rank(7) & 0b01100000 == 0 {
+                    bitboard_moves.push(SjadamMove::new(Square::E1, Square::G1, true));
+                }
+            if board.base_board.can_castle_queenside(White)
+                && all_pieces.rank(7) & 0b1110 == 0 {
+                    bitboard_moves.push(SjadamMove::new(Square::E1, Square::C1, true));
+
+                }
+        }
+        else {
+            if board.base_board.can_castle_kingside(Black)
+                && all_pieces.rank(0) & 0b0110_0000 == 0 {
+                    bitboard_moves.push(SjadamMove::new(Square::E8, Square::G8, true));
+                }
+            if board.base_board.can_castle_queenside(Black)
+                && all_pieces.rank(0) & 0b1110 == 0 {
+                    bitboard_moves.push(SjadamMove::new(Square::E8, Square::C8, true));
+                }
+        }
     }
+     
     /*
     if false // board.base_board[square].piece_type() == PieceType::King
     {
@@ -664,14 +686,15 @@ pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &
 }
 
 #[inline(never)]
-fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>) {
+fn king_castling(board: &ChessBoard, square: Square) -> Vec<SjadamMove> {
 
     let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
+
+    let mut moves = vec![];
     
     // Kingside castling
     if board.can_castle_kingside(board.to_move) {
-        let mut can_castle_here = !is_attacked(board, square);
+        let mut can_castle_here = true; // !is_attacked(board, square);
         
         // Check that the two squares are empty and not in check
         for n in &[1, 2] {
@@ -681,17 +704,14 @@ fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>
             if !board[square_checked].is_empty() {
                 can_castle_here = false;
             }
-            
         }
         if can_castle_here {
             moves.push(SjadamMove::new(square, Square(square.0 + 2), true));
         }
-        
-        
     }
     // Queenside castling
     if board.can_castle_queenside(board.to_move) {
-        let mut can_castle_here = !is_attacked(board, square);
+        let mut can_castle_here = true; // !is_attacked(board, square);
         
         // Check that the two squares are empty and not in check
         for n in &[1, 2] {
@@ -709,6 +729,7 @@ fn king_castling(board: &ChessBoard, square: Square, moves: &mut Vec<SjadamMove>
             moves.push(SjadamMove::new(square, Square(square.0 - 2), true));
         }
     }
+    moves
 }
 
 #[inline(never)]
