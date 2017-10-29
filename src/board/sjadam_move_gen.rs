@@ -287,21 +287,8 @@ impl SjadamBitBoard {
 */
 
 #[inline(never)]
-pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
-    let mut moves = vec![];
-    for square in BoardIter::new() {
-        if !board.base_board[square].is_empty()
-            && board.base_board[square].color().unwrap() == board.to_move() {
-                moves.append(&mut legal_moves_for_square(board, square));
-        }
-    }
-    moves
-}
-
-fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<SjadamMove> {
-    let mut sjadam_squares = BitBoard::empty();
-    sjadam_squares.set(square);
-
+pub fn all_legal_moves(board: &SjadamBoard) -> Vec<SjadamMove> {
+    let mut moves = Vec::with_capacity(300);
     let friendly_pieces =
         BitBoard::from_board(&board.base_board,
                              |piece| !piece.is_empty() &&
@@ -313,15 +300,48 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
     
     let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
     
+    for square in BoardIter::new() {
+        if !board.base_board[square].is_empty()
+            && board.base_board[square].color().unwrap() == board.to_move()
+        {
+            legal_moves_for_square(board, square, friendly_pieces,
+                                   opponent_pieces, &mut moves);
+        }
+    }
+    if board.to_move() == White {
+        if board.base_board.can_castle_kingside(White)
+            && all_pieces.rank(7) & 0b01100000 == 0 {
+                moves.push(SjadamMove::new(Square::E1, Square::G1, true));
+            }
+        if board.base_board.can_castle_queenside(White)
+            && all_pieces.rank(7) & 0b1110 == 0 {
+                moves.push(SjadamMove::new(Square::E1, Square::C1, true));
+            }
+    }
+    else {
+        if board.base_board.can_castle_kingside(Black)
+            && all_pieces.rank(0) & 0b0110_0000 == 0 {
+                moves.push(SjadamMove::new(Square::E8, Square::G8, true));
+            }
+        if board.base_board.can_castle_queenside(Black)
+            && all_pieces.rank(0) & 0b1110 == 0 {
+                moves.push(SjadamMove::new(Square::E8, Square::C8, true));
+            }
+    }
+    moves
+}
+
+fn legal_moves_for_square(board: &SjadamBoard, square: Square, friendly_pieces: BitBoard,
+                          opponent_pieces: BitBoard, bitboard_moves: &mut Vec<SjadamMove>) {
+    let mut sjadam_squares = BitBoard::empty();
+    sjadam_squares.set(square);
+    
+    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
+    
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
                           &all_pieces, square);
 
     sjadam_opponent_moves(&mut sjadam_squares, &opponent_pieces, &all_pieces);
-
-    //let mut chess_moves = vec![]; // Moves with both
-    //let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
-
-    let mut bitboard_moves = Vec::with_capacity(300);
 
     let moves : BitBoard = match board.base_board[square].piece_type() {
         PieceType::Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
@@ -347,108 +367,18 @@ fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<Sjadam
         PieceType::King => king_moves(sjadam_squares, friendly_pieces),
         _ => BitBoard::empty(),
     };
-
+    for i in 0..63 {
+        if moves.get(Square(i)) && Square(i) != square {
+            bitboard_moves.push(SjadamMove::new(square, Square(i), false));
+        }
+    }
+    /*
     for chess_move_square in BoardIter::new()
         .filter(|&i| moves.get(i) && i != square)
     { 
         debug_assert!(!board.base_board[square].is_empty());
         bitboard_moves.push(SjadamMove::new(square, chess_move_square, false));
-    }
-    
-    if board.base_board[square].piece_type() == PieceType::King {
-        let castling_rank = if board.to_move() == Black { 0 } else { 7 };
-        if board.to_move() == White {
-            if board.base_board.can_castle_kingside(White)
-                && all_pieces.rank(7) & 0b01100000 == 0 {
-                    bitboard_moves.push(SjadamMove::new(Square::E1, Square::G1, true));
-                }
-            if board.base_board.can_castle_queenside(White)
-                && all_pieces.rank(7) & 0b1110 == 0 {
-                    bitboard_moves.push(SjadamMove::new(Square::E1, Square::C1, true));
-
-                }
-        }
-        else {
-            if board.base_board.can_castle_kingside(Black)
-                && all_pieces.rank(0) & 0b0110_0000 == 0 {
-                    bitboard_moves.push(SjadamMove::new(Square::E8, Square::G8, true));
-                }
-            if board.base_board.can_castle_queenside(Black)
-                && all_pieces.rank(0) & 0b1110 == 0 {
-                    bitboard_moves.push(SjadamMove::new(Square::E8, Square::C8, true));
-                }
-        }
-    }
-     
-    /*
-    if false // board.base_board[square].piece_type() == PieceType::King
-    {
-        for chess_move_square in BoardIter::new()
-            .filter(|&i| sjadam_squares.get(i))   
-        {
-            let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
-            let old_board = board.clone();
-            let mut old_castling = None;
-            if chess_move_square != square {
-                // "Do" the pure sjadam part of the move, but keep the same player to move
-                // Also do not promote pieces
-                board.base_board[chess_move_square] = board.base_board[square];
-                board.base_board[square] = Piece::empty();
-                old_castling = Some(board.base_board.castling_en_passant);
-                if board.base_board[chess_move_square].piece_type() == PieceType::King {
-                    let color = board.to_move();
-                    board.base_board.disable_castling(color)
-                }
-            }
-            
-            debug_assert!(!board.base_board[chess_move_square].is_empty(),
-                          "Square {} is empty on \n{:?}, but is marked in {:?}",
-                          chess_move_square, board.base_board, sjadam_squares);
-            // Generate the chess part of the move
-            legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
-            if chess_move_square != square {
-                pure_sjadam_moves.push(sjadam_move.clone());
-            }
-
-            if chess_move_square != square {
-                board.base_board[square] = board.base_board[chess_move_square];
-                board.base_board[chess_move_square] = Piece::empty();
-                board.base_board.castling_en_passant = old_castling.unwrap();
-                debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
-            }
-        }
-    }
-     
-    let mut combined_moves = chess_moves.iter()
-        .map(|mv| {
-            let castling = i8::abs(mv.to.file() as i8 - mv.from.file() as i8) == 2
-                && board.base_board[square].piece_type() == King;
-            SjadamMove::new(square, mv.to, castling)
-        })
-        .filter(|mv| mv.from() != mv.to())
-        .collect::<Vec<_>>();
-    combined_moves.append(&mut pure_sjadam_moves);
-    let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
-        let (from1, to1) = mv1.from_to_squares();
-        let (from2, to2) = mv2.from_to_squares();
-        to1.cmp(&to2)
-            .then((board.base_board[from1].piece_type()).cmp(&board.base_board[from2].piece_type()))
-    };
-    let move_eq = |mv1: &mut SjadamMove, mv2: &mut SjadamMove| {
-        let (from1, to1) = mv1.from_to_squares();
-        let (from2, to2) = mv2.from_to_squares();
-        to1 == to2 && board.base_board[from1].piece_type() == board.base_board[from2].piece_type()
-    };
-    // Two moves are considered equal if they place the same piece on the same square,
-    // and do not castle
-    combined_moves.sort_by(move_cmp);
-    combined_moves.dedup_by(move_eq);
-    // TODO: Here castling and non-castling moves will be considered equal,
-    // and may be removed. Fix that
-    combined_moves.append(&mut bitboard_moves);
-    combined_moves
-*/
-    bitboard_moves
+    }*/
 }
 
 /// Recursively sets all available sjadam-move squares
