@@ -45,10 +45,6 @@ impl SjadamMove {
         Self { from: from, to: to, castling: castling }
     }
     
-    pub fn from_sjadam_move(from: Square, to: Square) -> Self {
-        Self::new(from, to, false)
-    }
-    
     pub fn from_to_squares(&self) -> (Square, Square) {
         (self.from, self.to)
     }

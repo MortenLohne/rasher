@@ -52,30 +52,26 @@ impl EvalBoard for SjadamBoard {
         }
         
         // Remove castling priviledges if anything moves from or to a corner
-        let a1 = Square::from_alg("a1").unwrap();
-        let h1 = Square::from_alg("h1").unwrap();
-        let a8 = Square::from_alg("a8").unwrap();
-        let h8 = Square::from_alg("h8").unwrap();
         match mv.from() {
-            square if square == a1 =>
+            square if square == Square::A1 =>
                 self.base_board.disable_castling_queenside(White),
-            square if square == h1 =>
+            square if square == Square::H1 =>
                 self.base_board.disable_castling_kingside(White),
-            square if square == a8 =>
+            square if square == Square::A8 =>
                 self.base_board.disable_castling_queenside(Black),
-            square if square == h8 =>
+            square if square == Square::H8 =>
                 self.base_board.disable_castling_kingside(Black),
             _ => (),
         }
 
         match mv.to() {
-            square if square == a1 =>
+            square if square == Square::A1 =>
                 self.base_board.disable_castling_queenside(White),
-            square if square == h1 =>
+            square if square == Square::H1 =>
                 self.base_board.disable_castling_kingside(White),
-            square if square == a8 =>
+            square if square == Square::A8 =>
                 self.base_board.disable_castling_queenside(Black),
-            square if square == h8 =>
+            square if square == Square::H8 =>
                 self.base_board.disable_castling_kingside(Black),
             _ => (),
         }

@@ -59,6 +59,7 @@ impl PieceType {
             _ => None,
         }
     }
+    #[allow(dead_code)]
     pub fn from_disc(disc: u32) -> Option<Self> {
         if disc > 6 { None }
         else { Some(unsafe { mem::transmute(disc as u8) }) }
@@ -205,20 +206,19 @@ impl Square {
     pub fn rank(self) -> u8 {
         self.0 >> 3
     }
+    
     pub const H1 : Square = Square(63);
     pub const G1 : Square = Square(62);
     pub const E1 : Square = Square(60);
     pub const C1 : Square = Square(58);
     pub const A1 : Square = Square(56);
+
+    pub const H8 : Square = Square(7);
     pub const G8 : Square = Square(6);
     pub const E8 : Square = Square(4);
     pub const C8 : Square = Square(2);
-
+    pub const A8 : Square = Square(0);
 }
-
-
-
-// use std::hash::{Hash, Hasher, SipHasher};
 
 #[derive(Clone)]
 pub struct ChessBoard {
