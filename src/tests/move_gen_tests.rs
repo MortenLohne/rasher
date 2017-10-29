@@ -235,9 +235,9 @@ fn starting_position_perf_test_long() {
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
     assert_eq!(legal_moves_after_plies(&mut board1, 4), 197_281);
-    assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_609);
-    assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_324);
-    assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_901_860); //~10 min
+    assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_617);
+    assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_679);
+    assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_913_043); //~10 min
     //assert_eq!(legal_moves_after_plies(&mut board, 8), 84_998_978_956);
 }
 
@@ -274,8 +274,8 @@ fn correct_move_gen_test2_long() {
     assert_eq!(legal_moves_after_plies(&mut board2, 1), 48);
     assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
     assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
-    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_603);
-    assert_eq!(legal_moves_after_plies(&mut board2, 5), 193_690_690);
+    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_604);
+    assert_eq!(legal_moves_after_plies(&mut board2, 5), 193_690_734);
 }
 
 #[test]
@@ -285,7 +285,7 @@ fn correct_move_gen_test3() {
     assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
     assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
     assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_624);
+    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
 }
 
 #[test]
@@ -296,9 +296,9 @@ fn correct_move_gen_test3_long() {
     assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
     assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
     assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_624);
-    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_083);
-    assert_eq!(legal_moves_after_plies(&mut board3, 7), 178_633_661);
+    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
+    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_100);
+    assert_eq!(legal_moves_after_plies(&mut board3, 7), 178_636_411);
 }
 
 #[test]
@@ -306,7 +306,7 @@ fn correct_move_gen_test4() {
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..6).zip(
-        [6, 264, 9_467, 422_333].iter()) 
+        [6, 264, 9_467, 422_355].iter()) 
     {
         assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
     }
@@ -318,7 +318,7 @@ fn correct_move_gen_test4_long() {
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..7).zip(
-        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) 
+        [6, 264, 9_467, 422_355, 15_833_319, 706_095_622].iter()) 
     {
         assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
     }
@@ -350,7 +350,7 @@ fn correct_move_gen_test6_long() {
     let mut board6 = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
     for (depth, nodes) in (1..7).zip(
-        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
+        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_365].iter()) {
         assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
     }
 }
@@ -369,7 +369,7 @@ use std::fmt;
 pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n : u8) -> u64
     where <B as EvalBoard>::Move: fmt::Display
 {
-    if n == 0 { 1 }
+    if n == 0 || board.game_result() != None { 1 }
     else {
         let mut total_moves = 0;
         let old_board = board.clone();
