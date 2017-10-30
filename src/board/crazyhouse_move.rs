@@ -1,6 +1,7 @@
 use board::std_move::{ChessMove, ChessUndoMove};
 use board::std_board::*;
-use search_algorithms::game_move::Move;
+use ::uci::UciMove;
+use board::crazyhouse_board::CrazyhouseBoard;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CrazyhouseUndoMove {
@@ -14,7 +15,9 @@ pub enum CrazyhouseMove {
     CrazyMove(PieceType, Square, u8),
 }
 
-impl Move for CrazyhouseMove { 
+impl UciMove for CrazyhouseMove {
+    type Board = CrazyhouseBoard;
+    
     fn from_alg(input : &str) -> Result<Self, String> {
         use board::std_board::PieceType::*;
         if input.contains('@') {

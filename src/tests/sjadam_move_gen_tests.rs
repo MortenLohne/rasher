@@ -1,7 +1,7 @@
 use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
 use board::sjadam_move::SjadamMove;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
 use search_algorithms::board::{GameResult, EvalBoard};
 use tests::move_gen_tests;
 

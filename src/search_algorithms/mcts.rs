@@ -1,7 +1,8 @@
 use search_algorithms::board::GameResult;
 use search_algorithms::board::GameResult::*;
 use search_algorithms::board::EvalBoard;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
+use ::uci::UciBoard;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
 
@@ -19,7 +20,9 @@ use uci;
 
 use rayon::prelude::*;
 
-pub fn play_human<B: EvalBoard + fmt::Debug>(mut board: B) {
+pub fn play_human<B: EvalBoard + fmt::Debug + UciBoard>(mut board: B)
+    where <B as EvalBoard>::Move: uci::UciMove
+{
     let stdin = io::stdin();
     while board.game_result() == None {
         println!("{:?}", board);
@@ -88,7 +91,7 @@ use std::thread;
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync + UciMove
 {
     let (sender, receiver) = mpsc::channel();
     
@@ -101,7 +104,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
                      channel: mpsc::Sender<uci::UciInfo>)
-    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync + UciMove
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::get_time();
@@ -163,7 +166,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
 fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
                     board: &mut B, start_time: time::Timespec,
                     options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo>)
-    where B: EvalBoard + fmt::Debug
+    where B: EvalBoard + fmt::Debug, <B as EvalBoard>::Move: UciMove
 {
     debug_assert_eq!(mc_tree.board, *board);
     let ms_taken = (time::get_time() - start_time).num_milliseconds();
@@ -185,7 +188,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         let mut pv = go_move.to_alg();
         pv.push(' ');
         pv.push_str(&node.pv(board).iter()
-                    .map(Move::to_alg)
+                    .map(UciMove::to_alg)
                     .collect::<Vec<_>>()
                     .join(" "));
         let score = alpha_beta::Score::Val((node.score().into_inner() as f32 - 0.5) * 20.0);

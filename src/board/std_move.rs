@@ -1,6 +1,6 @@
 use board::std_board::PieceType::*;
 use board::std_board::*;
-use search_algorithms::game_move::Move;
+use ::uci::UciMove;
 
 use std::fmt;
 
@@ -56,7 +56,10 @@ impl ChessMove {
         ChessMove { from: from, to: to, prom: Some(prom) }
     }
 }
-impl Move for ChessMove {
+impl UciMove for ChessMove {
+
+    type Board = ChessBoard;
+    
     fn to_alg(&self) -> String {
         let (file_from, rank_from) = self.from.file_rank();
         let (file_to, rank_to) = self.to.file_rank();

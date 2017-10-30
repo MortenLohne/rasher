@@ -4,7 +4,6 @@ use board::crazyhouse_board::CrazyhouseBoard;
 use board::std_board::TimeInfo;
 
 use search_algorithms::board;
-use search_algorithms::game_move::Move;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
@@ -17,12 +16,13 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
 
-pub trait UciBoard : Sized {
+pub trait UciBoard: Sized {
     fn from_fen(&str) -> Result<Self, String>;
     fn to_fen(&self) -> String;
 }
 
 pub trait UciMove : Sized {
+    type Board;
     fn from_alg(&str) -> Result<Self, String>;
     fn to_alg(&self) -> String;
 }
@@ -307,7 +307,8 @@ use std::sync::mpsc;
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
                         -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
-    where B: 'static + board::EvalBoard + fmt::Debug + Send, <B as board::EvalBoard>::Move: Sync
+    where B: 'static + board::EvalBoard + fmt::Debug + Send,
+<B as board::EvalBoard>::Move: Sync + UciMove
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
 }
@@ -491,7 +492,7 @@ pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position<Board> (input : &String) -> Result<Board, String>
-    where Board: 'static + board::EvalBoard + UciBoard{
+    where Board: 'static + board::EvalBoard + UciBoard, <Board as board::EvalBoard>::Move: UciMove<Board=Board> {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
@@ -519,7 +520,6 @@ fn parse_position<Board> (input : &String) -> Result<Board, String>
         return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
                            input, words[1], words.len()))
     };
-    use search_algorithms::game_move::Move;
     if words.len() > moves_pos  {
         if words[moves_pos] == "moves" {
             for c_move_str in words.iter().skip(moves_pos + 1) {

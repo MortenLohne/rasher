@@ -2,8 +2,8 @@ use board::sjadam_move_gen::BitBoard;
 use board::std_board;
 use board::std_board::ChessBoard;
 use board::std_move::ChessMove;
+use uci::UciMove;
 use search_algorithms::board::EvalBoard;
-use search_algorithms::game_move::Move;
 
 #[test]
 fn rotate() {

@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::EvalBoard;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
 use search_algorithms::board::Color::*;
 use self::Score::*;
 use std::thread;
@@ -25,7 +25,8 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
+    where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq,
+<B as EvalBoard>::Move: Sync + Send + UciMove
 {
     let (sender, receiver) = mpsc::channel();
     let thread = thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
@@ -36,7 +37,8 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
-    where B: EvalBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send + Hash + Eq,
+<B as EvalBoard>::Move: Sync + UciMove
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
 }
@@ -47,7 +49,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         channel: mpsc::Sender<uci::UciInfo>,
                         move_list: &Option<Vec<B::Move>>) 
                          -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug + Hash + Eq
+    where B: EvalBoard + fmt::Debug + Hash + Eq, <B as EvalBoard>::Move: UciMove
 {
     {
         engine_comm.lock().unwrap().engine_is_running = true;
@@ -116,7 +118,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 continue;
             }
             let pv_str = moves.iter()
-                .map(Move::to_alg)
+                .map(UciMove::to_alg)
                 .collect::<Vec<_>>()
                 .join(" ");
             pv_moves.push(moves[0].clone());
@@ -162,7 +164,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                           time_restriction: uci::TimeRestriction,
                           move_list: Option<Vec<B::Move>>, table: &mut Table<B, B::Move>)
                           -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug + Hash + Eq
+    where B: EvalBoard + fmt::Debug + Hash + Eq, <B as EvalBoard>::Move: UciMove
 {
     
     fn find_best_move_ab_rec<B> (board: &mut B, depth : u16,
@@ -173,7 +175,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                   mut move_list: Option<Vec<B::Move>>,
                                   table: &mut Table<B, B::Move>)
                                   -> (Score, Vec<B::Move>)
-        where B: EvalBoard + fmt::Debug + Hash + Eq
+        where B: EvalBoard + fmt::Debug + Hash + Eq, <B as EvalBoard>::Move: UciMove
     {
         debug_assert!(alpha <= beta, "alpha={}, beta={}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board); 
@@ -364,7 +366,7 @@ struct Table<B, M> {
     max_memory: usize,
 }
 
-impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
+impl<B: EvalBoard + Eq + Hash, M: UciMove> Table<B, M> {
     pub fn new(max_memory: usize) -> Table<B, M> {
         Table { hash_table: HashMap::with_capacity(6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,

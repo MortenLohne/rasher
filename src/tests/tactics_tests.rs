@@ -4,7 +4,7 @@ use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;

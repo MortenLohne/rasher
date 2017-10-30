@@ -1,8 +1,8 @@
 use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
-use board::sjadam_move::SjadamMove;
 use search_algorithms::alpha_beta;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
+use board::sjadam_move::SjadamMove;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
 use uci;

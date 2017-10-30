@@ -348,7 +348,8 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
     Ok(())
 }
 
-impl UciBoard for ChessBoard {    
+impl UciBoard for ChessBoard {
+    
     fn from_fen(fen : &str) -> Result<Self, String> {
         let fen_split : Vec<&str> = fen.split(" ").collect();
         if fen_split.len() < 4 || fen_split.len() > 6 {

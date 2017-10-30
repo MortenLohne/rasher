@@ -1,6 +1,6 @@
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
 use search_algorithms::board::EvalBoard;
 
 use uci::UciBoard;

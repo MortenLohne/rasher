@@ -2,7 +2,7 @@ use board::std_board::Square;
 use board::std_board::PieceType;
 use board::sjadam_board::SjadamBoard;
 
-use search_algorithms::game_move::Move;
+use ::uci::UciMove;
 
 use std::fmt;
 
@@ -66,7 +66,10 @@ impl SjadamMove {
     }
 }
 
-impl Move for SjadamMove {
+impl UciMove for SjadamMove {
+
+    type Board = SjadamBoard;
+    
     fn from_alg(input: &str) -> Result<Self, String> {
         if input.len() < 4 {
             return Err(format!("Move \"{}\" was too short to parse", input))

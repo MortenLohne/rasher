@@ -5,7 +5,7 @@ use rand;
 use search_algorithms::mcts;
 use search_algorithms::mcts::MonteCarloTree;
 use search_algorithms::board::EvalBoard;
-use search_algorithms::game_move::Move;
+use uci::UciMove;
 use uci::UciBoard;
 
 use board::std_board::ChessBoard;
