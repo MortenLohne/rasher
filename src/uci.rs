@@ -16,15 +16,12 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
 
-pub trait UciBoard: Sized {
+pub trait UciBoard: board::EvalBoard {
     fn from_fen(&str) -> Result<Self, String>;
     fn to_fen(&self) -> String;
-}
 
-pub trait UciMove : Sized {
-    type Board;
-    fn from_alg(&str) -> Result<Self, String>;
-    fn to_alg(&self) -> String;
+    fn from_alg(&self, &str) -> Result<Self::Move, String>; // Rename move_from_lan
+    fn to_alg(&self, &Self::Move) -> String; // lan_move_string
 }
 
 /// Connects the engine to a GUI using UCI. 
@@ -111,7 +108,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| <<ChessBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(|move_string| parse_position::<ChessBoard>(&board_string)?.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -132,7 +129,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| <<CrazyhouseBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(|move_string| parse_position::<CrazyhouseBoard>(&board_string)?.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -153,7 +150,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| <<SjadamBoard as board::EvalBoard>::Move>::from_alg(move_string))
+                                         .map(|move_string| parse_position::<SjadamBoard>(&board_string)?.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -307,8 +304,8 @@ use std::sync::mpsc;
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
                         -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
-    where B: 'static + board::EvalBoard + fmt::Debug + Send,
-<B as board::EvalBoard>::Move: Sync + UciMove
+    where B: 'static + UciBoard + fmt::Debug + Send,
+<B as board::EvalBoard>::Move: Sync
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
 }
@@ -492,7 +489,7 @@ pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position<Board> (input : &String) -> Result<Board, String>
-    where Board: 'static + board::EvalBoard + UciBoard, <Board as board::EvalBoard>::Move: UciMove<Board=Board> {
+    where Board: 'static + UciBoard {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
@@ -523,7 +520,7 @@ fn parse_position<Board> (input : &String) -> Result<Board, String>
     if words.len() > moves_pos  {
         if words[moves_pos] == "moves" {
             for c_move_str in words.iter().skip(moves_pos + 1) {
-                let c_move = match Board::Move::from_alg(c_move_str) {
+                let c_move = match board.from_alg(c_move_str) {
                     Ok(m) => m,
                     Err(err) => {
                         return Err(err.to_string());

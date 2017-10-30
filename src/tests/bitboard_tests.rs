@@ -1,9 +1,8 @@
 use board::sjadam_move_gen::BitBoard;
 use board::std_board;
 use board::std_board::ChessBoard;
-use board::std_move::ChessMove;
-use uci::UciMove;
 use search_algorithms::board::EvalBoard;
+use uci::UciBoard;
 
 #[test]
 fn rotate() {
@@ -81,10 +80,11 @@ fn rank() {
 fn file() {
     let start_board = BitBoard::all_from_board(&ChessBoard::start_board());
     assert_eq!(start_board.file(0), 0b1100_0011);
-    let mut chess_board = ChessBoard::start_board();
-    chess_board.do_move(ChessMove::from_alg("a2a4").unwrap());
-    let board = BitBoard::all_from_board(&chess_board);
-    assert_eq!(board.file(0), 0b1100_1001);
+    let mut board = ChessBoard::start_board();
+    let mv = board.from_alg("a2a4").unwrap();
+    board.do_move(mv);
+    let bit_board = BitBoard::all_from_board(&board);
+    assert_eq!(bit_board.file(0), 0b1100_1001);
 }
 
 #[test]

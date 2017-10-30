@@ -1,7 +1,5 @@
 use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
-use board::sjadam_move::SjadamMove;
-use uci::UciMove;
 use search_algorithms::board::{GameResult, EvalBoard};
 use tests::move_gen_tests;
 
@@ -52,7 +50,7 @@ fn can_take_king_while_checked() {
     if board.game_result() != Some(GameResult::WhiteWin) { 
         let moves = board.all_legal_moves();
         
-        let correct_move = SjadamMove::from_alg("c5g6").unwrap();
+        let correct_move = board.from_alg("c5g6").unwrap();
         assert!(board.all_legal_moves().contains(&correct_move),
                 "White couldn't take king on board:\n{:?}Moves: {:?}",
                 board, moves);
@@ -64,7 +62,7 @@ fn sjadam_move_to_promote_pawn() {
     let board = SjadamBoard::from_fen("k7/5R2/5P2/8/8/8/8/7K w - - 0 1").unwrap();
     let moves = board.all_legal_moves();
         
-    let correct_move = SjadamMove::from_alg("f6f8").unwrap();
+    let correct_move = board.from_alg("f6f8").unwrap();
     assert!(board.all_legal_moves().contains(&correct_move),
             "White couldn't promote in sjadam on board:\n{:?}Moves: {:?}",
             board, moves);
@@ -96,14 +94,15 @@ fn startpos_perf_test_long() {
 #[test]
 fn castling_en_passant_perf_test() {
     let mut board = SjadamBoard::start_board();
-    board.do_move(SjadamMove::from_alg("g1e3").unwrap());
-    board.do_move(SjadamMove::from_alg("g8e6").unwrap());
-    board.do_move(SjadamMove::from_alg("f1c4").unwrap());
-    board.do_move(SjadamMove::from_alg("e8g8").unwrap());
-    board.do_move(SjadamMove::from_alg("c2c3").unwrap());
-    board.do_move(SjadamMove::from_alg("d7d5").unwrap());
-    board.do_move(SjadamMove::from_alg("c1a3").unwrap());
-    board.do_move(SjadamMove::from_alg("b7b5").unwrap());
+    let board2 = board.clone(); // From before non-lexical lifetimes
+    board.do_move(board2.from_alg("g1e3").unwrap());
+    board.do_move(board2.from_alg("g8e6").unwrap());
+    board.do_move(board2.from_alg("f1c4").unwrap());
+    board.do_move(board2.from_alg("e8g8").unwrap());
+    board.do_move(board2.from_alg("c2c3").unwrap());
+    board.do_move(board2.from_alg("d7d5").unwrap());
+    board.do_move(board2.from_alg("c1a3").unwrap());
+    board.do_move(board2.from_alg("b7b5").unwrap());
     for (n, &moves) in (1..4).zip([159, 26_638, 4_176_219].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,
@@ -115,15 +114,16 @@ fn castling_en_passant_perf_test() {
 #[test]
 fn castling_en_passant_perf_test_2() {
     let mut board = SjadamBoard::start_board();
-    board.do_move(SjadamMove::from_alg("g1e3").unwrap());
-    board.do_move(SjadamMove::from_alg("g8e6").unwrap());
-    board.do_move(SjadamMove::from_alg("f1c4").unwrap());
-    board.do_move(SjadamMove::from_alg("e8g8").unwrap());
-    board.do_move(SjadamMove::from_alg("c2c3").unwrap());
-    board.do_move(SjadamMove::from_alg("d7d5").unwrap());
-    board.do_move(SjadamMove::from_alg("c1a3").unwrap());
-    board.do_move(SjadamMove::from_alg("b7b5").unwrap());
-    board.do_move(SjadamMove::from_alg("c3b6").unwrap());
+    let board2 = board.clone(); // From before non-lexical lifetimes
+    board.do_move(board2.from_alg("g1e3").unwrap());
+    board.do_move(board2.from_alg("g8e6").unwrap());
+    board.do_move(board2.from_alg("f1c4").unwrap());
+    board.do_move(board2.from_alg("e8g8").unwrap());
+    board.do_move(board2.from_alg("c2c3").unwrap());
+    board.do_move(board2.from_alg("d7d5").unwrap());
+    board.do_move(board2.from_alg("c1a3").unwrap());
+    board.do_move(board2.from_alg("b7b5").unwrap());
+    board.do_move(board2.from_alg("c3b6").unwrap());
     for (n, &moves) in (1..4).zip([176, 30_653, 5_116_707].iter()) {
         let result = move_gen_tests::legal_moves_after_plies(&mut board, n);
         assert_eq!(result, moves,

@@ -1,6 +1,7 @@
 use board::std_board::PieceType;
 use board::std_board::ChessBoard;
 use board::std_board;
+use board::std_board::Square;
 use board::std_board::Piece;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
@@ -271,5 +272,44 @@ impl uci::UciBoard for CrazyhouseBoard {
         
     fn to_fen(&self) -> String {
         "".to_string() // TODO: write
+    }
+
+    fn from_alg(&self, input : &str) -> Result<Self::Move, String> {
+        use board::std_board::PieceType::*;
+        if input.contains('@') {
+            let piece_type = match input.chars().next().unwrap() {
+                '@' => Pawn,
+                'N' => Knight,
+                'B' => Bishop,
+                'R' => Rook,
+                'Q' => Queen,
+                'K' => King,
+                _ => return Err(format!("Couldn't parse move {}.", input)),
+            };
+            let square_str : String = input.chars().skip_while(|&c| c != '@').collect();
+            let square = Square::from_alg(&square_str).ok_or(
+                format!("Failed to parse destination square for move {}", input));
+            square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
+        }
+        else {
+            self.base_board.from_alg(input).map(|mv| CrazyhouseMove::NormalMove(mv))
+        }
+    }
+    
+    fn to_alg(&self, mv: &Self::Move) -> String {
+        use board::std_board::PieceType::*;
+        match mv {
+            &CrazyhouseMove::NormalMove(mv) => self.base_board.to_alg(&mv),
+            &CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
+                Knight => "N",
+                Bishop => "B",
+                Rook => "R",
+                Queen => "Q",
+                King => "K",
+                Pawn => "",
+                Empty => panic!("Encountered move with empty piece")
+            }.to_string() 
+                + "@" + &square.to_string()
+        }
     }
 }

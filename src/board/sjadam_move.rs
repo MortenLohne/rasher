@@ -2,8 +2,6 @@ use board::std_board::Square;
 use board::std_board::PieceType;
 use board::sjadam_board::SjadamBoard;
 
-use ::uci::UciMove;
-
 use std::fmt;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -63,30 +61,6 @@ impl SjadamMove {
     }
     pub fn to(&self) -> Square {
         self.from_to_squares().1
-    }
-}
-
-impl UciMove for SjadamMove {
-
-    type Board = SjadamBoard;
-    
-    fn from_alg(input: &str) -> Result<Self, String> {
-        if input.len() < 4 {
-            return Err(format!("Move \"{}\" was too short to parse", input))
-        }
-        if input.len() > 5 {
-            return Err(format!("Move \"{}\" was too long to parse", input))
-        }
-        let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
-        let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
-        match input.len() {
-            4 => Ok(Self::new(from, to, false)),
-            5 if input.as_bytes()[4] == 'c' as u8 => Ok(Self::new(from, to, true)),
-            _ => Err(format!("Couldn't parse move {}", input))
-        }
-    }
-    fn to_alg(&self) -> String {
-        self.to_string()
     }
 }
 

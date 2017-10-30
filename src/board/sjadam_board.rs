@@ -186,6 +186,25 @@ impl UciBoard for SjadamBoard {
     fn to_fen(&self) -> String {
         self.base_board.to_fen()
     }
+
+    fn from_alg(&self, input: &str) -> Result<Self::Move, String> {
+        if input.len() < 4 {
+            return Err(format!("Move \"{}\" was too short to parse", input))
+        }
+        if input.len() > 5 {
+            return Err(format!("Move \"{}\" was too long to parse", input))
+        }
+        let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
+        let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
+        match input.len() {
+            4 => Ok(SjadamMove::new(from, to, false)),
+            5 if input.as_bytes()[4] == 'c' as u8 => Ok(SjadamMove::new(from, to, true)),
+            _ => Err(format!("Couldn't parse move {}", input))
+        }
+    }
+    fn to_alg(&self, mv: &Self::Move) -> String {
+        mv.to_string()
+    }
 }
 
 impl SjadamBoard {

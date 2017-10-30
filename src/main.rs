@@ -18,18 +18,18 @@ extern crate rayon;
 #[cfg(feature = "logging")]
 extern crate log4rs;
 
-use search_algorithms::alpha_beta;
-use search_algorithms::alpha_beta::Score;
-use uci::UciMove;
-use search_algorithms::mcts;
-
 use std::sync::{Arc, Mutex};
 use std::io;
 use std::fmt;
 use std::hash::Hash;
 
+use search_algorithms::alpha_beta;
+use search_algorithms::alpha_beta::Score;
+use search_algorithms::mcts;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::GameResult;
+use uci::UciBoard;
+
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use board::sjadam_board::SjadamBoard;
@@ -153,8 +153,8 @@ fn main() {
 
 /// Makes the engine play a game against itself
 fn play_game<B> (mut board : B) 
-    where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq,
-<B as EvalBoard>::Move: Sync + Send + uci::UciMove {
+    where B: UciBoard + fmt::Debug + Send + 'static + Hash + Eq,
+<B as EvalBoard>::Move: Sync + Send {
     println!("Board:\n{:?}", board);
     println!("\n");
     match board.game_result() {
@@ -166,7 +166,8 @@ fn play_game<B> (mut board : B)
             
             let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
             println!("Found move {} with score {}.", move_str, score);
-            board.do_move(UciMove::from_alg(&move_str).unwrap());
+            let mv = board.from_alg(&move_str).unwrap();
+            board.do_move(mv);
             play_game(board);
         }
         Some(GameResult::WhiteWin) => println!("White won at move! Board:\n{:?}", board),
@@ -176,7 +177,7 @@ fn play_game<B> (mut board : B)
 }
 /// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B)
-    where B: 'static + EvalBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync + Send + uci::UciMove
+    where B: 'static + UciBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
 {
     match board.game_result() {
         None => {
@@ -194,7 +195,7 @@ fn play_human<B>(mut board : B)
                     input_str.clear();
                     reader.read_line(&mut input_str).expect("Failed to read line");
                     
-                    match B::Move::from_alg(input_str.trim()) {
+                    match board.from_alg(input_str.trim()) {
                         Ok(val) => {
                             if legal_moves.contains(&val) { break; }
                             println!("Move {:?} is illegal! Legal moves: {:?}", val, legal_moves);
@@ -206,7 +207,7 @@ fn play_human<B>(mut board : B)
                         },
                     }
                 }
-                let c_move =  B::Move::from_alg(input_str.trim()).unwrap();
+                let c_move = board.from_alg(input_str.trim()).unwrap();
                 board.do_move(c_move);
                 play_human(board);
             }
@@ -216,7 +217,7 @@ fn play_human<B>(mut board : B)
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 
                 let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-                let best_move = <B as EvalBoard>::Move::from_alg(&move_str);
+                let best_move = board.from_alg(&move_str);
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move.unwrap());
                 play_human(board);
