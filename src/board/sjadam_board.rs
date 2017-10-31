@@ -1,4 +1,5 @@
 use board::std_board;
+use board::std_board::PieceType::*;
 use board::std_board::{ChessBoard, Piece, PieceType, Square};
 use board::sjadam_move::{SjadamMove, SjadamUndoMove};
 use board::sjadam_move_gen;
@@ -191,6 +192,28 @@ impl UciBoard for SjadamBoard {
         if input.len() < 4 {
             return Err(format!("Move \"{}\" was too short to parse", input))
         }
+        #[cfg(feature = "legacy_sjadam_move_format")]
+        {
+            if input.len() == 5 && (input.as_bytes()[4] as char == '-' || input.as_bytes()[0] as char == '-') || input.len() == 6 {
+                let mut chars = input.chars().peekable();
+                if *chars.peek().unwrap() == '-' {
+                    let from = Square::from_alg(&input[1..3]).ok_or("Illegal square")?;
+                    let to = Square::from_alg(&input[3..5]).ok_or("Illegal square")?;
+                    // TODO: Check for castling
+                    return Ok(SjadamMove::new(from, to, false))
+                }
+                let alg : String = chars.by_ref().collect();
+                let from = Square::from_alg(&alg[0..2]).ok_or("Illegal square")?;
+                let sjadam = Square::from_alg(&alg[2..4]).ok_or("Illegal square")?;
+                if alg.chars().last().unwrap() == '-' {
+                    return Ok(SjadamMove::new(from, sjadam, false));
+                }
+                else {
+                    let to = Square::from_alg(&alg[4..]).ok_or("Illegal square")?;
+                    return Ok(SjadamMove::new(from, to, false));
+                }
+            }
+        }
         if input.len() > 5 {
             return Err(format!("Move \"{}\" was too long to parse", input))
         }
@@ -203,6 +226,85 @@ impl UciBoard for SjadamBoard {
         }
     }
     fn to_alg(&self, mv: &Self::Move) -> String {
+        debug_assert_eq!(self.base_board[mv.from()].color(), Some(self.to_move()));
+        debug_assert_ne!(self.base_board[mv.to()].color(), Some(self.to_move()));
+        #[cfg(feature = "legacy_sjadam_move_format")]
+        {
+            // println!("Converting move {:?} on\n{:?}", mv, self);
+            let dia_neighbours = |square: i8| [square - 9, square - 7, square + 7, square + 9]
+                .iter().cloned()
+                .filter(|&sq| sq >= 0 && sq < 64)
+                .map(|sq| Square(sq as u8))
+                .filter(|&sq| self.base_board[sq].is_empty() || sq == mv.from())
+                .collect::<Vec<Square>>();
+            let orth_neighbours = |square: i8| [square - 8, square - 1, square + 1, square + 8]
+                .iter().cloned()
+                .filter(|&sq| sq >= 0 && sq < 64)
+                .map(|sq| Square(sq as u8))
+                .filter(|&sq| self.base_board[sq].is_empty() || sq == mv.from())
+                .collect::<Vec<Square>>();
+            let knight_neighbours = |square: i8| [square - 17, square - 15, square - 9, square - 6,
+                                                  square + 6, square + 9, square + 15, square + 17]
+                .iter().cloned()
+                .filter(|&sq| sq >= 0 && sq < 64)
+                .map(|sq| Square(sq as u8))
+                .filter(|&sq| self.base_board[sq].is_empty() || sq == mv.from())
+                .collect::<Vec<Square>>();
+
+            let pawn_neighbours = |square: i8| [square + 7, square + 9]
+                .iter().cloned()
+                .map(|sq| if self.to_move() == Black { sq - 16 } else { sq } )
+                .filter(|&sq| sq >= 0 && sq < 64)
+                .map(|sq| Square(sq as u8))
+                .inspect(|&sq| println!("Inspecting pawn square {}", sq))
+                .filter(|&sq| self.base_board[sq].is_empty() || sq == mv.from())
+                .inspect(|&sq| println!("Approved pawn square {}", sq))
+                .collect::<Vec<Square>>();
+
+            // If destination square is empty, do it as a pure sjadam move
+            let sjadam_square = if self.base_board[mv.to()].is_empty() {
+                if mv.castling() {
+                    mv.from()
+                }
+                else {
+                    mv.to() // TODO: Doesn't work with castling. Does not create en passant squares
+                }
+            }
+            else {
+                match self.base_board[mv.from()].piece_type() {
+                    Bishop => *dia_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
+                    Rook => *orth_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
+                    Queen | King => { let mut neighbs = orth_neighbours(mv.to().0 as i8);
+                                      neighbs.append(&mut dia_neighbours(mv.to().0 as i8));
+                                      *neighbs.get(0).expect(&mv.to_string())
+                    },
+                    Knight => *knight_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
+                    Pawn => *pawn_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
+                    
+                    Empty => unreachable!(),
+                }
+            };
+
+            
+            
+            let mut f = String::new();
+            use fmt::Write;
+            write!(f, "{}{}{}",
+                   if mv.from() == sjadam_square {
+                       "-".to_string()
+                   }
+                   else {
+                       mv.from().to_string()
+                   },
+                   sjadam_square,
+                   if sjadam_square == mv.to() {
+                       "-".to_string()
+                   }
+                   else {
+                       mv.to().to_string()
+                   }).unwrap();
+            return f;
+        }
         mv.to_string()
     }
 }

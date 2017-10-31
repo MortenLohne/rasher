@@ -6,6 +6,7 @@ authors = ["Morten Lohne"]
 [features]
 default = ["logging"]
 logging = ["log4rs"]
+legacy_sjadam_move_format = []
 
 [dependencies]
 time = "0.1.*"
