@@ -1,6 +1,8 @@
 use board::std_board::Square;
-use board::std_board::PieceType;
+use board::std_board::{Piece, PieceType};
 use board::sjadam_board::SjadamBoard;
+use board::sjadam_move_gen::SjadamBitBoard;
+use search_algorithms::board::EvalBoard;
 
 use std::fmt;
 
@@ -51,6 +53,12 @@ impl SjadamMove {
         (self.from().file() as i8 - self.to().file() as i8).abs() % 2 == 1
             && board.base_board[self.to].is_empty()
             && board.base_board[self.from].piece_type() == PieceType::Pawn
+    }
+
+    pub fn en_passant_bitboard(&self, board: &SjadamBitBoard) -> bool {
+         (self.from().file() as i8 - self.to().file() as i8).abs() % 2 == 1
+            && !board.all_pieces().get(self.to)
+            && board.piece_at_square(Piece::new(PieceType::Pawn, board.to_move()), self.from)
     }
 
     pub fn castling(&self) -> bool {

@@ -1,5 +1,4 @@
 use board::std_board;
-use board::std_board::PieceType::*;
 use board::std_board::{ChessBoard, Piece, PieceType, Square};
 use board::sjadam_move::{SjadamMove, SjadamUndoMove};
 use board::sjadam_move_gen;
@@ -8,6 +7,9 @@ use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::GameResult;
+
+#[cfg(feature = "legacy_sjadam_move_format")]
+use board::std_board::PieceType::*;
 
 use rand;
 use uci::UciBoard;
@@ -119,6 +121,7 @@ impl EvalBoard for SjadamBoard {
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
         let start_color = self.to_move();
+        
         self.base_board[mv.from()] = Piece::new(mv.piece_moved, !start_color);
         self.base_board[mv.to()] = Piece::new(mv.capture, start_color);
         if mv.castling() {

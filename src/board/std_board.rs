@@ -873,8 +873,6 @@ impl ChessBoard {
             None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
         }
     }
-
-   
 }
 
 // Stores time information for the game, in milliseconds
