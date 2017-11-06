@@ -158,17 +158,43 @@ impl fmt::Debug for BitBoard {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone)]
 pub struct SjadamBoard {
+    white_pieces: BitBoard,
+    black_pieces: BitBoard,
     bitboards: [BitBoard; 12],
     to_move: Color,
     castling_en_passant: u8,
     half_move_clock: u8,
     move_num: u16,
 }
+
+impl PartialEq for SjadamBoard {
+    fn eq(&self, other: &Self) -> bool {
+        self.bitboards == other.bitboards && self.to_move == other.to_move
+            && self.castling_en_passant == other.castling_en_passant
+    }
+}
+
+impl Eq for SjadamBoard {}
+
+
+use std::hash::Hasher;
+use std::hash::Hash;
+
+impl Hash for SjadamBoard {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.bitboards.hash(state);
+        self.to_move.hash(state);
+        self.castling_en_passant.hash(state);
+    }
+}
+
 impl SjadamBoard {
     pub fn from_chess_board(other: &ChessBoard) -> Self {
-        let mut board = Self { bitboards: [BitBoard::empty(); 12], to_move: other.to_move(),
+        let mut board = Self { bitboards: [BitBoard::empty(); 12],
+                               white_pieces: BitBoard::empty(), black_pieces: BitBoard::empty(),
+                               to_move: other.to_move(),
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
                                move_num: other.move_num };
@@ -223,15 +249,21 @@ impl SjadamBoard {
     }
 
     pub fn white_pieces(&self) -> BitBoard {
+        self.white_pieces
+            /*
         [0, 2, 4, 6, 8, 10].iter()
             .map(|&i| self.bitboards[i])
             .fold(BitBoard::empty(), |acc, board| BitBoard::from_u64(acc.board | board.board))
+*/
     }
 
     pub fn black_pieces(&self) -> BitBoard {
+        self.black_pieces
+            /*
         [1, 3, 5, 7, 9, 11].iter()
             .map(|&i| self.bitboards[i])
             .fold(BitBoard::empty(), |acc, board| BitBoard::from_u64(acc.board | board.board))
+         */
     }
 
     pub fn all_pieces(&self) -> BitBoard {
@@ -245,20 +277,30 @@ impl SjadamBoard {
     pub fn set_piece_at_square(&mut self, piece: Piece, square: Square) {
         debug_assert!(!piece.is_empty());
         self.bitboards[piece as u8 as usize - 2].set(square);
+        if piece.color().unwrap() == White {
+            self.white_pieces.set(square);
+        }
+        else {
+            self.black_pieces.set(square);
+        }
     }
 
     pub fn clear_piece_at_square(&mut self, piece: Piece, square: Square) {
         debug_assert!(!piece.is_empty());
         self.bitboards[piece as u8 as usize - 2].clear(square);
+        if piece.color().unwrap() == White {
+            self.white_pieces.clear(square);
+        }
+        else {
+            self.black_pieces.clear(square);
+        }
     }
 
     pub fn move_piece(&mut self, piece: Piece, from: Square, to: Square) {
-        //println!("Moving piece {} from {} to {} on\n{:?}", piece, from, to, self);
         debug_assert!(self.piece_at_square(piece, from), "No {} to move from {} to {} on \n{:?}",
                       piece, from, to, self);
         self.set_piece_at_square(piece, to);
         self.clear_piece_at_square(piece, from);
-        //println!("Moved piece:\n{:?}", self);
     }
 
     pub fn disable_castling(&mut self, color: Color) {
@@ -310,10 +352,7 @@ impl SjadamBoard {
             Some(square) => {
                 let (mut byte, _) = square.file_rank();
                 byte = byte | 0b1000_0000;
-                //println!("byte << 4 was {:b}, byte={:b}", byte << 4, byte);
                 self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
-                //println!("Bitmap set to {:b}", self.castling_en_passant);
-                //panic!();
             },
             None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
         }
