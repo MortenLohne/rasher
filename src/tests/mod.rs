@@ -25,3 +25,6 @@ mod score_tests;
 
 #[cfg(test)]
 mod board_tests;
+
+#[cfg(test)]
+mod bitboard_tests;

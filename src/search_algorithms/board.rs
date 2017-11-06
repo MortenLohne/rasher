@@ -1,4 +1,3 @@
-use search_algorithms::game_move;
 use std::ops;
 use std::fmt;
 use self::Color::*;
@@ -47,8 +46,8 @@ impl ops::Not for GameResult {
 }
 
 pub trait EvalBoard : PartialEq + Clone {
-    type Move : game_move::Move + Clone;
-    type UndoMove : Clone;
+    type Move : Clone + fmt::Debug + PartialEq + Eq;
+    type UndoMove : Clone + fmt::Debug;
 
     /// Returns whose turn it is
     fn to_move(&self) -> Color;

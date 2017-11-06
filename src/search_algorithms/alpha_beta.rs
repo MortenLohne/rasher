@@ -11,7 +11,7 @@ use std::cmp::Ordering;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::EvalBoard;
-use search_algorithms::game_move::Move;
+use uci::UciBoard;
 use search_algorithms::board::Color::*;
 use self::Score::*;
 use std::thread;
@@ -25,7 +25,8 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: EvalBoard + fmt::Debug + Send + 'static + Hash + Eq, <B as EvalBoard>::Move: Sync + Send
+    where B: UciBoard + fmt::Debug + Send + 'static + Hash + Eq,
+<B as EvalBoard>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
     let thread = thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
@@ -36,7 +37,8 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
-    where B: EvalBoard + fmt::Debug + Send + Hash + Eq, <B as EvalBoard>::Move: Sync
+    where B: UciBoard + fmt::Debug + Send + Hash + Eq,
+<B as EvalBoard>::Move: Sync
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
 }
@@ -47,7 +49,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         channel: mpsc::Sender<uci::UciInfo>,
                         move_list: &Option<Vec<B::Move>>) 
                          -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug + Hash + Eq
+    where B: UciBoard + fmt::Debug + Hash + Eq
 {
     {
         engine_comm.lock().unwrap().engine_is_running = true;
@@ -108,17 +110,22 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             best_node_count = Some(node_count.clone());
 
             if !moves.is_empty() {
-                engine_comm.lock().unwrap().best_move = Some(moves[0].to_alg());
+                engine_comm.lock().unwrap().best_move = Some(board.to_alg(&moves[0]));
             }
             else {
                 warn!("Find_best_move_ab didn't return any moves");
                 engine_comm.lock().unwrap().best_move = None;
                 continue;
             }
+            // Commented out because moves are not converted to strings with the correct board
+            // This causes engine to emit length 1 pv
+            /*
             let pv_str = moves.iter()
-                .map(Move::to_alg)
+                .map(|mv| board.to_alg(mv))
                 .collect::<Vec<_>>()
                 .join(" ");
+             */
+            let pv_str = board.to_alg(&moves[0]);
             pv_moves.push(moves[0].clone());
             pvs.push((score, pv_str));
             total_node_count = total_node_count + node_count;
@@ -162,7 +169,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                           time_restriction: uci::TimeRestriction,
                           move_list: Option<Vec<B::Move>>, table: &mut Table<B, B::Move>)
                           -> (Score, Vec<B::Move>, NodeCount)
-    where B: EvalBoard + fmt::Debug + Hash + Eq
+    where B: UciBoard + fmt::Debug + Hash + Eq
 {
     
     fn find_best_move_ab_rec<B> (board: &mut B, depth : u16,
@@ -173,7 +180,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                   mut move_list: Option<Vec<B::Move>>,
                                   table: &mut Table<B, B::Move>)
                                   -> (Score, Vec<B::Move>)
-        where B: EvalBoard + fmt::Debug + Hash + Eq
+        where B: UciBoard + fmt::Debug + Hash + Eq
     {
         debug_assert!(alpha <= beta, "alpha={}, beta={}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board); 
@@ -364,7 +371,7 @@ struct Table<B, M> {
     max_memory: usize,
 }
 
-impl<B: EvalBoard + Eq + Hash, M: Move> Table<B, M> {
+impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
     pub fn new(max_memory: usize) -> Table<B, M> {
         Table { hash_table: HashMap::with_capacity(6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,

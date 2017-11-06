@@ -3,6 +3,7 @@ use board::std_move;
 use search_algorithms::board;
 use search_algorithms::board::EvalBoard;
 use board::std_move_gen::move_gen;
+use board::std_move::ChessMove;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use ::uci::UciBoard;
@@ -60,6 +61,11 @@ impl PieceType {
             _ => None,
         }
     }
+    #[allow(dead_code)]
+    pub fn from_disc(disc: u32) -> Option<Self> {
+        if disc > 6 { None }
+        else { Some(unsafe { mem::transmute(disc as u8) }) }
+    }
 }
 
 impl fmt::Display for PieceType {
@@ -94,6 +100,12 @@ pub enum Piece {
     BlackQueen = 11,
     WhiteKing = 12,
     BlackKing = 13,
+}
+
+impl Default for Piece {
+    fn default() -> Self {
+        Piece::Empty
+    }
 }
 
 impl fmt::Display for Piece {
@@ -200,6 +212,18 @@ impl Square {
     pub fn rank(self) -> u8 {
         self.0 >> 3
     }
+    
+    pub const H1 : Square = Square(63);
+    pub const G1 : Square = Square(62);
+    pub const E1 : Square = Square(60);
+    pub const C1 : Square = Square(58);
+    pub const A1 : Square = Square(56);
+
+    pub const H8 : Square = Square(7);
+    pub const G8 : Square = Square(6);
+    pub const E8 : Square = Square(4);
+    pub const C8 : Square = Square(2);
+    pub const A8 : Square = Square(0);
 }
 
 #[derive(Clone)]
@@ -324,7 +348,8 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
     Ok(())
 }
 
-impl UciBoard for ChessBoard {    
+impl UciBoard for ChessBoard {
+    
     fn from_fen(fen : &str) -> Result<Self, String> {
         let fen_split : Vec<&str> = fen.split(" ").collect();
         if fen_split.len() < 4 || fen_split.len() > 6 {
@@ -421,6 +446,62 @@ impl UciBoard for ChessBoard {
         write!(string, " {}", self.half_move_clock).unwrap();
         write!(string, " {}", self.move_num).unwrap();
         string
+    }
+
+    fn to_alg(&self, mv: &Self::Move) -> String {
+        let (file_from, rank_from) = mv.from.file_rank();
+        let (file_to, rank_to) = mv.to.file_rank();
+        let mut s : String = "".to_string();
+        s.push_str(&format!("{}{}{}{}", (file_from + 'a' as u8) as char,
+                            (8 - rank_from + '0' as u8) as char,
+                            (file_to + 'a' as u8) as char, (8 - rank_to + '0' as u8) as char));
+        match mv.prom {
+            Some(Queen) => s.push('q'),
+            Some(Rook) => s.push('r'),
+            Some(Knight) => s.push('n'),
+            Some(Bishop) => s.push('b'),
+            None => (),
+            _ => panic!("Illegal promotion move"),
+        }
+        s
+    }
+
+    // Parse a ChessMove from short algebraic notation (e2e4, g2g1Q, etc)
+    fn from_alg(&self, alg : &str) -> Result<Self::Move, String> {
+        // Some GUIs send moves as "e2-e4" instead of "e2e4".
+        // In that case, remove the dash and try again
+        if alg.chars().nth(2) == Some('-') {
+            let mut fixed_alg = alg.to_string();
+            fixed_alg.remove(2);
+            self.from_alg(&fixed_alg)
+        }
+        else if alg.len() == 4 || alg.len() == 5 {
+            let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
+            let to = Square::from_alg(&alg[2..4]).unwrap_or(Square(0));
+            if alg.len() == 4 {
+                Ok(ChessMove { from: from, to: to, prom: None })
+            }
+            else {
+                Ok(ChessMove { from: from, to: to, prom: Some(
+                    match alg.chars().nth(4) {
+                        Some('Q') => Queen,
+                        Some('q') => Queen,
+                        Some('R') => Rook,
+                        Some('r') => Rook,
+                        Some('N') => Knight,
+                        Some('n') => Knight,
+                        Some('B') => Bishop,
+                        Some('b') => Bishop,
+                        Some(ch) => return Err(format!("Bad promotion letter {} in move {}", ch, alg)),
+                        None => return Err(format!("No promotion letter in move {}", alg)),
+                    })
+                })
+            }
+        }
+        
+        else {
+            Err(format!("Move {} had incorrect length: Found {}, expected 4/5", alg, alg.len()))
+        }
     }
 }
 
@@ -764,6 +845,12 @@ impl ops::IndexMut<Square> for ChessBoard {
 }
 
 impl ChessBoard {
+    pub fn empty() -> Self {
+        Self { board: [[Piece::Empty; 8]; 8], to_move: White, castling_en_passant: 0,
+               half_move_clock: 0, move_num: 0
+        }
+    }
+    
     // TODO: Remove in favour of indexing operator
     pub fn piece_at(&self, square : Square) -> Piece {
         self[square].clone()

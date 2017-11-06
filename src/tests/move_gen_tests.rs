@@ -1,6 +1,5 @@
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::game_move::Move;
 use search_algorithms::board::EvalBoard;
 
 use uci::UciBoard;
@@ -99,15 +98,17 @@ fn respond_to_checks() {
     let mut board6 = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/6P1/4P3/8 b - - 0 1").unwrap();
     assert!(move_gen::is_attacked(&board6, board6.king_pos(board6.to_move())) == true,
             format!("Error: King should be under attack here:\n{}", board5));
-    move_is_available_prop(&mut board6, ChessMove::from_alg("h4g4").unwrap());
-    move_is_unavailable_prop(&mut board6, ChessMove::from_alg("f4g3").unwrap());
+    let mv = board6.from_alg("h4g4").unwrap();
+    let mv2 = board6.from_alg("f4g3").unwrap();
+    move_is_available_prop(&mut board6, mv);
+    move_is_unavailable_prop(&mut board6, mv2);
 }
 
 #[test]
 fn en_passant_test () {
     let mut board1 = ChessBoard::from_fen("7k/p7/8/1P6/8/8/8/7K b - - 0 1").unwrap();
-    let move1 = ChessMove::from_alg("a7a5").unwrap();
-    let move2 = ChessMove::from_alg("b5a6").unwrap();
+    let move1 = board1.from_alg("a7a5").unwrap();
+    let move2 = board1.from_alg("b5a6").unwrap();
     // Do a move that allows en passant
     board1.do_move(move1);
 
@@ -176,7 +177,7 @@ fn king_in_check_test() {
 fn castling_test () {
     // Checks that white kingside castle works
     let board1 = ChessBoard::from_fen("5k1r/6pp/4Q3/8/8/8/8/4K2R w K - 0 1").unwrap();
-    let move1 = ChessMove::from_alg("e1g1").unwrap();
+    let move1 = board1.from_alg("e1g1").unwrap();
     basic_tactics_prop(&board1, move1);
 
     // Checks that white can't castle while in check
@@ -186,35 +187,40 @@ fn castling_test () {
 
     // Checks that black queenside castling works in a tactic
     let board3 = ChessBoard::from_fen("r3k3/1R6/8/8/8/8/8/3K4 b q - 0 1").unwrap();
-    let move3 = ChessMove::from_alg("e8c8").unwrap();
+    let move3 = board3.from_alg("e8c8").unwrap();
     basic_tactics_prop(&board3, move3);
 
     // Positions with both castlings available
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    move_is_available_prop(&mut board4, ChessMove::from_alg("e1c1").unwrap());
-    move_is_available_prop(&mut board4, ChessMove::from_alg("e1g1").unwrap());
-    move_is_unavailable_prop(&mut board4, ChessMove::from_alg("e1h1").unwrap());
+    let mv = board4.from_alg("e1c1").unwrap();
+    let mv2 = board4.from_alg("e1g1").unwrap();
+    let mv3 = board4.from_alg("e1h1").unwrap();
+    move_is_available_prop(&mut board4, mv);
+    move_is_available_prop(&mut board4, mv2);
+    move_is_unavailable_prop(&mut board4, mv3);
 
     // Positions were castling is legal, but rook is attacked
     let mut board5 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
-    move_is_available_prop(&mut board5, ChessMove::from_alg("e1g1").unwrap());
-    move_is_available_prop(&mut board5, ChessMove::from_alg("e1f1").unwrap());
+    let mv4 = board5.from_alg("e1g1").unwrap();
+    let mv5 = board5.from_alg("e1f1").unwrap();
+    move_is_available_prop(&mut board5, mv4);
+    move_is_available_prop(&mut board5, mv5);
 }
 
 fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
     assert!(all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should be legal here, board:{}Legal moves: {:?}",
-            c_move.to_alg(), board, all_moves);
+            board.to_alg(&c_move), board, all_moves);
 }
 
 fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
     let all_moves = move_gen::all_legal_moves(board);
     assert!(!all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should not be legal here, board:{}Legal moves: {:?}",
-            c_move.to_alg(), board, all_moves);
+            board.to_alg(&c_move), board, all_moves);
 }
 
 #[test]
@@ -235,9 +241,9 @@ fn starting_position_perf_test_long() {
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
     assert_eq!(legal_moves_after_plies(&mut board1, 4), 197_281);
-    assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_609);
-    assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_324);
-    assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_901_860); //~10 min
+    assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_617);
+    assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_679);
+    assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_913_043); //~10 min
     //assert_eq!(legal_moves_after_plies(&mut board, 8), 84_998_978_956);
 }
 
@@ -274,8 +280,8 @@ fn correct_move_gen_test2_long() {
     assert_eq!(legal_moves_after_plies(&mut board2, 1), 48);
     assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
     assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
-    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_603);
-    assert_eq!(legal_moves_after_plies(&mut board2, 5), 193_690_690);
+    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_604);
+    assert_eq!(legal_moves_after_plies(&mut board2, 5), 193_690_734);
 }
 
 #[test]
@@ -285,7 +291,7 @@ fn correct_move_gen_test3() {
     assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
     assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
     assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_624);
+    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
 }
 
 #[test]
@@ -296,9 +302,9 @@ fn correct_move_gen_test3_long() {
     assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
     assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
     assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_624);
-    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_083);
-    assert_eq!(legal_moves_after_plies(&mut board3, 7), 178_633_661);
+    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
+    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_100);
+    assert_eq!(legal_moves_after_plies(&mut board3, 7), 178_636_411);
 }
 
 #[test]
@@ -306,7 +312,7 @@ fn correct_move_gen_test4() {
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..6).zip(
-        [6, 264, 9_467, 422_333].iter()) 
+        [6, 264, 9_467, 422_355].iter()) 
     {
         assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
     }
@@ -318,7 +324,7 @@ fn correct_move_gen_test4_long() {
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
     for (depth, nodes) in (1..7).zip(
-        [6, 264, 9_467, 422_333, 15_833_292, 706_045_033].iter()) 
+        [6, 264, 9_467, 422_355, 15_833_319, 706_095_622].iter()) 
     {
         assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
     }
@@ -350,7 +356,7 @@ fn correct_move_gen_test6_long() {
     let mut board6 = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
     for (depth, nodes) in (1..7).zip(
-        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137].iter()) {
+        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_365].iter()) {
         assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
     }
 }
@@ -362,28 +368,42 @@ fn correct_move_gen_test7() {
     assert_eq!(legal_moves_after_plies(&mut board7, 3), 62_379);
 }
 
+use std::fmt;
+
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
-pub fn legal_moves_after_plies<B: EvalBoard>(board : &mut B, n : u8) -> u64 {
-    if n == 0 { 1 }
+pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n : u8) -> u64
+    where <B as EvalBoard>::Move: fmt::Display
+{
+    if n == 0 || board.game_result() != None { 1 }
     else {
         let mut total_moves = 0;
+        let old_board = board.clone();
         for c_move in board.all_legal_moves() {            
             let undo_move = board.do_move(c_move.clone());
             total_moves += legal_moves_after_plies(board, n - 1);
             board.undo_move(undo_move);
+            debug_assert_eq!(old_board, *board,
+                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
+                             c_move, old_board, board);
         }
         total_moves
     }
 }
 
 #[allow(dead_code)]
-pub fn perf_prop<B: EvalBoard>(board: &mut B, n: u8) -> Vec<(B::Move, u64)> {
-    let mut results = vec![];
+    pub fn perf_prop<B: EvalBoard + Eq + fmt::Debug>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
+    where <B as EvalBoard>::Move: fmt::Display
+{
+        let mut results = vec![];
+        let old_board = board.clone();
     for c_move in board.all_legal_moves() {
         let undo_move = board.do_move(c_move.clone());
-        results.push((c_move, legal_moves_after_plies(board, n - 1)));
+        results.push((c_move.clone(), legal_moves_after_plies(board, n - 1)));
         board.undo_move(undo_move);
+        debug_assert_eq!(old_board, *board,
+                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
+                             c_move, old_board, board);
     }
     results
 }

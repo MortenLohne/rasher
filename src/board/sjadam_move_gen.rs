@@ -1,215 +1,270 @@
 use board::sjadam_move::SjadamMove;
 use board::std_board::BoardIter;
-use board::std_board::ChessBoard;
-use board::std_board::PieceType;
-use board::std_board::Piece;
 use board::std_board::Square;
-use board::std_move::ChessMove;
+use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 
 use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
+
 use board::sjadam_board::SjadamBoard;
+use board::sjadam_board::BitBoard;
 
-// use board::std_move_gen::move_gen;
-
-use std::fmt;
-
-#[derive(PartialEq, Eq, Clone)]
-struct BitBoard {
-    board: u64,
-}
-
-impl BitBoard {
-    fn empty() -> Self {
-        BitBoard { board: 0 }
-    }
-    /// Returns a bitboard representation of the board, with all bits set
-    /// where f(piece) is true for the piece on the square
-    fn from_board<F: Fn(Piece) -> bool> (board: &ChessBoard, f: F) -> Self {
-        let mut bit_board = BitBoard::empty();
-        for square in BoardIter::new() {
-            if f(board[square]) {
-                bit_board.set(square);
+lazy_static! {
+    static ref ROOK_TABLE : [[u8; 256]; 32] = {
+        let mut table = [[0; 256]; 32];
+        for sjadam_squares in (0..256)
+            .filter(|i| i & 0b1010_1010 == 0 || i & 0b0101_0101 == 0)
+            .map(BitBoard::from_u64)
+        {
+            for all_pieces in (0..256).map(BitBoard::from_u64) {
+                let mut target_squares = sjadam_squares.clone();
+                for file in 0..8 {
+                    if sjadam_squares.get(Square(file)) {
+                        let mut cur_file = file.overflowing_sub(1).0;
+                        
+                        while cur_file < 8 {
+                            target_squares.set(Square(cur_file));
+                            if all_pieces.get(Square(cur_file)) {
+                                break;
+                            }
+                            cur_file = cur_file.overflowing_sub(1).0;
+                        }
+                        
+                        cur_file = file + 1;
+                        
+                        while cur_file < 8 {
+                            target_squares.set(Square(cur_file));
+                            if all_pieces.get(Square(cur_file)) {
+                                break;
+                            }
+                            cur_file += 1;
+                        }
+                    }
+                }
+                debug_assert_eq!(table[sjadam_lookup_index(sjadam_squares.rank(0))]
+                                 [all_pieces.rank(0) as usize], 0);
+                
+                table[sjadam_lookup_index(sjadam_squares.rank(0))]
+                    [all_pieces.rank(0) as usize]
+                    = target_squares.rank(0);
             }
         }
-        bit_board
-    }
-    fn all_from_board(board: &ChessBoard) -> Self {
-        Self::from_board(board, |piece| !piece.is_empty())
-    }
-    fn get(&self, idx: Square) -> bool {
-        let Square(i) = idx;
-        debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
-        self.board & (1<<i) != 0
-    }
-    // Sets the square to true
-    fn set(&mut self, idx: Square) {
-        let Square(i) = idx;
-        debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
-        self.board |= 1<<i;
-    }
-    #[allow(dead_code)]
-    // Sets the square to false
-    fn clear(&mut self, idx: Square) {
-        let Square(i) = idx;
-        debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
-        self.board &= !(1<<i);
-    }
-}
+        table
+    };
+    static ref KNIGHT_TABLE : [u64; 256] = {
+        let mut table = [0; 256];
+        let c = 1 << 18;
+        let attacks = c << 17 | c << 15 | c << 10 | c << 6 | c | c >> 6 | c >> 10 | c >> 15 | c >> 17;
+        let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
+        let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
 
-impl fmt::Debug for BitBoard {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for n in 0..8 {
-            write!(f, "{:08b}\n", (self.board >> (n * 8)) as u8).unwrap();
+        for pieces in 0..256 {
+            let mut targets : u64 = 0;
+            for file in 0..2 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= right_side & (attacks >> (2 - file))
+                }
+            }
+            
+            for file in 2..6 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= attacks << (file - 2)
+                }
+            }
+            
+            for file in 6..8 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= left_side & (attacks << (file - 2))
+                }
+            }
+            
+            table[pieces] = targets;
         }
-        Ok(())
-    }
-}
+        table
+    };
+    static ref KING_TABLE : [u64; 256] = {
+        let mut table = [0; 256];
+        let attacks = 0b11100000_11100000_111;
+        let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
+        let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
 
-pub fn all_legal_moves(board: &mut SjadamBoard) -> Vec<SjadamMove> {
-    let mut moves = vec![];
+        for pieces in 0..256 {
+            let mut targets : u64 = 0;
+            if pieces % 2 != 0 {
+                targets |= right_side & (attacks >> 1);
+            }
+            
+            for file in 1..7 {
+                if (pieces >> file) % 2 != 0 {
+                    targets |= attacks << (file - 1)
+                }
+            }
+            
+            if (pieces >> 7) % 2 != 0 {
+                targets |= left_side & (attacks << 6);
+            }
+            
+            table[pieces] = targets;
+        }
+        table
+    };
+}
+pub fn all_legal_moves(board: &SjadamBoard) -> Vec<SjadamMove> {
+    let mut moves = Vec::with_capacity(300);
+
+    let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
+        (board.white_pieces(), board.black_pieces())
+    }
+    else {
+        (board.black_pieces(), board.white_pieces())
+    };
+    
+    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
+
+    // TODO: Remove this loop, to avoid repeating bitboard.get_square(square) calls
     for square in BoardIter::new() {
-        if !board.base_board[square].is_empty()
-            && board.base_board[square].color().unwrap() == board.to_move() {
-                moves.append(&mut legal_moves_for_square(board, square));
+        if !board.get_square(square).is_empty()
+            && board.get_square(square).color().unwrap() == board.to_move()
+        {
+            legal_moves_for_square(&board, square, board.get_square(square).piece_type(),
+                                   &mut moves);
         }
+    }
+    if board.to_move() == White {
+        if board.can_castle_kingside(White)
+            && all_pieces.rank(7) & 0b01100000 == 0 {
+                moves.push(SjadamMove::new(Square::E1, Square::G1, true));
+            }
+        if board.can_castle_queenside(White)
+            && all_pieces.rank(7) & 0b1110 == 0 {
+                moves.push(SjadamMove::new(Square::E1, Square::C1, true));
+            }
+    }
+    else {
+        if board.can_castle_kingside(Black)
+            && all_pieces.rank(0) & 0b0110_0000 == 0 {
+                moves.push(SjadamMove::new(Square::E8, Square::G8, true));
+            }
+        if board.can_castle_queenside(Black)
+            && all_pieces.rank(0) & 0b1110 == 0 {
+                moves.push(SjadamMove::new(Square::E8, Square::C8, true));
+            }
     }
     moves
 }
-
-pub fn any_legal_moves(board: &mut SjadamBoard) -> bool {
-    for square in BoardIter::new() {
-        if !board.base_board[square].is_empty()
-            && board.base_board[square].color().unwrap() == board.to_move() {
-                if !legal_moves_for_square(board, square).is_empty() {
-                    return true;
-                }
-        }
-    }
-    false
-}
-
-fn legal_moves_for_square(board: &mut SjadamBoard, square: Square) -> Vec<SjadamMove> {
+    
+fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
+                          bitboard_moves: &mut Vec<SjadamMove>) {
+    
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
-    let friendly_pieces =
-        BitBoard::from_board(&board.base_board,
-                             |piece| !piece.is_empty() &&
-                             piece.color().unwrap() == board.to_move());
-    let opponent_pieces =
-        BitBoard::from_board(&board.base_board,
-                             |piece| !piece.is_empty() &&
-                             piece.color().unwrap() != board.to_move());
-    
-    let all_pieces = BitBoard::all_from_board(&board.base_board);
+
+    let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
+        (board.white_pieces(), board.black_pieces())
+    }
+    else {
+        (board.black_pieces(), board.white_pieces())
+    };
+        
+    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
     
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
                           &all_pieces, square);
 
     sjadam_opponent_moves(&mut sjadam_squares, &opponent_pieces, &all_pieces);
 
-    let mut chess_moves = vec![]; // Moves with both
-    let mut pure_sjadam_moves = vec![]; // Moves with only a sjadam part
-    
-    for chess_move_square in BoardIter::new()
-        .filter(|&i| sjadam_squares.get(i))   
-    {
-        let sjadam_move = SjadamMove::from_sjadam_move (square, chess_move_square);
-        let old_board = board.clone();
-        let mut old_castling = None;
-        if chess_move_square != square {
-            // "Do" the pure sjadam part of the move, but keep the same player to move
-            // Also do not promote pieces
-            board.base_board[chess_move_square] = board.base_board[square];
-            board.base_board[square] = Piece::empty();
-            old_castling = Some(board.base_board.castling_en_passant);
-            if board.base_board[chess_move_square].piece_type() == PieceType::King {
-                let color = board.to_move();
-                board.base_board.disable_castling(color)
+    let moves : BitBoard = match piece_type {
+        Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
+        Bishop => bishop_moves(sjadam_squares, friendly_pieces, all_pieces),
+        Queen => {
+            let mut queen_moves = bishop_moves(sjadam_squares, friendly_pieces, all_pieces);
+            queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
+            queen_moves
+        },
+        Knight => knight_moves(sjadam_squares, friendly_pieces),
+        Pawn => {
+            let mut all_pieces_pawns = all_pieces.clone();
+            if let Some(ep_square) = board.en_passant_square() {
+                all_pieces_pawns.set(ep_square);
             }
-        }
-        
-        debug_assert!(!board.base_board[chess_move_square].is_empty(),
-                      "Square {} is empty on \n{:?}, but is marked in {:?}",
-                      chess_move_square, board.base_board, sjadam_squares);
-        // Generate the chess part of the move
-        legal_moves_for_piece(&mut board.base_board, chess_move_square, &mut chess_moves);
-        if chess_move_square != square {
-            pure_sjadam_moves.push(sjadam_move.clone());
-        }
-
-        if chess_move_square != square {
-            board.base_board[square] = board.base_board[chess_move_square];
-            board.base_board[chess_move_square] = Piece::empty();
-            board.base_board.castling_en_passant = old_castling.unwrap();
-            debug_assert_eq!(*board, old_board, "Failed to restore board after {}", sjadam_move)
+            if board.to_move() == White {
+                pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces_pawns)
+            }
+            else {
+                pawn_moves_black(sjadam_squares, friendly_pieces, all_pieces_pawns)
+            }
+        },
+        King => king_moves(sjadam_squares, friendly_pieces),
+        _ => BitBoard::empty(),
+    };
+    
+    for i in 0..64 {
+        if moves.get(Square(i)) && Square(i) != square {
+            bitboard_moves.push(SjadamMove::new(square, Square(i), false));
         }
     }
-    let mut combined_moves = chess_moves.iter()
-        .map(|mv| SjadamMove
-             { from: square, sjadam_square: mv.from, to: mv.to })
-        .filter(|mv| mv.from != mv.to)
-        .collect::<Vec<_>>();
-    combined_moves.append(&mut pure_sjadam_moves);
-    let move_cmp = |mv1: &SjadamMove, mv2: &SjadamMove| {
-        let (from1, to1) = mv1.from_to_squares();
-        let (from2, to2) = mv2.from_to_squares();
-        to1.cmp(&to2)
-            .then((board.base_board[from1].piece_type()).cmp(&board.base_board[from2].piece_type()))
-    };
-    let move_eq = |mv1: &mut SjadamMove, mv2: &mut SjadamMove| {
-        let (from1, to1) = mv1.from_to_squares();
-        let (from2, to2) = mv2.from_to_squares();
-        to1 == to2 && board.base_board[from1].piece_type() == board.base_board[from2].piece_type()
-    };
-    // Two moves are considered equal if they place the same piece on the same square,
-    // and do not castle
-    combined_moves.sort_by(move_cmp);
-    combined_moves.dedup_by(move_eq);
-    // TODO: Here castling and non-castling moves will be considered equal,
-    // and may be removed. Fix that
-    combined_moves
 }
 
-/// Recursively sets all available sjadam-move squares 
+/// Recursively sets all available sjadam-move squares
+#[inline(never)]
 fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoard,
                          all_pieces: &BitBoard, square: Square) {
     let Square(i) = square;
     for x in &[-1, 0, 1] {
         for y in &[-1, 0, 1] {
             let (file, rank) = (square.file_rank().0 as i8, square.file_rank().1 as i8);
+            
             if (file <= 1 && *x == -1) || (file >= 6 && *x == 1)
-                || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1) {
-                    continue
-                }
+                || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1)
+            {
+                continue
+            }
             let dest_square = Square(i.wrapping_add((16 * y) as u8).wrapping_add((2 * x) as u8));
             let jumping_square = Square(i.wrapping_add((8 * y) as u8).wrapping_add(*x as u8));
+            
             if friendly_pieces.get(jumping_square) && !all_pieces.get(dest_square) &&
-                !sjadam_squares.get(dest_square) {
-                    sjadam_squares.set(dest_square);
-                    sjadam_friendly_moves(sjadam_squares, friendly_pieces,
-                                          all_pieces, dest_square);
-                }
+                !sjadam_squares.get(dest_square)
+            {
+                sjadam_squares.set(dest_square);
+                sjadam_friendly_moves(sjadam_squares, friendly_pieces,
+                                      all_pieces, dest_square);
+            }
         }
     }
 }
 
-/// Sets all available opponent sjadam-move squares 
+/// Sets all available opponent sjadam-move squares
+#[inline(never)]
 fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoard,
                          all_pieces: &BitBoard) {
+    let type1_mask = 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101;
+    let type2_mask = 0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010;
+    let type3_mask = 0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000;
+    
+    let color_offset = if type1_mask & sjadam_squares.board != 0 { 0 }
+    else if type2_mask & sjadam_squares.board != 0 { 1 }
+    else if type3_mask & sjadam_squares.board != 0 { 8 }
+    else { 9 };
+    
     let old_sjadam_squares = sjadam_squares.clone();
-    for square in BoardIter::new()
-        .filter(|i|old_sjadam_squares.get(*i))
+    
+    for i in [0, 2, 4, 6, 16, 18, 20, 22, 32, 34, 36, 38, 48, 50, 52, 54].iter()
+        .map(|&i| i + color_offset)
+        .filter(|&i| old_sjadam_squares.get(Square(i)))
     {
-        let Square(i) = square;
+        let square = Square(i);
+        
         for x in &[-1, 0, 1] {
             for y in &[-1, 0, 1] {
                 let (file, rank) = (square.file_rank().0 as i8, square.file_rank().1 as i8);
+                
                 if (file <= 1 && *x == -1) || (file >= 6 && *x == 1)
-                    || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1) {
-                        continue
-                    }
+                    || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1)
+                {
+                    continue
+                }
+                
                 let dest_square = Square(i.wrapping_add((16 * y) as u8).wrapping_add((2 * x) as u8));
                 let jumping_square = Square(i.wrapping_add((8 * y) as u8).wrapping_add(*x as u8));
                 if opponent_pieces.get(jumping_square) && !all_pieces.get(dest_square) {
@@ -220,341 +275,158 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     }
 }
 
-/// Adds all the legal moves for the piece in this position, to the input vector
-/// Adds all moves, also those that put the player in check
 #[inline(never)]
-pub fn legal_moves_for_piece(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
-    let piece = board[square].piece_type();
-    
-    match piece {
-        King => legal_moves_for_king(board, square, moves),
-        
-        Queen =>  {
-            add_moves_diagonally (board, square, moves);
-            add_straight_moves(board, square, moves);
-        },
-        Rook => {
-            add_straight_moves(board, square, moves);
-        },
-        Bishop => {
-            add_moves_diagonally(board, square, moves);
-        },
-        Knight => legal_moves_for_knight(board, square, moves),
-        
-        Pawn => legal_moves_for_pawn(board, square, moves),
-        
-        Empty => (),
+fn king_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+    let mut moves = 0;
+    for rank in 0..1 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KING_TABLE[index] >> ((- rank * 8) + 8);
     }
+    for rank in 1..8 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KING_TABLE[index] << ((rank * 8) - 8);
+    }
+    BitBoard::from_u64(moves & !friendly_pieces.board)
 }
 
 #[inline(never)]
-fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
+fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+    let mut moves = 0;
+    for rank in 0..2 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KNIGHT_TABLE[index] >> ((- rank * 8) + 16);
+    }
+    for rank in 2..8 {
+        let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
+        moves |= KNIGHT_TABLE[index] << ((rank * 8) - 16);
+    }
+    BitBoard::from_u64(moves & !friendly_pieces.board)
+}
+
+const RIGHT_MASK : u64 = 0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111;
+const LEFT_MASK : u64 = 0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110;
+
+#[inline(never)]
+fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) -> BitBoard {
+    let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
+    let left_captures = ((sjadam_squares.board & LEFT_MASK) << 7) & opponent_pieces.board; // & LEFT_MASK;
+    let right_captures = ((sjadam_squares.board & RIGHT_MASK) << 9) & opponent_pieces.board; // & RIGHT_MASK;
     
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
-    // If the king and the two castling squares are not in check, castling is allowed
-    // There must be no pieces between the castling pieces
-
-    // Kingside castling
-    if board.can_castle_kingside(board.to_move) {
-        let mut can_castle_here = !is_attacked(board, square);
-        
-        // Check that the two squares are empty and not in check
-        for n in &[1, 2] {
-            debug_assert_eq!(file, 4, "Error: King tried to castle from {} on:{}.",
-                             square, board);
-            let square_checked = Square(square.0 + n);
-            if !board[square_checked].is_empty()
-                || is_attacked(board, square_checked) {
-                    can_castle_here = false;
-                }
-            
-        }
-        if can_castle_here {
-            moves.push(ChessMove::new(square, Square(square.0 + 2)));
-        }
-        
-        
-    }
-    // Queenside castling
-    if board.can_castle_queenside(board.to_move) {
-        let mut can_castle_here = !is_attacked(board, square);
-        
-        // Check that the two squares are empty and not in check
-        for n in &[1, 2] {
-            debug_assert_eq!(file, 4, "Error: File is {}.", file);
-            let square_checked = Square(square.0 - n);
-            if !board.piece_at(square_checked).is_empty() ||
-                is_attacked(board, square_checked)
-                 {
-                    can_castle_here = false;
-                }
-        }
-        // Check that the knight-square is empty
-        if !board.piece_at(Square(square.0 - 3)).is_empty() {
-            can_castle_here = false;
-        }
-        if can_castle_here {
-            moves.push(ChessMove::new(square, Square(square.0 - 2)));
-        }
-        
-    }
+    let forward = sjadam_squares.board << 8 & !all_pieces.board;
+    let forward_two = (sjadam_squares.board & (255 << 8)) << 16 & !all_pieces.board & !(all_pieces.board << 8);
     
-    for i in -1..2 {
-        for j in -1..2 {
-            
-            if file + i < 0 || file + i >= 8 ||
-                rank + j < 0 || rank + j >= 8 ||
-                (j == 0 && i == 0) {
-                    continue;
-                }
-            let new_pos = Square(((rank + j) * 8 + file + i) as u8);
-
-            // Check that the square is not occupied by a friendly piece
-            let c_move = ChessMove::new(square, new_pos);
-
-            if board[new_pos].is_empty() {
-                let old_piece = board[square];
-                board[square] = Piece::empty();
-                moves.push(c_move);
-                board[square] = old_piece;
-            }
-            else if board[new_pos].color().unwrap() != board.to_move {
-                moves.push(c_move);
-            }
-        }
-    }
+    BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
 
 #[inline(never)]
-fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
+fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) -> BitBoard {
+    let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
     
-    for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                    (1, -2), (1, 2), (2, -1), (2, 1)] {
-        if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
-            continue;
-        }
-        let new_pos = Square(((rank + j) * 8 + file + i) as u8);
-        
-        let c_move = ChessMove::new(square, new_pos);
-
-        if board[new_pos].is_empty() || board[new_pos].color().unwrap() != board.to_move {
-            //println!("Knight can move to {}, onto a {} {}, on: {}",
-            //             Square(new_pos), color_to, piece_to, board);
-            moves.push(c_move);
-        }
-    }
+    let left_captures = ((sjadam_squares.board & RIGHT_MASK) >> 7) & opponent_pieces.board;
+    let right_captures = ((sjadam_squares.board & LEFT_MASK) >> 9) & opponent_pieces.board;
+    
+    let forward = sjadam_squares.board >> 8 & !all_pieces.board;
+    let forward_two = (sjadam_squares.board & (255 << 48)) >> 16 & !all_pieces.board & !(all_pieces.board >> 8);
+    
+    BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
 
 #[inline(never)]
-fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
-    // Helper variables
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
-    let pos = square.0 as i8;
-    let (start_rank, prom_rank, back_rank, direction) =
-        if board.to_move == White { (6, 1, 0, -1) } else { (1, 6, 7, 1) };
-
-    if rank == back_rank { return }
+fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+                all_pieces: BitBoard) -> BitBoard {
+    let mut bishop_moves = sjadam_squares.clone();
+    let mut sjadam_squares_45 = sjadam_squares.rotate_45();
     
-    debug_assert!(rank > 0 && board.to_move == White || rank < 7 && board.to_move == Black);;
-    // Checks if there are any pieces available for capture to the left,
-    // including en passant capture
-    if file > 0 {
-        let take_square = Square((pos + direction * 8) as u8 - 1);
-        if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
-            if rank == prom_rank {
-                for piece_type in &[Queen, Rook, Bishop, Knight] {
-                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
-                    moves.push(c_move);
-                }
-            }
-            else {
-                let c_move = ChessMove::new(square, take_square);
-                moves.push(c_move);
-            }
-        }
-        if board.en_passant_square().is_some()
-            && take_square == board.en_passant_square().unwrap()
-        {
-            let c_move = ChessMove::new(square, take_square);
-            moves.push(c_move);
-        }
-    }
-    // Ditto, but to the right
-    if file < 7 {
-        let take_square = Square((pos + direction * 8) as u8 + 1);
-        if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
-            if rank == prom_rank {
-                for piece_type in &[Queen, Rook, Bishop, Knight] {
-                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
-                    moves.push(c_move);
-                }
-            }
-            else {
-                let c_move = ChessMove::new(square, take_square);
-                moves.push(c_move);
-            }
-        }
-        if board.en_passant_square().is_some()
-            && take_square == board.en_passant_square().unwrap()
-        {
-            let c_move = ChessMove::new(square, take_square);
-            moves.push(c_move);
-        }
-    }
+    let all_pieces_45 = all_pieces.rotate_45();
+    for diagonal in 0..15 {
+        let diagonal_bits = sjadam_squares_45.diagonal(diagonal);
+        let mut target_rank = ROOK_TABLE
+            [sjadam_lookup_index(diagonal_bits)][all_pieces_45.diagonal(diagonal) as usize];
 
-    //Checks if the pawn can walk forward one or two squares, promote
-    let square_in_front = Square::from_ints(file as u8, (rank + direction) as u8);
-    
-    if board.piece_at(square_in_front).is_empty() {
-        if rank == prom_rank {
-            moves.push(ChessMove::new_prom(square, square_in_front, Queen));
-        }
-        else {
-            let c_move = ChessMove::new(square, square_in_front);
-            moves.push(c_move);
-        }
-        if rank == start_rank {
-            let square_2_in_front = Square::from_ints(file as u8,
-                                                      (rank + direction * 2) as u8);
-            let c_move = ChessMove::new(square, square_2_in_front);
-            if board.piece_at(square_2_in_front).is_empty() {
-                moves.push(c_move);
-            }
-        }
+        let len : u64 = if diagonal >= 8 { 15 - diagonal } else { diagonal + 1 } as u64;
+
+        target_rank &= !(!(0 as u64) << len) as u8;
+
+        let n = diagonal as i8 - 7;
+        let offset = if n <= 0 { n * (-8)} else { 8 * (8 - n) + n };
+
+        sjadam_squares_45.board |= (target_rank as u64) << offset;
     }
+    
+    let diagonal_moves = (0..7).fold(sjadam_squares_45, |acc, _| acc.rotate_45());
+
+    let mut sjadam_squares_315 = sjadam_squares.rotate_315();
+    let all_pieces_315 = all_pieces.rotate_315();
+    
+    for antidiagonal in (-7)..8 {
+        let diagonal_bits = sjadam_squares_315.antidiagonal(antidiagonal);
+        let mut target_rank = ROOK_TABLE
+            [sjadam_lookup_index(diagonal_bits)][all_pieces_315.antidiagonal(antidiagonal) as usize];
+        let len = 8 - antidiagonal.abs();
+        target_rank &= !(!(0 as u64) << len) as u8;
+        let n = antidiagonal;
+        let offset = if n <= 0 { n * (-8) - n} else { 8 * (8 - n) };
+
+        sjadam_squares_315.board |= (target_rank as u64) << offset;
+    }
+    sjadam_squares_315 = (0..7).fold(sjadam_squares_315, |acc, _| acc.rotate_315());
+    
+    bishop_moves.board |= diagonal_moves.board;
+    bishop_moves.board |= sjadam_squares_315.board;
+    bishop_moves.board &= !friendly_pieces.board;
+    bishop_moves
 }
 
-/// Returns whether a square is under attack by the side not to move
-pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
-    if !board.piece_at(square).is_empty() {
-        debug_assert_eq!(board.to_move(), board.piece_at(square).color().unwrap(),
-                         "{:?}\n Tried to check if {} {} at {} was attacked.",
-                         board,  board.piece_at(square).color().unwrap(),
-                         board.piece_at(square).piece_type(), square);
-    }
-    // Direction enemy pawns are coming from
-    let pawn_direction = if board.to_move == White { -1 } else { 1 };
-    let pos = square.0 as i8;
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
-
-    if file > 0 {
-        if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
-            let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
-            
-            if board[pawn_square] == Piece::new(Pawn, !board.to_move) { return true; }
-        }
-    }
-    if file < 7 {
-        if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
-            let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
-            
-            if board[pawn_square] == Piece::new(Pawn, !board.to_move) { return true; }
-        }
-    }
-
-    for &(i, j) in &[(0, 1), (1, 0), (0, -1), (-1, 0)] {
-        if check_threats_in_direction (i, j, board, square, &[Queen, Rook]) {
-            return true;
-        }
-    }
-    for &(i, j) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-        if check_threats_in_direction (i, j, board, square, &[Queen, Bishop]) {
-            return true;
-        }
-    }
+#[inline(never)]
+fn rook_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+              all_pieces: BitBoard) -> BitBoard {
+    let mut sjadam_squares_rotated = sjadam_squares.rotate();
+    let all_pieces_rotated = all_pieces.rotate();
     
-    for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                    (1, -2), (1, 2), (2, -1), (2, 1)] {
-        if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
-            continue;
-        }
-        let new_pos = Square(((rank + j) * 8 + file + i) as u8);
-        
-        if board[new_pos] == Piece::new(Knight, !board.to_move) {
-            return true;
-        }
+    for file in 0..8 {
+        lookup_rook(file, &mut sjadam_squares_rotated, all_pieces_rotated);
     }
-    for i in -1..2 {
-        for j in -1..2 {
-            if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 ||
-                (j == 0 && i == 0) {
-                    continue;
-                }
-            let new_pos = Square(((rank + j) * 8 + file + i) as u8);
-
-            // Check that there is no enemy king around
-            if board[new_pos] == Piece::new(King, !board.to_move) {
-                return true;
-            }
-        }
-    }
+    let mut rook_moves = sjadam_squares_rotated.rotate_270();
     
-    false
+    rook_moves.board &= !friendly_pieces.board;
+    let mut horizontal_moves = sjadam_squares.clone();
+    for rank in 0..8 {
+        lookup_rook(rank, &mut horizontal_moves, all_pieces);
+    }
+    horizontal_moves.board &= !friendly_pieces.board;
+    rook_moves.board |= horizontal_moves.board;
+    rook_moves
 }
 
-fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
-                               threats : &[PieceType]) -> bool {
-    let mut file = (square.0 & 0b0000_0111) as i8;
-    let mut rank = (square.0 >> 3) as i8;
-    loop {
-        file += i;
-        rank += j;
-        if file < 0 || rank < 0 || file >= 8 || rank >= 8 {
-            return false;
-        }
-        let piece = board[Square::from_ints(file as u8, rank as u8)];
-        if piece.is_empty() { continue }
-        if piece.color().unwrap() == board.to_move { return false; }
-        for threat in threats {
-            if piece.piece_type() == *threat {
-                return true;
-            }
-        }
-        return false;
-    }
-}
+/// Take the index of a rank, and a bitboard of available sjadam squares,
+/// and set all available rook moves on the rank
+/// Also sets captures of own pieces
+fn lookup_rook(rank: u8, sjadam_squares: &mut BitBoard, all_pieces: BitBoard) {
+    let rank_bits = sjadam_squares.rank(rank);
 
-fn add_moves_diagonally (board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
-    for &(i, j) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-        add_moves_in_direction(i, j, board, square, moves);
-    }
-}
-
-fn add_straight_moves(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
-    for &(i, j) in &[(0, 1), (1, 0), (0, -1), (-1, 0)] {
-        add_moves_in_direction(i, j, board, square, moves);
-    }
+    let target_rank = ROOK_TABLE
+        [sjadam_lookup_index(rank_bits)][all_pieces.rank(rank) as usize];
+    sjadam_squares.board |= (target_rank as u64) << (8 * rank as u64);
 }
     
-fn add_moves_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
-                           moves : &mut Vec<ChessMove>) {
-    
-    let mut file = (square.0 & 0b0000_0111) as i8;
-    let mut rank = (square.0 >> 3) as i8;
-    loop {
-        file += i;
-        rank += j;
-
-        if file < 0 || rank < 0 || file >= 8 || rank >= 8 {
-            break;
-        }
-        let target_square = Square::from_ints(file as u8, rank as u8);
-        let piece_to = board[target_square];
-
-        let c_move = ChessMove::new(square, target_square);
-        if piece_to.is_empty() {
-            moves.push(c_move);
-            continue;
-        }
-        if piece_to.color().unwrap() != board.to_move {
-            moves.push(c_move);
-        }
-        break;  // Break after finding a piece, friend or foe
-        
+fn sjadam_lookup_index(rank_bits: u8) -> usize {
+    let mut index;
+    if rank_bits.leading_zeros() % 2 == 0 {
+        index = 16;
+        index |= (rank_bits & 2) >> 1;
+        index |= (rank_bits & 8) >> 2;
+        index |= (rank_bits & 32) >> 3;
+        index |= (rank_bits & 128) >> 4;
     }
+    else {
+        index = 0;
+        index |= rank_bits & 1;
+        index |= (rank_bits & 4) >> 1;
+        index |= (rank_bits & 16) >> 2;
+        index |= (rank_bits & 64) >> 3;
+    }
+    debug_assert!(index < 32);
+    index as usize
 }

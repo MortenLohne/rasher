@@ -4,7 +4,6 @@ use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::game_move::Move;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
@@ -25,7 +24,7 @@ pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
     
     let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
     
-    let game_move = ChessMove::from_alg(&move_str).unwrap();
+    let game_move = board.from_alg(&move_str).unwrap();
     
     assert_eq!(game_move, best_move,
                "Best move was {:?} with score {}, expected {:?}, board:\n{}",
@@ -62,14 +61,14 @@ fn basic_tactics_test() {
 
     // Check that white can capture a queen to promote to a winning position
     let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
-    let best_move5 = ChessMove::from_alg("b7a8Q").unwrap();
+    let best_move5 = board5.from_alg("b7a8Q").unwrap();
     basic_tactics_prop(&board5, best_move5);
 }
 
 #[test]
 fn mate_in_two_test() {
     let board = ChessBoard::from_fen("2krr3/pp3ppp/8/2b2P2/5B2/2P3NP/PP2pnP1/R3K2R b - - 4 4").unwrap();
-    let best_move = ChessMove::from_alg("d8d1").unwrap();
+    let best_move = board.from_alg("d8d1").unwrap();
     basic_tactics_prop(&board, best_move);
     
 }
