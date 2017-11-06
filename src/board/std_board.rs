@@ -103,6 +103,12 @@ pub enum Piece {
     
 }
 
+impl Default for Piece {
+    fn default() -> Self {
+        Piece::Empty
+    }
+}
+
 impl fmt::Display for Piece {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(fmt, "{}", match self.color().unwrap_or(White) {
@@ -796,6 +802,12 @@ impl ops::IndexMut<Square> for ChessBoard {
 }
 
 impl ChessBoard {
+    pub fn empty() -> Self {
+        Self { board: [[Piece::Empty; 8]; 8], to_move: White, castling_en_passant: 0,
+               half_move_clock: 0, move_num: 0
+        }
+    }
+    
     // TODO: Remove in favour of indexing operator
     pub fn piece_at(&self, square : Square) -> Piece {
         self[square].clone()

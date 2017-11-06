@@ -1,6 +1,5 @@
 use board::std_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
-use board::sjadam_move_gen::SjadamBitBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use board::std_board::TimeInfo;
 
@@ -144,14 +143,14 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     ChessVariant::Sjadam => {
                         match engine_string.as_str() {
                             "minimax" => alpha_beta::start_uci_search(
-                                parse_position::<SjadamBitBoard>(&board_string)?,
+                                parse_position::<SjadamBoard>(&board_string)?,
                                 time_restriction,
                                 engine_options.clone(),
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| parse_position::<SjadamBitBoard>(&board_string)?.from_alg(move_string))
+                                         .map(|move_string| parse_position::<SjadamBoard>(&board_string)?.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),

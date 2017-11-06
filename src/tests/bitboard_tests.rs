@@ -1,4 +1,4 @@
-use board::sjadam_move_gen::BitBoard;
+use board::sjadam_board::BitBoard;
 use board::std_board;
 use board::std_board::ChessBoard;
 use search_algorithms::board::EvalBoard;
