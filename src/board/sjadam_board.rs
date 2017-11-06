@@ -250,20 +250,10 @@ impl SjadamBoard {
 
     pub fn white_pieces(&self) -> BitBoard {
         self.white_pieces
-            /*
-        [0, 2, 4, 6, 8, 10].iter()
-            .map(|&i| self.bitboards[i])
-            .fold(BitBoard::empty(), |acc, board| BitBoard::from_u64(acc.board | board.board))
-*/
     }
 
     pub fn black_pieces(&self) -> BitBoard {
         self.black_pieces
-            /*
-        [1, 3, 5, 7, 9, 11].iter()
-            .map(|&i| self.bitboards[i])
-            .fold(BitBoard::empty(), |acc, board| BitBoard::from_u64(acc.board | board.board))
-         */
     }
 
     pub fn all_pieces(&self) -> BitBoard {
@@ -412,8 +402,6 @@ impl UciBoard for SjadamBoard {
         }
     }
     fn to_alg(&self, mv: &Self::Move) -> String {
-        //debug_assert_eq!(self.base_board[mv.from()].color(), Some(self.to_move()));
-        //debug_assert_ne!(self.base_board[mv.to()].color(), Some(self.to_move()));
         #[cfg(feature = "legacy_sjadam_move_format")]
         {
             // println!("Converting move {:?} on\n{:?}", mv, self);
@@ -470,8 +458,6 @@ impl UciBoard for SjadamBoard {
                     Empty => unreachable!(),
                 }
             };
-
-            
             
             let mut f = String::new();
             use fmt::Write;
@@ -616,6 +602,7 @@ impl EvalBoard for SjadamBoard {
                 self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
             }
         }
+        
         self.to_move = !self.to_move();
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);

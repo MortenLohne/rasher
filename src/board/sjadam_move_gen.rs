@@ -22,6 +22,7 @@ lazy_static! {
                 for file in 0..8 {
                     if sjadam_squares.get(Square(file)) {
                         let mut cur_file = file.overflowing_sub(1).0;
+                        
                         while cur_file < 8 {
                             target_squares.set(Square(cur_file));
                             if all_pieces.get(Square(cur_file)) {
@@ -29,7 +30,9 @@ lazy_static! {
                             }
                             cur_file = cur_file.overflowing_sub(1).0;
                         }
+                        
                         cur_file = file + 1;
+                        
                         while cur_file < 8 {
                             target_squares.set(Square(cur_file));
                             if all_pieces.get(Square(cur_file)) {
@@ -41,6 +44,7 @@ lazy_static! {
                 }
                 debug_assert_eq!(table[sjadam_lookup_index(sjadam_squares.rank(0))]
                                  [all_pieces.rank(0) as usize], 0);
+                
                 table[sjadam_lookup_index(sjadam_squares.rank(0))]
                     [all_pieces.rank(0) as usize]
                     = target_squares.rank(0);
@@ -54,6 +58,7 @@ lazy_static! {
         let attacks = c << 17 | c << 15 | c << 10 | c << 6 | c | c >> 6 | c >> 10 | c >> 15 | c >> 17;
         let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
         let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
+
         for pieces in 0..256 {
             let mut targets : u64 = 0;
             for file in 0..2 {
@@ -61,16 +66,19 @@ lazy_static! {
                     targets |= right_side & (attacks >> (2 - file))
                 }
             }
+            
             for file in 2..6 {
                 if (pieces >> file) % 2 != 0 {
                     targets |= attacks << (file - 2)
                 }
             }
+            
             for file in 6..8 {
                 if (pieces >> file) % 2 != 0 {
                     targets |= left_side & (attacks << (file - 2))
                 }
             }
+            
             table[pieces] = targets;
         }
         table
@@ -86,14 +94,17 @@ lazy_static! {
             if pieces % 2 != 0 {
                 targets |= right_side & (attacks >> 1);
             }
+            
             for file in 1..7 {
                 if (pieces >> file) % 2 != 0 {
                     targets |= attacks << (file - 1)
                 }
             }
+            
             if (pieces >> 7) % 2 != 0 {
                 targets |= left_side & (attacks << 6);
             }
+            
             table[pieces] = targets;
         }
         table
@@ -203,18 +214,22 @@ fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoa
     for x in &[-1, 0, 1] {
         for y in &[-1, 0, 1] {
             let (file, rank) = (square.file_rank().0 as i8, square.file_rank().1 as i8);
+            
             if (file <= 1 && *x == -1) || (file >= 6 && *x == 1)
-                || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1) {
-                    continue
-                }
+                || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1)
+            {
+                continue
+            }
             let dest_square = Square(i.wrapping_add((16 * y) as u8).wrapping_add((2 * x) as u8));
             let jumping_square = Square(i.wrapping_add((8 * y) as u8).wrapping_add(*x as u8));
+            
             if friendly_pieces.get(jumping_square) && !all_pieces.get(dest_square) &&
-                !sjadam_squares.get(dest_square) {
-                    sjadam_squares.set(dest_square);
-                    sjadam_friendly_moves(sjadam_squares, friendly_pieces,
-                                          all_pieces, dest_square);
-                }
+                !sjadam_squares.get(dest_square)
+            {
+                sjadam_squares.set(dest_square);
+                sjadam_friendly_moves(sjadam_squares, friendly_pieces,
+                                      all_pieces, dest_square);
+            }
         }
     }
 }
@@ -231,19 +246,25 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     else if type2_mask & sjadam_squares.board != 0 { 1 }
     else if type3_mask & sjadam_squares.board != 0 { 8 }
     else { 9 };
+    
     let old_sjadam_squares = sjadam_squares.clone();
+    
     for i in [0, 2, 4, 6, 16, 18, 20, 22, 32, 34, 36, 38, 48, 50, 52, 54].iter()
         .map(|&i| i + color_offset)
         .filter(|&i| old_sjadam_squares.get(Square(i)))
     {
         let square = Square(i);
+        
         for x in &[-1, 0, 1] {
             for y in &[-1, 0, 1] {
                 let (file, rank) = (square.file_rank().0 as i8, square.file_rank().1 as i8);
+                
                 if (file <= 1 && *x == -1) || (file >= 6 && *x == 1)
-                    || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1) {
-                        continue
-                    }
+                    || (rank <= 1 && *y == -1) || (rank >= 6 && *y == 1)
+                {
+                    continue
+                }
+                
                 let dest_square = Square(i.wrapping_add((16 * y) as u8).wrapping_add((2 * x) as u8));
                 let jumping_square = Square(i.wrapping_add((8 * y) as u8).wrapping_add(*x as u8));
                 if opponent_pieces.get(jumping_square) && !all_pieces.get(dest_square) {
@@ -284,14 +305,17 @@ fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard
 
 const RIGHT_MASK : u64 = 0b01111111_01111111_01111111_01111111_01111111_01111111_01111111_01111111;
 const LEFT_MASK : u64 = 0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110;
+
 #[inline(never)]
 fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
     let left_captures = ((sjadam_squares.board & LEFT_MASK) << 7) & opponent_pieces.board; // & LEFT_MASK;
     let right_captures = ((sjadam_squares.board & RIGHT_MASK) << 9) & opponent_pieces.board; // & RIGHT_MASK;
+    
     let forward = sjadam_squares.board << 8 & !all_pieces.board;
     let forward_two = (sjadam_squares.board & (255 << 8)) << 16 & !all_pieces.board & !(all_pieces.board << 8);
+    
     BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
 
@@ -305,6 +329,7 @@ fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
     
     let forward = sjadam_squares.board >> 8 & !all_pieces.board;
     let forward_two = (sjadam_squares.board & (255 << 48)) >> 16 & !all_pieces.board & !(all_pieces.board >> 8);
+    
     BitBoard::from_u64(sjadam_squares.board | left_captures | right_captures | forward | forward_two)
 }
 
@@ -321,12 +346,15 @@ fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
             [sjadam_lookup_index(diagonal_bits)][all_pieces_45.diagonal(diagonal) as usize];
 
         let len : u64 = if diagonal >= 8 { 15 - diagonal } else { diagonal + 1 } as u64;
+
         target_rank &= !(!(0 as u64) << len) as u8;
+
         let n = diagonal as i8 - 7;
         let offset = if n <= 0 { n * (-8)} else { 8 * (8 - n) + n };
 
         sjadam_squares_45.board |= (target_rank as u64) << offset;
     }
+    
     let diagonal_moves = (0..7).fold(sjadam_squares_45, |acc, _| acc.rotate_45());
 
     let mut sjadam_squares_315 = sjadam_squares.rotate_315();
