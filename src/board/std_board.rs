@@ -34,7 +34,7 @@ impl PieceType {
             Bishop => 3.0,
             Rook => 5.0,
             Queen => 9.0,
-            King => 0.0,
+            King => 100.0,
             Empty => 0.0,
         }
     }
