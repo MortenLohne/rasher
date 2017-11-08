@@ -110,8 +110,10 @@ lazy_static! {
         table
     };
 }
+
 pub fn all_legal_moves(board: &SjadamBoard) -> Vec<SjadamMove> {
     let mut moves = Vec::with_capacity(300);
+    let mut active_moves = Vec::with_capacity(200);
 
     let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
         (board.white_pieces(), board.black_pieces())
@@ -128,7 +130,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> Vec<SjadamMove> {
             && board.get_square(square).color().unwrap() == board.to_move()
         {
             legal_moves_for_square(&board, square, board.get_square(square).piece_type(),
-                                   &mut moves);
+                                   &mut moves, &mut active_moves);
         }
     }
     if board.to_move() == White {
@@ -151,11 +153,13 @@ pub fn all_legal_moves(board: &SjadamBoard) -> Vec<SjadamMove> {
                 moves.push(SjadamMove::new(Square::E8, Square::C8, true));
             }
     }
-    moves
+    active_moves.append(&mut moves);
+    active_moves
 }
     
 fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
-                          bitboard_moves: &mut Vec<SjadamMove>) {
+                          quiet_moves: &mut Vec<SjadamMove>,
+                          active_moves: &mut Vec<SjadamMove>) {
     
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
@@ -201,7 +205,15 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
     
     for i in 0..64 {
         if moves.get(Square(i)) && Square(i) != square {
-            bitboard_moves.push(SjadamMove::new(square, Square(i), false));
+            let target = board.get_square(Square(i));
+            if target.color().is_some() && target.color().unwrap() != board.to_move()
+                && target.value().abs() >= piece_type.value().abs()
+            {
+                active_moves.push(SjadamMove::new(square, Square(i), false));
+            }
+            else {
+                quiet_moves.push(SjadamMove::new(square, Square(i), false));
+            }
         }
     }
 }
