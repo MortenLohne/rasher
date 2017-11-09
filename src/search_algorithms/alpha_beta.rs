@@ -347,7 +347,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 }
 
 fn quiescence_search<B: EvalBoard + fmt::Debug>(board: &mut B, mut alpha: f32, beta: f32) -> f32 {
-    //println!("Evaling board {:?}", board);
     let stand_pat = match board.game_result() {
         Some(GameResult::WhiteWin) => return f32::INFINITY,
         Some(GameResult::BlackWin) => return f32::NEG_INFINITY,
@@ -415,12 +414,15 @@ struct Table<B, M> {
 }
 
 impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
+    
+    #[inline(never)]
     pub fn new(max_memory: usize) -> Table<B, M> {
         Table { hash_table: HashMap::with_capacity(6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,
                 mem_usage: 0, max_memory: max_memory }
     }
-        
+
+    #[inline(never)]
     pub fn get(&mut self, key: &B) -> Option<&HashEntry<M>> {
         self.lookups += 1;
         let result = self.hash_table.get(key);
@@ -429,7 +431,8 @@ impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
         }
         result
     }
-
+    
+    #[inline(never)]
     pub fn insert(&mut self, key: B, value: HashEntry<M>) {
         let extra_mem = Self::value_mem_usage();
         if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
