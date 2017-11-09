@@ -77,6 +77,8 @@ fn main() {
                     println!("Standard board: {}", mem::size_of::<board::std_board::ChessBoard>());
                     println!("Standard move: {}", mem::size_of::<board::std_move::ChessMove>());
                     println!("Standard piece: {}", mem::size_of::<board::std_board::Piece>());
+                    println!("Sjadam board: {}", mem::size_of::<SjadamBoard>());
+                    println!("Sjadam move: {}", mem::size_of::<board::sjadam_move::SjadamMove>());
                     println!("Board score: {}", mem::size_of::<Score>());
                     println!("Size of chess mcts node: {}",
                              mem::size_of::<mcts::MonteCarloTree<ChessBoard>>());
