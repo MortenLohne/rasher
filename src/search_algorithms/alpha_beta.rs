@@ -228,7 +228,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 if let Mate(_) = time_restriction {
                     return (Val(board.eval_board()), vec![]);
                 }
-                let score = quiescence_search(board, alpha_val, beta_val);
+                let score = quiescence_search(board, node_counter, alpha_val, beta_val);
                 let ordering = match board.to_move() {
                     White => Ordering::Greater,
                     Black => Ordering::Less,
@@ -348,31 +348,50 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     (score, moves, node_counter)
 }
 
-fn quiescence_search<B: EvalBoard + fmt::Debug>(board: &mut B, mut alpha: f32, beta: f32) -> f32 {
+#[inline(never)]
+fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
+                        mut alpha: f32, mut beta: f32) -> f32
+    where B: EvalBoard + fmt::Debug {
+    node_counter.intern += 1;
+    node_counter.total += 1;
+    
     let stand_pat = match board.game_result() {
-        Some(GameResult::WhiteWin) => return f32::INFINITY,
-        Some(GameResult::BlackWin) => return f32::NEG_INFINITY,
+        Some(GameResult::WhiteWin) => return 200.0,
+        Some(GameResult::BlackWin) => return -200.0,
         Some(GameResult::Draw) => 0.0,
         None => board.eval_board(),
     };
-    if stand_pat >= beta {
-        return stand_pat;
-    }
-    if alpha < stand_pat {
-        alpha = stand_pat;
-    }
-    let captures = board.active_moves();
-    for mv in captures {
-        //println!("Doing quiescent move {:?} on {:?}", mv, board);
-        let undo_move = board.do_move(mv);
-        let score = quiescence_search(board, -beta, -alpha);
-        board.undo_move(undo_move);
-        if score >= beta { return beta; }
-        if score > alpha { alpha = score }
-    }
-    alpha
-}
 
+    let mut best_score = stand_pat;
+    let color = board.to_move();
+    
+    for mv in board.active_moves() {
+        let undo_move = board.do_move(mv);
+        let score = quiescence_search(board, node_counter, alpha, beta);
+        board.undo_move(undo_move);
+        if (board.to_move() == Black && score < best_score)
+            || (board.to_move() == White && score > best_score)
+        {
+            best_score = score;
+        }
+
+        if color == White && score > alpha {
+            alpha = score;
+            best_score = score;
+        }
+        
+        else if color == Black && score < beta {
+            beta = score;
+            best_score = score;
+        }
+        if alpha >= beta {
+            break; 
+        }
+    }
+
+    best_score
+}
+    
 fn increment_score<B: EvalBoard>(score: Score, board: &B) -> Score {
     match score {
         BlackWin(i) if board.to_move() == Black => BlackWin(i + 1),

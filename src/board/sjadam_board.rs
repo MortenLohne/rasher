@@ -171,7 +171,8 @@ pub struct SjadamBoard {
 
 impl PartialEq for SjadamBoard {
     fn eq(&self, other: &Self) -> bool {
-        self.bitboards == other.bitboards && self.to_move == other.to_move
+        self.bitboards == other.bitboards
+            && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
     }
 }
@@ -647,7 +648,14 @@ impl EvalBoard for SjadamBoard {
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
-        sjadam_move_gen::all_legal_moves(&self)
+        let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(&self);
+        active_moves.append(&mut moves);
+        active_moves
+    }
+
+    fn active_moves (&self) -> Vec<Self::Move> {
+        let (active_moves, _) = sjadam_move_gen::all_legal_moves(&self);
+        active_moves
     }
     
     #[inline(never)]
