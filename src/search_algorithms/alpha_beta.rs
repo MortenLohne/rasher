@@ -118,15 +118,17 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 engine_comm.lock().unwrap().best_move = None;
                 continue;
             }
-            // Commented out because moves are not converted to strings with the correct board
-            // This causes engine to emit length 1 pv
-            /*
-            let pv_str = moves.iter()
-                .map(|mv| board.to_alg(mv))
-                .collect::<Vec<_>>()
-                .join(" ");
-             */
-            let pv_str = board.to_alg(&moves[0]);
+
+            let mut pv_str = String::new();
+            {
+                let mut pv_board = board.clone();
+                for mv in moves.iter() {
+                    pv_str.push_str(&pv_board.to_alg(&mv));
+                    pv_str.push(' ');
+                    pv_board.do_move(mv.clone());
+                }
+            }
+
             pv_moves.push(moves[0].clone());
             pvs.push((score, pv_str));
             total_node_count = total_node_count + node_count;
