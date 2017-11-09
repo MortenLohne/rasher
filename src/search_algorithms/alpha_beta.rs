@@ -6,6 +6,7 @@ use std::fmt;
 use std::cmp;
 use std::cmp::PartialOrd;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::hash::Hash;
 use std::cmp::Ordering;
 use std::f32;
@@ -456,9 +457,12 @@ impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
     #[inline(never)]
     pub fn insert(&mut self, key: B, value: HashEntry<M>) {
         let extra_mem = Self::value_mem_usage();
-        if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
-            self.mem_usage += extra_mem;
-            self.hash_table.insert(key, value);
+        match self.hash_table.entry(key) {
+            Entry::Occupied(mut entry) => *entry.get_mut() = value,
+            Entry::Vacant(entry) => if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
+                self.mem_usage += extra_mem;
+                entry.insert(value);
+            },
         }
     }
 
