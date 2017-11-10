@@ -692,4 +692,8 @@ impl EvalBoard for SjadamBoard {
          */    
         white_val - black_val
     }
+
+    fn branch_factor() -> u64 {
+        60
+    }
 }
