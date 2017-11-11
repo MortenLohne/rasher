@@ -112,8 +112,9 @@ lazy_static! {
 }
 
 pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>) {
-    let mut moves = Vec::with_capacity(300);
-    let mut active_moves = Vec::with_capacity(300);
+    let mut moves = Vec::with_capacity(250);
+    let mut active_moves = Vec::with_capacity(50);
+    let mut winning_moves = Vec::with_capacity(300);
 
     let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
         (board.white_pieces(), board.black_pieces())
@@ -130,7 +131,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
             && board.get_square(square).color().unwrap() == board.to_move()
         {
             legal_moves_for_square(&board, square, board.get_square(square).piece_type(),
-                                   &mut moves, &mut active_moves);
+                                   &mut moves, &mut active_moves, &mut winning_moves);
         }
     }
     if board.to_move() == White {
@@ -153,12 +154,14 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
                 moves.push(SjadamMove::new(Square::E8, Square::C8, true));
             }
     }
-    (active_moves, moves)
+    winning_moves.append(&mut active_moves);
+    (winning_moves, moves)
 }
     
 fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
                           quiet_moves: &mut Vec<SjadamMove>,
-                          active_moves: &mut Vec<SjadamMove>) {
+                          active_moves: &mut Vec<SjadamMove>,
+                          winning_moves: &mut Vec<SjadamMove>) {
     
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
@@ -205,14 +208,23 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
     for i in 0..64 {
         if moves.get(Square(i)) && Square(i) != square {
             let target = board.get_square(Square(i));
+            let mv = SjadamMove::new(square, Square(i), false);
             if target.color().is_some() && target.color().unwrap() != board.to_move()
-                && target.value().abs() >= piece_type.value().abs()
                 && target.piece_type() != Pawn
             {
-                active_moves.push(SjadamMove::new(square, Square(i), false));
+                if target.value().abs() > piece_type.value().abs()
+                    || target.piece_type() == King {
+                    winning_moves.push(mv);
+                }
+                else if target.value().abs() == piece_type.value().abs() {
+                    active_moves.push(mv);
+                }
+                else {
+                    quiet_moves.push(mv);
+                }
             }
             else {
-                quiet_moves.push(SjadamMove::new(square, Square(i), false));
+                quiet_moves.push(mv);
             }
         }
     }
