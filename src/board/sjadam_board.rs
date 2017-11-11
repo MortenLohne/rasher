@@ -660,7 +660,7 @@ impl EvalBoard for SjadamBoard {
     
     #[inline(never)]
     fn eval_board (&self) -> f32 {
-
+        debug_assert!(self.game_result() == None);
         let centre1 = 0b00000000_00000000_00000000_00011000_00011000_00000000_00000000_00000000;
         let centre2 = 0b00000000_00000000_00111100_00111100_00111100_00111100_00000000_00000000;
         let centre3 = 0b00000000_01111110_01111110_01111110_01111110_01111110_01111110_00000000;
@@ -683,6 +683,13 @@ impl EvalBoard for SjadamBoard {
 
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
+
+        let tempo_bonus = (white_val + black_val.abs()) / 100.0;
+
+        match self.to_move {
+            White => white_val - black_val + tempo_bonus,
+            Black => white_val - black_val - tempo_bonus,
+        }
         
         /*
         TODO: Put pawn advancement eval back
@@ -690,7 +697,7 @@ impl EvalBoard for SjadamBoard {
         Pawn => (rank as f32 - 3.5) * -0.1,
         _ => 0.0,
          */    
-        white_val - black_val
+        
     }
 
     fn branch_factor() -> u64 {
