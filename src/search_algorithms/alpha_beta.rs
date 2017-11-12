@@ -126,6 +126,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 for mv in moves.iter() {
                     pv_str.push_str(&pv_board.to_alg(&mv));
                     pv_str.push(' ');
+                    debug_assert!(pv_board.all_legal_moves().contains(&mv),
+                                  "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
+                                  mv, moves, pv_board, board);
                     pv_board.do_move(mv.clone());
                 }
             }
@@ -195,7 +198,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 if entry_depth >= depth && (
                     ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
                 {
-                    return (score, match best_reply.clone() { Some(v) => vec![v], None => vec![], })
+                        return (score, best_reply.iter().cloned().collect())
                 }
                 else {
                     best_reply.clone()
@@ -333,9 +336,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 White => Ordering::Greater,
                 Black => Ordering::Less,
             };
-
             table.insert(board.clone(), HashEntry {
-                best_reply: best_line.get(0).map(Clone::clone), score: (ordering, score), depth: depth
+                best_reply: best_line.last().map(Clone::clone),
+                score: (ordering, score), depth: depth
             });
         }
         (score, best_line)
