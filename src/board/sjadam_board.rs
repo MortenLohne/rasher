@@ -418,8 +418,8 @@ impl UciBoard for SjadamBoard {
                 .map(|sq| Square(sq as u8))
                 .filter(|&sq| self.is_empty(sq) || sq == mv.from())
                 .collect::<Vec<Square>>();
-            let knight_neighbours = |square: i8| [square - 17, square - 15, square - 9, square - 6,
-                                                  square + 6, square + 9, square + 15, square + 17]
+            let knight_neighbours = |square: i8| [square - 17, square - 15, square - 10, square - 6,
+                                                  square + 6, square + 10, square + 15, square + 17]
                 .iter().cloned()
                 .filter(|&sq| sq >= 0 && sq < 64)
                 .map(|sq| Square(sq as u8))
@@ -431,9 +431,7 @@ impl UciBoard for SjadamBoard {
                 .map(|sq| if self.to_move() == Black { sq - 16 } else { sq } )
                 .filter(|&sq| sq >= 0 && sq < 64)
                 .map(|sq| Square(sq as u8))
-                .inspect(|&sq| println!("Inspecting pawn square {}", sq))
                 .filter(|&sq| self.is_empty(sq) || sq == mv.from())
-                .inspect(|&sq| println!("Approved pawn square {}", sq))
                 .collect::<Vec<Square>>();
 
             // If destination square is empty, do it as a pure sjadam move
@@ -453,7 +451,9 @@ impl UciBoard for SjadamBoard {
                                       neighbs.append(&mut dia_neighbours(mv.to().0 as i8));
                                       *neighbs.get(0).expect(&mv.to_string())
                     },
-                    Knight => *knight_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
+                    Knight => *knight_neighbours(mv.to().0 as i8).get(0)
+                        .expect(&format!("Couldn't reconstruct move {} on \n{:?}",
+                                        mv, self)),
                     Pawn => *pawn_neighbours(mv.to().0 as i8).get(0).expect(&mv.to_string()),
                     
                     Empty => unreachable!(),
