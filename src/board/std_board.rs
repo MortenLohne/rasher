@@ -415,17 +415,12 @@ impl UciBoard for ChessBoard {
             string.push('/');
         }
         string.pop();
+
         match self.to_move() {
             White => string.push_str(" w"),
             Black => string.push_str(" b"),
         }
-        match self.en_passant_square() {
-            Some(square) => {
-                let (file, _) = square.file_rank();
-                write!(string, " {}", file).unwrap();
-            },
-            None => string.push_str(" -"),
-        }
+        
         string.push(' ');
         if self.can_castle_kingside(White) {
             string.push('K');
@@ -442,6 +437,15 @@ impl UciBoard for ChessBoard {
         if string.chars().last() == Some(' ') {
             string.push('-');
         }
+        
+        match self.en_passant_square() {
+            Some(square) => {
+                let (file, _) = square.file_rank();
+                write!(string, " {}", file).unwrap();
+            },
+            None => string.push_str(" -"),
+        }
+        
         write!(string, " {}", self.half_move_clock).unwrap();
         write!(string, " {}", self.move_num).unwrap();
         string
