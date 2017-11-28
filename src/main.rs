@@ -2,6 +2,7 @@ mod uci;
 mod board;
 mod tests;
 mod search_algorithms;
+mod opening_gen;
 
 #[cfg(test)]
 #[macro_use]
@@ -22,6 +23,7 @@ use std::io;
 use std::fmt;
 use std::hash::Hash;
 use std::time;
+use std::collections::HashSet;
 
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
@@ -29,6 +31,8 @@ use search_algorithms::mcts;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::GameResult;
 use uci::UciBoard;
+
+use opening_gen::OpeningTree;
 
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
@@ -144,7 +148,45 @@ fn main() {
                     }
                 }
                 "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
+
+                "opening_gen" => {
+                    if tokens.len() == 1 || tokens[1] == "standard" {
+                        opening_gen::gen_from_startpos::<ChessBoard>(4);
+                    }
+                    else {
+                        match tokens[1] {
+                            "crazyhouse" => opening_gen::gen_from_startpos::<CrazyhouseBoard>(4),
+                            
+                            "sjadam" => {
+                                let mut tree = OpeningTree::new_root();
+                                let root_eval = tree.eval(4, SjadamBoard::start_board());
+                                println!("Size before pruning: {}", tree.size());
+                                tree.prune(&mut SjadamBoard::start_board(), &mut HashSet::new());
+                                println!("Size after pruning: {}", tree.size());
+                                println!("Eval: {:?}", root_eval);
+                                for child in tree.children.as_ref().unwrap_or(&vec![]) {
+
+                                    println!("Child eval for {:?}: {}",
+                                             child.mv, child.eval);
+
+                                    for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
+                                        println!("Grandchild eval for {:?}: {}",
+                                                 grandchild.mv, grandchild.eval);
+                                    }
+                                }
+                                tree.print_opening(&mut SjadamBoard::start_board(),
+                                                   &mut vec![]);
+
+                            },
+                            
+                            s => println!("Unrecognized variant {}.", s),
+                        }
+                    }
+                    break;
+                },
+                
                 s => warn!("Unrecognized command \"{}\".", s),
+               
             }
         }
         else {
