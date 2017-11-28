@@ -14,7 +14,7 @@ time = "0.1.*"
 itertools = "0.7.*"
 rand = "0.3"
 ordered-float = "0.5.*"
-rayon = "0.8.*"
+rayon = "0.9.*"
 log = "0.3.*"
 lazy_static = "0.2.*"
 
