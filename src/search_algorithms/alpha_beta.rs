@@ -496,6 +496,18 @@ pub enum Score {
     BlackWin(u16),
 }
 
+impl Score {
+    #[allow(dead_code)]
+    pub fn to_cp(self) -> i16 {
+        match self {
+            Val(val) => (val * 100.0) as i16,
+            Draw(_) => 0,
+            WhiteWin(n) => 12000 - n as i16,
+            BlackWin(n) => -12000 + n as i16,
+        }
+    }
+}
+
 impl fmt::Display for Score {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
