@@ -7,6 +7,7 @@ use search_algorithms::board;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
+use search_algorithms::board::EvalBoard;
 
 extern crate time;
 
@@ -59,6 +60,38 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
             "ucinewgame" => (), // Ignore this for now
             "position" => board_string = input.to_string(),
             "setoption" => parse_setoption(&input, &mut engine_options)?,
+            "eval" => {
+                match engine_options.variant {
+                    ChessVariant::Standard => {
+                        let board = parse_position::<ChessBoard>(&board_string)?;
+                        println!("Eval: {}", board.eval_board());
+                    }
+                    ChessVariant::Sjadam => {
+                        let board = parse_position::<SjadamBoard>(&board_string)?;
+                        println!("Eval: {}", board.eval_board());
+                    }
+                    ChessVariant::Crazyhouse => {
+                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                        println!("Eval: {}", board.eval_board());
+                    }
+                };
+            }
+            "fen" => {
+                match engine_options.variant {
+                    ChessVariant::Standard => {
+                        let board = parse_position::<ChessBoard>(&board_string)?;
+                        println!("Fen: {}", board.to_fen());
+                    }
+                    ChessVariant::Sjadam => {
+                        let board = parse_position::<SjadamBoard>(&board_string)?;
+                        println!("Fen: {}", board.to_fen());
+                    }
+                    ChessVariant::Crazyhouse => {
+                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                        println!("Fen: {}", board.to_fen());
+                    }
+                };
+            }
             "engine" =>
                 if tokens.len() >= 2 {
                     engine_string = tokens[1].to_string(); }
