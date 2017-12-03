@@ -684,7 +684,7 @@ impl EvalBoard for SjadamBoard {
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
 
-        let tempo_bonus = (white_val + black_val.abs()) / 100.0;
+        let tempo_bonus = (white_val + black_val.abs()) / 200.0;
 
         match self.to_move {
             White => white_val - black_val + tempo_bonus,
