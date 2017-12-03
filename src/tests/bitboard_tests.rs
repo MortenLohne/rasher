@@ -1,6 +1,10 @@
 use board::sjadam_board::BitBoard;
-use board::std_board;
+use board::sjadam_board::SjadamBoard;
 use board::std_board::ChessBoard;
+use board::std_board::Square;
+use board::std_board::Piece;
+use board::std_board::PieceType::*;
+use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
 
@@ -18,10 +22,10 @@ fn rotate() {
     board = board.rotate();
     for rank in 0..8 {
         for &file in [0, 1, 6, 7].iter() {
-            assert!(board.get(std_board::Square::from_ints(file, rank)));
+            assert!(board.get(Square::from_ints(file, rank)));
         }
         for &file in [2, 3, 4, 5].iter() {
-            assert!(!board.get(std_board::Square::from_ints(file, rank)),
+            assert!(!board.get(Square::from_ints(file, rank)),
             "Found piece in the middle of board \n{:?}", board);
         }
     }
@@ -122,4 +126,41 @@ fn long_antidiagonal() {
     assert_eq!(board.antidiagonal(-7), 1);
     assert_eq!(board.antidiagonal(-6), 0b11);
     assert_eq!(board.antidiagonal(-5), 0b011);
+}
+
+#[test]
+fn diagonal_neighbours() {
+    let a8_neighbours = BitBoard::diagonal_neighbours(Square(0));
+    assert_eq!(a8_neighbours.popcount(), 1,
+               "Neighbours of square 0:\n{:?}",
+               BitBoard::diagonal_neighbours(Square(0)));
+    assert_eq!(BitBoard::diagonal_neighbours(Square(8)).popcount(), 2);
+    assert_eq!(BitBoard::diagonal_neighbours(Square(9)).popcount(), 4);
+
+    let mut board = BitBoard::empty();
+    board.set(Square(9));
+    assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
+}
+
+#[test]
+fn orthogonal_neighbours() {
+    let a8_neighbours = BitBoard::orthogonal_neighbours(Square(0));
+    assert_eq!(a8_neighbours.popcount(), 2);
+    assert_eq!(BitBoard::orthogonal_neighbours(Square(8)).popcount(), 3);
+    assert_eq!(BitBoard::orthogonal_neighbours(Square(9)).popcount(), 4);
+
+    let mut board = BitBoard::empty();
+    board.set(Square(8));
+
+    assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
+}
+
+#[test]
+fn first_piece() {
+    let start_board = SjadamBoard::start_board();
+    let white_kings = start_board.get_piece(Piece::new(King, White));
+    let black_kings = start_board.get_piece(Piece::new(King, Black));
+    
+    assert_eq!(white_kings.first_piece(), Some(Square(60)));
+    assert_eq!(black_kings.first_piece(), Some(Square(4)));
 }

@@ -5,8 +5,8 @@ use rand;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
-    White,
-    Black,
+    White = 0,
+    Black = 1,
 }
 impl ops::Not for Color {
     type Output = Color;
@@ -27,6 +27,13 @@ impl fmt::Display for Color {
         })
     }
 }
+
+impl Color {
+    pub fn disc(self) -> usize {
+        self as u16 as usize
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum GameResult {
     WhiteWin,

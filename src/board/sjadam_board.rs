@@ -11,12 +11,98 @@ use search_algorithms::board::GameResult;
 #[cfg(feature = "legacy_sjadam_move_format")]
 use board::std_board::PieceType::*;
 
+use std::ops;
 use std::fmt;
 use uci::UciBoard;
+
+const WHITE_SQUARES : BitBoard = BitBoard {
+    board: 0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101
+};
+const BLACK_SQUARES : BitBoard = BitBoard {
+    board: 0b01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010
+};
+const EVEN_RANKS : BitBoard = BitBoard {
+    board: 0b11111111_00000000_11111111_00000000_11111111_00000000_11111111_00000000
+};
+const ODD_RANKS : BitBoard = BitBoard {
+    board: 0b00000000_11111111_00000000_11111111_00000000_11111111_00000000_11111111
+};
+const EVEN_FILES : BitBoard = BitBoard {
+    board: 0b10101010_10101010_10101010_10101010_10101010_10101010_10101010_10101010
+};
+const ODD_FILES : BitBoard = BitBoard {
+    board: 0b01010101_01010101_01010101_01010101_01010101_01010101_01010101_01010101
+};
+
+
+lazy_static! {
+    static ref DIAGONAL_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+        
+        for i in 0..64 {
+            let mut board = BitBoard::empty();
+            let (file, rank) = Square(i).file_rank();
+            
+            for &x in [u8::overflowing_sub(file, 1).0, file + 1].iter() {
+                for &y in [u8::overflowing_sub(rank, 1).0, rank + 1].iter() {
+                    if x < 8 && y < 8 {
+                        board.set(Square::from_ints(x, y));
+                    }
+                }
+            }
+            table[i as usize] = board;
+        }
+        table
+    };
+
+    static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+
+        for i in 0..64 {
+            let mut board = BitBoard::empty();
+            let (file, rank) = Square(i).file_rank();
+            
+            for &x in [u8::overflowing_sub(file, 1).0, file + 1].iter() {
+                if x < 8 {
+                    board.set(Square::from_ints(x, rank));
+                }
+            }
+            
+            for &y in [u8::overflowing_sub(rank, 1).0, rank + 1].iter() {
+                if y < 8 {
+                    board.set(Square::from_ints(file, y));
+                }
+            }
+            table[i as usize] = board;
+        }
+        table
+    };
+}
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub struct BitBoard {
     pub board: u64,
+}
+
+impl ops::BitOr for BitBoard {
+    type Output = BitBoard;
+    fn bitor(self, rhs: BitBoard) -> BitBoard {
+        BitBoard::from_u64(self.board | rhs.board)
+    }
+}
+
+impl ops::BitAnd for BitBoard {
+    type Output = BitBoard;
+    fn bitand(self, rhs: BitBoard) -> BitBoard {
+        BitBoard::from_u64(self.board & rhs.board)
+    }
+}
+
+impl ops::Not for BitBoard {
+    type Output = BitBoard;
+    fn not(self) -> BitBoard {
+        BitBoard::from_u64(!self.board)
+    }
 }
 
 impl BitBoard {
@@ -63,7 +149,10 @@ impl BitBoard {
         self.board &= !(1<<i);
     }
 
-    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.board == 0
+    }
+    
     pub fn popcount(&self) -> u32 {
         self.board.count_ones()
     }
@@ -146,6 +235,49 @@ impl BitBoard {
         let n = diagonal_id as i16;
         let offset = if n <= 0 { n * (-8) - n} else { 8 * (8 - n) };
         ((self.board >> offset) & !(!0 << len as u64)) as u8
+    }
+
+    /// Returns a board with the diagonal neighbours squares (up to 4) set
+    pub fn diagonal_neighbours(square: Square) -> BitBoard {
+        DIAGONAL_NEIGHBOURS[square.0 as usize]
+    }
+
+    pub fn rank_neighbours(square: Square) -> BitBoard {
+        let (file, rank) = square.file_rank();
+        let mut board = BitBoard::empty();
+        if file > 0 {
+            board.set(Square::from_ints(file - 1, rank));
+        }
+        if file < 7 {
+            board.set(Square::from_ints(file + 1, rank));
+        }
+        board
+    }
+
+    pub fn file_neighbours(square: Square) -> BitBoard {
+        let (file, rank) = square.file_rank();
+        let mut board = BitBoard::empty();
+        if rank > 0 {
+            board.set(Square::from_ints(file, rank - 1));
+        }
+        if rank < 7 {
+            board.set(Square::from_ints(file, rank + 1));
+        }
+        board
+    }
+    
+    pub fn orthogonal_neighbours(square: Square) -> BitBoard {
+        ORTHOGONAL_NEIGHBOURS[square.0 as usize]
+    }
+
+    pub fn first_piece(&self) -> Option<Square> {
+        let square = self.board.trailing_zeros();
+        if square == 64 {
+            None
+        }
+        else {
+            Some(Square(square as u8))
+        }
     }
 }
 
@@ -668,8 +800,13 @@ impl EvalBoard for SjadamBoard {
         let centre_value = |bits: u64| (bits & centre1).count_ones() + (bits & centre2).count_ones()
             + (bits & centre3).count_ones();
 
-        let value_modifiers = [(1.0, 0.0), (3.0, 0.3), (3.0, 0.15),
-                               (5.0, 0.1), (9.0, 0.3), (0.0, 0.0)];
+        // Array of (piece value, centrality value) for each piece
+        let value_modifiers = [(1.0, 0.0), // Pawn
+                               (3.0, 0.3), // Knight
+                               (3.0, 0.15), // Bishop
+                               (5.0, 0.1), // Rook
+                               (9.0, 0.3), // Queen
+                               (0.0, 0.0)]; // King
         
         let pieces_value = |piece_ids: [usize; 6]| piece_ids.iter()
             .map(|i| {
@@ -686,10 +823,104 @@ impl EvalBoard for SjadamBoard {
 
         let tempo_bonus = (white_val + black_val.abs()) / 200.0;
 
+        const QUEEN_VAL : f32 = 0.5;
+        const ROOK_VAL : f32 = 0.5;
+        const BISHOP_VAL : f32 = 0.5;
+        const PAWN_VAL : f32 = 0.05;
+
+        let king_safety_penalties = [White, Black].iter().map(|&color| {
+
+            let mut penalty = 0.0;
+            let kings = self.bitboards[10 + color.disc()];
+            let king_pos = kings.first_piece().unwrap();
+
+            let friendly_pieces = if color == White {
+                self.white_pieces()
+            }
+            else {
+                self.black_pieces()
+            };
+            
+            {
+                let mut dia_penalty = 0.0;
+                
+                let colored_squares = if (kings & WHITE_SQUARES).is_empty() {
+                    BLACK_SQUARES
+                }
+                else {
+                    WHITE_SQUARES
+                };
+
+                let diagonal_neighbours = BitBoard::diagonal_neighbours(king_pos);
+                
+                let friendly_dia_neighbours = diagonal_neighbours & friendly_pieces;
+                let open_dia_neighbours = diagonal_neighbours.popcount() - friendly_dia_neighbours.popcount();
+                let bishops = self.bitboards[4 + (!color).disc()];
+                let queens = self.bitboards[8 + (!color).disc()];
+
+                //println!("King and opposing dia sliders for {}:\n{:?}",
+                //         color, kings | bishops | queens);
+                
+                dia_penalty -= BISHOP_VAL * (bishops & colored_squares).popcount() as f32;
+                dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
+                dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
+
+                let pawns = self.bitboards[0 + (!color).disc()];
+                dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
+                dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
+
+                //println!("Diagonal penalty for {}: {}, {} open diagonal neighbours",
+                //         color, dia_penalty, open_dia_neighbours);
+
+                dia_penalty *= open_dia_neighbours as f32;
+                //println!("Final {} diagonal penalty: {}", color, dia_penalty);
+                penalty += dia_penalty
+            }
+
+            {
+                let mut file_penalty = 0.0;
+                let files = if (kings & EVEN_FILES).is_empty() {
+                    ODD_FILES
+                }
+                else {
+                    EVEN_FILES
+                };
+
+                let friendly_file_neighbours = BitBoard::file_neighbours(king_pos)
+                    & friendly_pieces;
+                let open_file_neighbours = BitBoard::file_neighbours(king_pos).popcount() - friendly_file_neighbours.popcount();
+
+                let rooks = self.bitboards[6 + (!color).disc()];
+                let queens = self.bitboards[8 + (!color).disc()];
+
+                //println!("King and opposing file sliders for {}:\n{:?}",
+                //         color, kings | rooks | queens);
+
+                file_penalty -= ROOK_VAL * (rooks & files).popcount() as f32;
+                file_penalty -= ROOK_VAL * (rooks & !files).popcount() as f32 * 0.3;
+                file_penalty -= QUEEN_VAL * (queens & files).popcount() as f32;
+                file_penalty -= QUEEN_VAL * (queens & !files).popcount() as f32 * 0.4;
+
+                //println!("File penalty for {}: {}, {} open file neighbours",
+                //         color, file_penalty, open_file_neighbours);
+
+                file_penalty *= open_file_neighbours as f32;
+                //println!("Final {} file penalty: {}", color, file_penalty);
+
+                penalty += file_penalty;
+            }
+            penalty
+        })
+            .collect::<Vec<_>>();
+
+        //println!("White pieces: {}, black pieces: {}, tempo bonus: {}, white king safety: {}, black king safety: {}", white_val, black_val, tempo_bonus, king_safety_penalties[0], king_safety_penalties[1]);
         match self.to_move {
-            White => white_val - black_val + tempo_bonus,
-            Black => white_val - black_val - tempo_bonus,
+            White => white_val - black_val + tempo_bonus
+                + king_safety_penalties[0] - king_safety_penalties[1],
+            Black => white_val - black_val - tempo_bonus
+                + king_safety_penalties[0] - king_safety_penalties[1],
         }
+
         
         /*
         TODO: Put pawn advancement eval back
