@@ -145,9 +145,11 @@ fn sjadammate18() {
 }
 
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
+    let mut engine_options = uci::EngineOptions::new();
+    engine_options.null_move_pruning = false;
     let (handle, channel) = alpha_beta::start_uci_search(
         board.clone(), uci::TimeRestriction::Mate(3),
-        uci::EngineOptions::new(),
+        engine_options,
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
     let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();

@@ -357,11 +357,13 @@ pub struct EngineOptions {
     pub threads: u32,
     pub hash_memory: u32, // In megabytes
     pub multipv: u32,
+    pub null_move_pruning: bool,
 }
 
 impl EngineOptions {
     pub fn new() -> EngineOptions {
-        EngineOptions { variant: ChessVariant::Standard, threads: 1, hash_memory: 256, multipv: 1 }
+        EngineOptions { variant: ChessVariant::Standard, threads: 1,
+                        hash_memory: 256, multipv: 1, null_move_pruning: true }
     }
 }
 
