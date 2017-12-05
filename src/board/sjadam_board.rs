@@ -869,8 +869,8 @@ impl EvalBoard for SjadamBoard {
                 dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
                 dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
 
-                //println!("Diagonal penalty for {}: {}, {} open diagonal neighbours",
-                //         color, dia_penalty, open_dia_neighbours);
+               // println!("Diagonal penalty for {}: {}, {} open diagonal neighbours",
+               //          color, dia_penalty, open_dia_neighbours);
 
                 dia_penalty *= open_dia_neighbours as f32;
                 //println!("Final {} diagonal penalty: {}", color, dia_penalty);
@@ -909,6 +909,40 @@ impl EvalBoard for SjadamBoard {
 
                 penalty += file_penalty;
             }
+
+            {
+                let mut rank_penalty = 0.0;
+                let ranks = if (kings & EVEN_RANKS).is_empty() {
+                    ODD_RANKS
+                }
+                else {
+                    EVEN_RANKS
+                };
+
+                let friendly_rank_neighbours = BitBoard::rank_neighbours(king_pos)
+                    & friendly_pieces;
+                let open_rank_neighbours = BitBoard::rank_neighbours(king_pos).popcount() - friendly_rank_neighbours.popcount();
+
+                let rooks = self.bitboards[6 + (!color).disc()];
+                let queens = self.bitboards[8 + (!color).disc()];
+
+                //println!("King and opposing rank sliders for {}:\n{:?}",
+                //         color, kings | rooks | queens);
+
+                rank_penalty -= ROOK_VAL * (rooks & ranks).popcount() as f32;
+                rank_penalty -= ROOK_VAL * (rooks & !ranks).popcount() as f32 * 0.3;
+                rank_penalty -= QUEEN_VAL * (queens & ranks).popcount() as f32;
+                rank_penalty -= QUEEN_VAL * (queens & !ranks).popcount() as f32 * 0.4;
+
+                //println!("Rank penalty for {}: {}, {} open rank neighbours",
+                //         color, rank_penalty, open_rank_neighbours);
+
+                rank_penalty *= open_rank_neighbours as f32;
+                //println!("Final {} rank penalty: {}", color, rank_penalty);
+
+                penalty += rank_penalty;
+            }
+            
             penalty
         })
             .collect::<Vec<_>>();
