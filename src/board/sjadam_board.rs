@@ -55,6 +55,39 @@ lazy_static! {
         table
     };
 
+    static ref RANK_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+        for i in 0..64 {
+            let (file, rank) = Square(i).file_rank();
+            let mut board = BitBoard::empty();
+            if file > 0 {
+                board.set(Square::from_ints(file - 1, rank));
+            }
+            if file < 7 {
+                board.set(Square::from_ints(file + 1, rank));
+            }
+            table[i as usize] = board;
+        }
+        table
+    };
+
+    static ref FILE_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+        
+        for i in 0..64 {
+            let (file, rank) = Square(i).file_rank();
+            let mut board = BitBoard::empty();
+            if rank > 0 {
+                board.set(Square::from_ints(file, rank - 1));
+            }
+            if rank < 7 {
+                board.set(Square::from_ints(file, rank + 1));
+            }
+            table[i as usize] = board;
+        }
+        table
+    };
+        
     static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
         let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
 
@@ -243,27 +276,11 @@ impl BitBoard {
     }
 
     pub fn rank_neighbours(square: Square) -> BitBoard {
-        let (file, rank) = square.file_rank();
-        let mut board = BitBoard::empty();
-        if file > 0 {
-            board.set(Square::from_ints(file - 1, rank));
-        }
-        if file < 7 {
-            board.set(Square::from_ints(file + 1, rank));
-        }
-        board
+        RANK_NEIGHBOURS[square.0 as usize]
     }
 
     pub fn file_neighbours(square: Square) -> BitBoard {
-        let (file, rank) = square.file_rank();
-        let mut board = BitBoard::empty();
-        if rank > 0 {
-            board.set(Square::from_ints(file, rank - 1));
-        }
-        if rank < 7 {
-            board.set(Square::from_ints(file, rank + 1));
-        }
-        board
+        FILE_NEIGHBOURS[square.0 as usize]
     }
     
     pub fn orthogonal_neighbours(square: Square) -> BitBoard {
