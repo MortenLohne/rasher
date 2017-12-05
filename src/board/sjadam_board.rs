@@ -874,9 +874,6 @@ impl EvalBoard for SjadamBoard {
                 let open_dia_neighbours = diagonal_neighbours.popcount() - friendly_dia_neighbours.popcount();
                 let bishops = self.bitboards[4 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
-
-                //println!("King and opposing dia sliders for {}:\n{:?}",
-                //         color, kings | bishops | queens);
                 
                 dia_penalty -= BISHOP_VAL * (bishops & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
@@ -886,11 +883,7 @@ impl EvalBoard for SjadamBoard {
                 dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
                 dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
 
-               // println!("Diagonal penalty for {}: {}, {} open diagonal neighbours",
-               //          color, dia_penalty, open_dia_neighbours);
-
                 dia_penalty *= open_dia_neighbours as f32;
-                //println!("Final {} diagonal penalty: {}", color, dia_penalty);
                 penalty += dia_penalty
             }
 
@@ -910,20 +903,12 @@ impl EvalBoard for SjadamBoard {
                 let rooks = self.bitboards[6 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
 
-                //println!("King and opposing file sliders for {}:\n{:?}",
-                //         color, kings | rooks | queens);
-
                 file_penalty -= ROOK_VAL * (rooks & files).popcount() as f32;
                 file_penalty -= ROOK_VAL * (rooks & !files).popcount() as f32 * 0.3;
                 file_penalty -= QUEEN_VAL * (queens & files).popcount() as f32;
                 file_penalty -= QUEEN_VAL * (queens & !files).popcount() as f32 * 0.4;
 
-                //println!("File penalty for {}: {}, {} open file neighbours",
-                //         color, file_penalty, open_file_neighbours);
-
                 file_penalty *= open_file_neighbours as f32;
-                //println!("Final {} file penalty: {}", color, file_penalty);
-
                 penalty += file_penalty;
             }
 
@@ -943,20 +928,12 @@ impl EvalBoard for SjadamBoard {
                 let rooks = self.bitboards[6 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
 
-                //println!("King and opposing rank sliders for {}:\n{:?}",
-                //         color, kings | rooks | queens);
-
                 rank_penalty -= ROOK_VAL * (rooks & ranks).popcount() as f32;
                 rank_penalty -= ROOK_VAL * (rooks & !ranks).popcount() as f32 * 0.3;
                 rank_penalty -= QUEEN_VAL * (queens & ranks).popcount() as f32;
                 rank_penalty -= QUEEN_VAL * (queens & !ranks).popcount() as f32 * 0.4;
 
-                //println!("Rank penalty for {}: {}, {} open rank neighbours",
-                //         color, rank_penalty, open_rank_neighbours);
-
                 rank_penalty *= open_rank_neighbours as f32;
-                //println!("Final {} rank penalty: {}", color, rank_penalty);
-
                 penalty += rank_penalty;
             }
             
@@ -964,22 +941,18 @@ impl EvalBoard for SjadamBoard {
         })
             .collect::<Vec<_>>();
 
-        //println!("White pieces: {}, black pieces: {}, tempo bonus: {}, white king safety: {}, black king safety: {}", white_val, black_val, tempo_bonus, king_safety_penalties[0], king_safety_penalties[1]);
         match self.to_move {
             White => white_val - black_val + tempo_bonus
                 + king_safety_penalties[0] - king_safety_penalties[1],
             Black => white_val - black_val - tempo_bonus
                 + king_safety_penalties[0] - king_safety_penalties[1],
-        }
-
-        
+        } 
         /*
         TODO: Put pawn advancement eval back
         let pawn_val = match self.board[rank][file].piece_type() {
         Pawn => (rank as f32 - 3.5) * -0.1,
         _ => 0.0,
          */    
-        
     }
 
     fn branch_factor() -> u64 {
