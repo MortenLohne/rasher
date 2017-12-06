@@ -1,6 +1,6 @@
 use board::sjadam_move::SjadamMove;
-use board::std_board::BoardIter;
 use board::std_board::Square;
+use board::std_board::Piece;
 use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 
@@ -116,25 +116,21 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
     let mut active_moves = Vec::with_capacity(50);
     let mut winning_moves = Vec::with_capacity(300);
 
-    let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
-        (board.white_pieces(), board.black_pieces())
-    }
-    else {
-        (board.black_pieces(), board.white_pieces())
-    };
-    
-    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
+    let color = board.to_move();
+    let all_pieces = board.all_pieces();
 
-    // TODO: Remove this loop, to avoid repeating bitboard.get_square(square) calls
-    for square in BoardIter::new() {
-        if !board.get_square(square).is_empty()
-            && board.get_square(square).color().unwrap() == board.to_move()
-        {
-            legal_moves_for_square(&board, square, board.get_square(square).piece_type(),
+    for (piece, mut bitboard) in [Knight, Bishop, Rook, Queen, Pawn, King].iter()
+        .map(|&piece_type| (Piece::new(piece_type, color),
+                            board.get_piece(Piece::new(piece_type, color))))
+    {
+        while let Some(square) = bitboard.first_piece() {
+            legal_moves_for_square(&board, square, piece.piece_type(),
                                    &mut moves, &mut active_moves, &mut winning_moves);
+            bitboard.clear(square);
         }
     }
-    if board.to_move() == White {
+
+    if color == White {
         if board.can_castle_kingside(White)
             && all_pieces.rank(7) & 0b01100000 == 0 {
                 moves.push(SjadamMove::new(Square::E1, Square::G1, true));
@@ -165,15 +161,14 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
     
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
-
-    let (friendly_pieces, opponent_pieces) = if board.to_move() == White {
-        (board.white_pieces(), board.black_pieces())
-    }
-    else {
-        (board.black_pieces(), board.white_pieces())
+    let color = board.to_move();
+    
+    let (friendly_pieces, opponent_pieces) = match color {
+        White => (board.white_pieces(), board.black_pieces()),
+        Black => (board.black_pieces(), board.white_pieces()),
     };
         
-    let all_pieces = BitBoard::from_u64(opponent_pieces.board | friendly_pieces.board);
+    let all_pieces = board.all_pieces();
     
     sjadam_friendly_moves(&mut sjadam_squares, &friendly_pieces,
                           &all_pieces, square);
@@ -202,7 +197,7 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
             }
         },
         King => king_moves(sjadam_squares, friendly_pieces),
-        _ => BitBoard::empty(),
+        Empty => BitBoard::empty(),
     };
     
     for i in 0..64 {
