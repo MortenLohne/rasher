@@ -209,7 +209,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             None
         };
         // Check if the thread should stop
-        if node_counter.total % 8096 == 0 {
+        if node_counter.total % 1024 == 0 {
             let should_stop : bool;
             {
                 let mut engine_comm = engine_comm.lock().unwrap();
