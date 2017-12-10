@@ -229,25 +229,28 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         if depth == 0 {
             node_counter.leaf += 1;
             node_counter.total += 1;
-            if let (Val(alpha_val), Val(beta_val)) = (alpha, beta) {
-                if let Mate(_) = time_restriction {
-                    return (Val(board.eval_board()), vec![]);
-                }
-                let score = quiescence_search(board, node_counter, alpha_val, beta_val);
-                let ordering = match board.to_move() {
-                    White => Ordering::Greater,
-                    Black => Ordering::Less,
-                };
-                
-                table.insert(board.clone(), HashEntry {
-                    best_reply: None, score: (ordering, Val(score)), depth: depth
-                });
-                return (Val(score), vec![]);
-            }
-            else {
+            
+            if let Mate(_) = time_restriction {
                 return (Val(board.eval_board()), vec![]);
             }
+            let score = match quiescence_search(board, node_counter, alpha, beta) {
+                // Mates form quiescence search may not be correct
+                WhiteWin(i) if i > 1 => WhiteWin(i).to_val(),
+                BlackWin(i) if i > 1 => BlackWin(i).to_val(),
+                s => s,
+            };
+            
+            let ordering = match board.to_move() {
+                White => Ordering::Greater,
+                Black => Ordering::Less,
+            };
+            
+            table.insert(board.clone(), HashEntry {
+                best_reply: None, score: (ordering, score), depth: depth
+            });
+            return (score, vec![]);
         }
+        
         else {
             node_counter.intern += 1;
             node_counter.total += 1;
@@ -312,11 +315,12 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     
                 }
             }
-
+            
             move_searched = true;
             
-            let new_alpha = decrement_score(alpha, board);
-            let new_beta = decrement_score(beta, board);
+            let new_alpha = decrement_score(alpha);
+            let new_beta = decrement_score(beta);
+
 
             let (tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
@@ -348,7 +352,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             }
         }
 
-        let score = increment_score(best_score.unwrap(), board);
+        let score = increment_score(best_score.unwrap());
         
         if move_list == None {
             // When doing multipv search, the position may already be in the hash
@@ -374,19 +378,25 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 }
 
 #[inline(never)]
-fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
-                        mut alpha: f32, mut beta: f32) -> f32
+pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
+                        mut alpha: Score, mut beta: Score) -> Score
     where B: EvalBoard + fmt::Debug {
     node_counter.intern += 1;
     node_counter.total += 1;
-    
-    let stand_pat = match board.game_result() {
-        Some(GameResult::WhiteWin) => return 200.0,
-        Some(GameResult::BlackWin) => return -200.0,
-        Some(GameResult::Draw) => 0.0,
-        None => board.eval_board(),
-    };
 
+    let stand_pat = match board.game_result() {
+        Some(result) => return Score::from_game_result(result),
+        None => Val(board.eval_board()),
+    };
+    /*
+    let stand_pat = match board.game_result() {
+        Some(GameResult::WhiteWin) => return Val(200.0),
+        Some(GameResult::BlackWin) => return Val(-200.0),
+        Some(GameResult::Draw) => return Val(0.0),
+        None => Val(board.eval_board()),
+    };
+     
+*/
     let mut best_score = stand_pat;
     let color = board.to_move();
     
@@ -414,30 +424,23 @@ fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
         }
     }
 
-    best_score
+    increment_score(best_score)
 }
     
-fn increment_score<B: EvalBoard>(score: Score, board: &B) -> Score {
+fn increment_score(score: Score) -> Score {
     match score {
-        BlackWin(i) if board.to_move() == Black => BlackWin(i + 1),
-        BlackWin(i) => BlackWin(i),
-        WhiteWin(i) if board.to_move() == White => WhiteWin(i + 1),
-        WhiteWin(i) => WhiteWin(i),
+        BlackWin(i) => BlackWin(i + 1),
+        WhiteWin(i) => WhiteWin(i + 1),
         Draw(i) => Draw(i + 1),
         Val(n) => Val(n),
     }
 }
 
-fn decrement_score<B: EvalBoard>(score: Score, board: &B) -> Score {
+fn decrement_score(score: Score) -> Score {
     match score {
-        BlackWin(i) if board.to_move() == Black && i > 0 => BlackWin(i - 1),
-        BlackWin(i) if i > 0 => BlackWin(i),
-        BlackWin(i) => BlackWin(i),
-        WhiteWin(i) if board.to_move() == White && i > 0 => WhiteWin(i - 1),
-        WhiteWin(i) if i > 0 => WhiteWin(i),
-        WhiteWin(i) => WhiteWin(i),
-        Draw(i) if i > 0 => Draw(i - 1),
-        Draw(i) => Draw(i),
+        BlackWin(i) => BlackWin(u16::saturating_sub(i, 1)),
+        WhiteWin(i) => WhiteWin(u16::saturating_sub(i, 1)),
+        Draw(i) => Draw(u16::saturating_sub(i, 1)),
         Val(n) => Val(n),
     }
 }
@@ -518,6 +521,13 @@ pub enum Score {
 }
 
 impl Score {
+    pub fn from_game_result(result: GameResult) -> Self {
+        match result {
+            GameResult::WhiteWin => WhiteWin(0),
+            GameResult::BlackWin => BlackWin(0),
+            GameResult::Draw => Draw(0),
+        }
+    }
     #[allow(dead_code)]
     pub fn to_cp(self) -> i16 {
         match self {
@@ -527,14 +537,23 @@ impl Score {
             BlackWin(n) => -12000 + n as i16,
         }
     }
+
+    pub fn to_val(self) -> Self {
+        match self {
+            Val(val) => Val(val),
+            Draw(_) => Val(0.0),
+            WhiteWin(n) => Val(12000.0 - n as f32),
+            BlackWin(n) => Val(-12000.0 + n as f32),
+        }
+    }
 }
 
 impl fmt::Display for Score {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
             Score::Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
-            Score::WhiteWin(n) => write!(fmt, "mate {}", n as i16),
-            Score::BlackWin(n) => write!(fmt, "mate {}", n as i16 * -1),
+            Score::WhiteWin(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
+            Score::BlackWin(n) => write!(fmt, "mate {}", ((1 + n as i16) / 2) * -1),
             Score::Draw(_) => write!(fmt, "0"),
         }
     }
@@ -568,3 +587,11 @@ impl PartialOrd for Score {
         }
     }
 }
+
+impl Ord for Score {
+    fn cmp (&self, other: &Score) -> cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl Eq for Score {}
