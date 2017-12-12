@@ -233,12 +233,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             if let Mate(_) = time_restriction {
                 return (Val(board.eval_board()), vec![]);
             }
-            let score = match quiescence_search(board, node_counter, alpha, beta) {
-                // Mates form quiescence search may not be correct
-                WhiteWin(i) if i > 1 => WhiteWin(i).to_val(),
-                BlackWin(i) if i > 1 => BlackWin(i).to_val(),
-                s => s,
-            };
+             
+            let score = quiescence_search(board, node_counter, alpha, beta);
             
             let ordering = match board.to_move() {
                 White => Ordering::Greater,
