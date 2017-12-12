@@ -388,20 +388,14 @@ pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
         Some(result) => return Score::from_game_result(result),
         None => Val(board.eval_board()),
     };
-    /*
-    let stand_pat = match board.game_result() {
-        Some(GameResult::WhiteWin) => return Val(200.0),
-        Some(GameResult::BlackWin) => return Val(-200.0),
-        Some(GameResult::Draw) => return Val(0.0),
-        None => Val(board.eval_board()),
-    };
-     
-*/
+
     let mut best_score = stand_pat;
     let color = board.to_move();
+
+    let active_moves = board.active_moves();
     
-    for mv in board.active_moves() {
-        let undo_move = board.do_move(mv);
+    for mv in active_moves.iter() {
+        let undo_move = board.do_move(mv.clone());
         let score = quiescence_search(board, node_counter, alpha, beta);
         board.undo_move(undo_move);
         if (board.to_move() == Black && score < best_score)
@@ -424,7 +418,39 @@ pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
         }
     }
 
-    increment_score(best_score)
+    // If all active moves lead to being mated, re-examine with all moves
+    // TODO: Avoid re-computing move list
+    match (best_score, color) {
+        (Score::WhiteWin(_), Black) | (Score::BlackWin(_), White) => {
+            for mv in board.all_legal_moves().iter()
+                .filter(|mv| !active_moves.contains(mv)){
+                let undo_move = board.do_move(mv.clone());
+                let score = quiescence_search(board, node_counter, alpha, beta);
+                board.undo_move(undo_move);
+                if (board.to_move() == Black && score < best_score)
+                    || (board.to_move() == White && score > best_score)
+                {
+                    best_score = score;
+                }
+
+                if color == White && score > alpha {
+                    alpha = score;
+                    best_score = score;
+                }
+                
+                else if color == Black && score < beta {
+                    beta = score;
+                    best_score = score;
+                }
+                if alpha >= beta {
+                    break; 
+                }
+            }
+            increment_score(best_score)
+
+        },
+        _ => increment_score(best_score),
+    }
 }
     
 fn increment_score(score: Score) -> Score {
