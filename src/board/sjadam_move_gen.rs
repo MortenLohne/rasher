@@ -153,7 +153,8 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
     winning_moves.append(&mut active_moves);
     (winning_moves, moves)
 }
-    
+
+#[inline(never)]
 fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
                           quiet_moves: &mut Vec<SjadamMove>,
                           active_moves: &mut Vec<SjadamMove>,
@@ -175,7 +176,7 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
 
     sjadam_opponent_moves(&mut sjadam_squares, &opponent_pieces, &all_pieces);
 
-    let moves : BitBoard = match piece_type {
+    let mut moves : BitBoard = match piece_type {
         Rook => rook_moves(sjadam_squares, friendly_pieces, all_pieces),
         Bishop => bishop_moves(sjadam_squares, friendly_pieces, all_pieces),
         Queen => {
@@ -200,17 +201,20 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
         Empty => BitBoard::empty(),
     };
     
-    for i in 0..64 {
-        if moves.get(Square(i)) && Square(i) != square {
-            let target = board.get_square(Square(i));
-            let mv = SjadamMove::new(square, Square(i), false);
-            if target.color().is_some() && target.color().unwrap() != board.to_move()
-                && target.piece_type() != Pawn
-            {
+    moves.clear(square);
+    while let Some(target_square) = moves.first_piece() {
+        
+        let mv = SjadamMove::new(square, target_square, false);
+        if !opponent_pieces.get(target_square) {
+            quiet_moves.push(mv);
+        }
+        else {
+            let target = board.get_square(target_square);
+            if target.piece_type() != Pawn {
                 if target.value().abs() > piece_type.value().abs()
                     || target.piece_type() == King {
-                    winning_moves.push(mv);
-                }
+                        winning_moves.push(mv);
+                    }
                 else if target.value().abs() == piece_type.value().abs() {
                     active_moves.push(mv);
                 }
@@ -222,6 +226,7 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
                 quiet_moves.push(mv);
             }
         }
+        moves.clear(target_square);
     }
 }
 
