@@ -143,19 +143,6 @@ fn diagonal_neighbours() {
 }
 
 #[test]
-fn orthogonal_neighbours() {
-    let a8_neighbours = BitBoard::orthogonal_neighbours(Square(0));
-    assert_eq!(a8_neighbours.popcount(), 2);
-    assert_eq!(BitBoard::orthogonal_neighbours(Square(8)).popcount(), 3);
-    assert_eq!(BitBoard::orthogonal_neighbours(Square(9)).popcount(), 4);
-
-    let mut board = BitBoard::empty();
-    board.set(Square(8));
-
-    assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
-}
-
-#[test]
 fn first_piece() {
     let start_board = SjadamBoard::start_board();
     let white_kings = start_board.get_piece(Piece::new(King, White));

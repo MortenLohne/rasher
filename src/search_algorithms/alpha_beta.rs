@@ -559,15 +559,6 @@ impl Score {
             BlackWin(n) => -12000 + n as i16,
         }
     }
-
-    pub fn to_val(self) -> Self {
-        match self {
-            Val(val) => Val(val),
-            Draw(_) => Val(0.0),
-            WhiteWin(n) => Val(12000.0 - n as f32),
-            BlackWin(n) => Val(-12000.0 + n as f32),
-        }
-    }
 }
 
 impl fmt::Display for Score {

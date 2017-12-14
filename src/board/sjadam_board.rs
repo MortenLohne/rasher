@@ -87,29 +87,6 @@ lazy_static! {
         }
         table
     };
-        
-    static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
-        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
-
-        for i in 0..64 {
-            let mut board = BitBoard::empty();
-            let (file, rank) = Square(i).file_rank();
-            
-            for &x in [u8::overflowing_sub(file, 1).0, file + 1].iter() {
-                if x < 8 {
-                    board.set(Square::from_ints(x, rank));
-                }
-            }
-            
-            for &y in [u8::overflowing_sub(rank, 1).0, rank + 1].iter() {
-                if y < 8 {
-                    board.set(Square::from_ints(file, y));
-                }
-            }
-            table[i as usize] = board;
-        }
-        table
-    };
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
@@ -281,10 +258,6 @@ impl BitBoard {
 
     pub fn file_neighbours(square: Square) -> BitBoard {
         FILE_NEIGHBOURS[square.0 as usize]
-    }
-    
-    pub fn orthogonal_neighbours(square: Square) -> BitBoard {
-        ORTHOGONAL_NEIGHBOURS[square.0 as usize]
     }
 
     pub fn first_piece(&self) -> Option<Square> {
