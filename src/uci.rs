@@ -117,22 +117,11 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
             }
             "engine" =>
                 if tokens.len() >= 2 {
-                    engine_string = tokens[1].to_string(); }
-                else { },
+                    engine_string = tokens[1].to_string();
+                },
             "stop" => {
-                let best_move : String;
-                {
-                    let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));
-                    engine_comm.engine_should_stop = true;
-                    best_move = match engine_comm.best_move.clone() {
-                        Some(mv) => mv,
-                        None => {
-                            warn!("Haven't found a move yet: sending a bogus move");
-                            "e2e4".to_string() // Send a bogus move
-                        },
-                    };
-                }
-                uci_send(&format!("bestmove {}", best_move));
+                let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));
+                engine_comm.engine_should_stop = true;
             },
             "go" => {
                 loop {
@@ -228,19 +217,20 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                 last_info = Some(uci_info);
                             },
                             Err(_) => {
-                                // If the channel has hung up,
-                                // send final data as well as bestmove command
+                                // If the channel has hung up, send bestmove command
                                 match last_info {
                                     None => uci_send("bestmove null"),
+                                    Some(ref uci_info) if uci_info.pvs.is_empty() => {
+                                        uci_send(&format!("UCI info {:?} was sent with no PVs",
+                                                         uci_info));
+                                        uci_send("bestmove null");
+                                    },
                                     Some(uci_info) => {
-                                        assert!(!uci_info.pvs.is_empty(),
-                                                "UCI info {:?} was sent with no PVs", uci_info);
-                                        uci_send(&uci_info.to_info_string());
                                         let (_, ref moves_string) = uci_info.pvs[0];
-                                        println!("bestmove {}",
-                                                 moves_string
-                                                 .split_whitespace()
-                                                 .next().unwrap_or("none"));
+                                        uci_send(&format!("bestmove {}",
+                                                         moves_string
+                                                         .split_whitespace()
+                                                         .next().unwrap_or("null")));
                                     },
                                 };
                                 return;
@@ -346,12 +336,11 @@ pub enum TimeRestriction {
 pub struct EngineComm {
     pub engine_should_stop : bool,
     pub engine_is_running : bool,
-    pub best_move : Option<String>,
 }
 
 impl EngineComm {
     pub fn new() -> Self {
-        EngineComm{ engine_should_stop: false, engine_is_running: false, best_move : None }
+        EngineComm{ engine_should_stop: false, engine_is_running: false }
     }
 }
 
