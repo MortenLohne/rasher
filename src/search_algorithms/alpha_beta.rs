@@ -303,20 +303,25 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             let old_board = board.clone();
             let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
 
-            if depth < 3 && options.null_move_pruning
-                && move_searched && !board.game_result().is_some() {
-                let eval = board.eval_board();
-                if !board.to_move() == White && eval < old_eval {
-                    board.undo_move(undo_move);
-                    continue;
+            match (alpha, beta, color) {
+                // Do not prune if you are getting mated
+                (_, Score::WhiteWin(_), Black) |
+                (Score::BlackWin(_), _, White) => (),
+                _ if depth < 3 && options.null_move_pruning
+                    && move_searched && !board.game_result().is_some() =>
+                {
+                    let eval = board.eval_board();
+                    if !board.to_move() == White && eval < old_eval {
+                        board.undo_move(undo_move);
+                        continue;
+                    }
+                    else if !board.to_move() == Black && eval > old_eval {
+                        board.undo_move(undo_move);
+                        continue;
+                    }
                 }
-                else if !board.to_move() == Black && eval > old_eval {
-                    board.undo_move(undo_move);
-                    continue;
-                    
-                }
+                _ => (),
             }
-            
             move_searched = true;
             
             let new_alpha = decrement_score(alpha);
