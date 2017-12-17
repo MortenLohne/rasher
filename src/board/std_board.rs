@@ -934,12 +934,4 @@ impl ChessBoard {
     }
 }
 
-// Stores time information for the game, in milliseconds
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct TimeInfo {
-    pub white_time : u32,
-    pub black_time : u32,
-    pub white_inc : u32,
-    pub black_inc : u32,
-    pub moves_to_go : Option<u16>, // Number of moves to the next time control
-}
+

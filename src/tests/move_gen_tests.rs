@@ -6,8 +6,6 @@ use uci::UciBoard;
 
 use super::super::board::std_move_gen::move_gen;
 
-extern crate time;
-
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::{Black, White};
 use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};

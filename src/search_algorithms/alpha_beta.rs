@@ -18,8 +18,7 @@ use search_algorithms::board::Color::*;
 use self::Score::*;
 use std::thread;
 use std::mem;
-
-extern crate time;
+use std::time;
 use std::sync::{Arc, Mutex};
 
 /// Start a standard uci search, sending the results through a channel
@@ -63,9 +62,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     };
     debug_assert!(max_depth > 1);
     
-    let start_time = time::get_time();
     let mut total_node_count = NodeCount::new();
-
+    let start_time = time::Instant::now();
+    
     let mut table = Table::new(options.hash_memory as usize * 1024 * 1024);
     
     for depth in 1..(max_depth + 1) {
@@ -90,14 +89,14 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             // This means the root position will still be hashed correctly
                 if moves_to_search.len() == board.all_legal_moves().len() {
                     find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
-                                      options, None, &mut table)
+                                      options, start_time, None, &mut table)
                 }
             else {
                 // TODO: Clearing the hash table loses a ton of performance in multipv mode
                 table.clear();
                 //table.remove(&board);
                 find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction, options,
-                                  Some(moves_to_search.clone()), &mut table)
+                                  start_time, Some(moves_to_search.clone()), &mut table)
             }
             {
                 let mut pv_str = String::new();
@@ -122,29 +121,34 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             }
         
         }
-        let ms_taken = (time::get_time() - start_time).num_milliseconds();
+        let time_taken = time::Instant::now() - start_time;
+        let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1000_000;
         
         let uci_info = uci::UciInfo {
-            depth: depth, seldepth: depth, time: ms_taken, nodes: total_node_count.total,
+            depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total,
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
             pvs: pvs };
         channel.send(uci_info).unwrap();
         
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => {
+
+                let time_taken = time::Instant::now() - start_time;
                 let (time, inc) = match board.to_move() {
                     White => (info.white_time, info.white_inc),
                     Black => (info.black_time, info.black_inc),
                 };
                 
-                if ms_taken as u32 > inc / (B::branch_factor() as u32 / 5)
+                if time_taken > inc / (B::branch_factor() as u32 / 5)
                     + time / (B::branch_factor() as u32 * 5) {
                         break;
                     }
             }
             
             uci::TimeRestriction::MoveTime(time) =>
-                if ms_taken > time / (B::branch_factor() as i64 / 5) { break },
+                if time_taken > time / (B::branch_factor() as u32 / 5) {
+                    break
+                },
             
             _ => (),
             
@@ -160,8 +164,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 
 /// Returns a score, and a list of moves representing the best line it found
 fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
-                          time_restriction: uci::TimeRestriction, options: uci::EngineOptions,
-                          move_list: Option<Vec<B::Move>>, table: &mut Table<B, B::Move>)
+                         time_restriction: uci::TimeRestriction, options: uci::EngineOptions,
+                         start_time: time::Instant, move_list: Option<Vec<B::Move>>,
+                         table: &mut Table<B, B::Move>)
                           -> Option<(Score, Vec<B::Move>, NodeCount)>
     where B: UciBoard + fmt::Debug + Hash + Eq
 {
@@ -171,6 +176,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                  engine_comm: &Mutex<uci::EngineComm>,
                                  time_restriction: uci::TimeRestriction,
                                  options: uci::EngineOptions,
+                                 start_time: time::Instant,
                                  node_counter: &mut NodeCount,
                                  mut move_list: Option<Vec<B::Move>>,
                                  table: &mut Table<B, B::Move>)
@@ -197,18 +203,28 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         };
         // Check if the thread should stop
         if node_counter.total % 1024 == 0 {
-            let should_stop : bool;
             {
                 let mut engine_comm = engine_comm.lock().unwrap();
-                should_stop = engine_comm.engine_should_stop;
-                if should_stop {
+                if engine_comm.engine_should_stop {
                     engine_comm.engine_is_running = false;
+                    return None // "Engine was told to stop"
                 }
             }
-            if should_stop {
-                return None // "Engine was told to stop"
+            // If we've spent more than half of our time, abort immediately
+            if let uci::TimeRestriction::GameTime(info) = time_restriction {
+
+                let time_taken = time::Instant::now() - start_time;
+                let time_left = match board.to_move() {
+                    White => info.white_time,
+                    Black => info.black_time,
+                };
+                
+                if time_taken > time_left / 2 {
+                    return None;
+                }
             }
         }
+        
         match board.game_result() {
             Some(GameResult::WhiteWin) => return Some((WhiteWin(0), vec![])),
             Some(GameResult::BlackWin) => return Some((BlackWin(0), vec![])),
@@ -310,8 +326,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             let (tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
                                       new_alpha, new_beta,
-                                      engine_comm, time_restriction,
-                                      options, node_counter, None, table)?;
+                                      engine_comm, time_restriction, options,
+                                      start_time, node_counter, None, table)?;
             board.undo_move(undo_move);
             debug_assert_eq!(board, &old_board,
                              "Failed to restore board after move {:?}", c_move);
@@ -357,7 +373,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     let mut node_counter = NodeCount { intern: 0, leaf: 0, total: 0 };
     if let Some((score, mut moves)) =
         find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0), engine_comm,
-                              time_restriction, options, &mut node_counter, move_list, table)
+                              time_restriction, options, start_time,
+                              &mut node_counter, move_list, table)
     {
         moves.reverse();
         Some((score, moves, node_counter))

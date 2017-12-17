@@ -1,7 +1,6 @@
 use board::std_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
-use board::std_board::TimeInfo;
 
 use search_algorithms::board;
 use search_algorithms::alpha_beta;
@@ -9,13 +8,12 @@ use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::board::EvalBoard;
 
-extern crate time;
-
 use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
+use std::time;
 
 pub trait UciBoard: board::EvalBoard {
     fn from_fen(&str) -> Result<Self, String>;
@@ -322,13 +320,23 @@ pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciIn
     }
 }
 
+// Stores time information for the game, in milliseconds
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct TimeInfo {
+    pub white_time : time::Duration,
+    pub black_time : time::Duration,
+    pub white_inc : time::Duration,
+    pub black_inc : time::Duration,
+    pub moves_to_go : Option<u16>, // Number of moves to the next time control
+}
+
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum TimeRestriction {
     GameTime(TimeInfo),
     Depth(u16),
     Nodes(u64),
     Mate(u16),
-    MoveTime(i64),
+    MoveTime(time::Duration),
     Infinite,
 }
 
@@ -446,19 +454,23 @@ pub fn parse_go (input : &str)
                  -> Result<(TimeRestriction, Option<Vec<String>>), String> {
 
     // Parses an optional string to return a u32
-    fn parse_int (next_token : Option<&str>) -> Result<u32, String> {
+    fn parse_int (next_token : Option<&str>) -> Result<u64, String> {
         
         match next_token {
-            Some(token) => u32::from_str_radix(token, 10).map_err(|_| String::from("Error: \"movetime\" token formatted incorrectly")),
+            Some(token) => u64::from_str_radix(token, 10).map_err(|_| String::from("Error: \"movetime\" token formatted incorrectly")),
             None => Err(String::from("Error: Expected int after \"movetime\" token, but it was the last token in the command")),
         }
-    }        
+    }
+
+    fn parse_dur(next_token: Option<&str>) -> Result<time::Duration, String> {
+        parse_int(next_token).map(time::Duration::from_millis)
+    }
 
     match input.split_whitespace().nth(1) {
         Some("infinite") => return Ok((TimeRestriction::Infinite, None)),
         Some("movetime") => return Ok((TimeRestriction::MoveTime(
-            try!(parse_int(input.split_whitespace().nth(2))
-                 ) as i64), None)),
+            try!(parse_dur(input.split_whitespace().nth(2))
+                 )), None)),
         Some("depth") => return Ok((TimeRestriction::Depth(
             try!(parse_int(input.split_whitespace().nth(2))
             ) as u16), None)),
@@ -482,12 +494,10 @@ pub fn parse_go (input : &str)
         match tokens_it.next() {
             Some("moves_to_go") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
             Some("movestogo") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
-            Some("btime") => black_time = Some(try!(parse_int(tokens_it.next()))),
-            Some("wtime") => {
-                white_time = Some(try!(parse_int(tokens_it.next())));
-            },
-            Some("winc") => white_inc = Some(try!(parse_int(tokens_it.next()))),
-            Some("binc") => black_inc = Some(try!(parse_int(tokens_it.next()))),
+            Some("btime") => black_time = Some(try!(parse_dur(tokens_it.next()))),
+            Some("wtime") => white_time = Some(try!(parse_dur(tokens_it.next()))),
+            Some("winc") => white_inc = Some(try!(parse_dur(tokens_it.next()))),
+            Some("binc") => black_inc = Some(try!(parse_dur(tokens_it.next()))),
             Some (s) => return Err(format!("Unknown token \"{}\" in go command", s)),
             None => break,
         }
@@ -497,11 +507,11 @@ pub fn parse_go (input : &str)
     }
     if white_inc == None {
         warn!("Did not receive white increment times, assuming 0");
-        white_inc = Some(0);
+        white_inc = Some(time::Duration::new(0, 0));
     }
     if black_inc == None {
         warn!("Did not receive black increment times, assuming 0");
-        black_inc = Some(0);
+        black_inc = Some(time::Duration::new(0, 0));
     }
     let time_info = TimeInfo {white_time: white_time.unwrap(), black_time: black_time.unwrap(),
                               white_inc: white_inc.unwrap(), black_inc: black_inc.unwrap(),

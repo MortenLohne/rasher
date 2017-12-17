@@ -4,10 +4,11 @@ use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
+use uci::TimeRestriction::*;
+use search_algorithms::board::Color::*;
 
 use rand;
 use ordered_float::NotNaN;
-use time;
 use itertools::Itertools;
 use std::f64;
 use std::io;
@@ -16,6 +17,7 @@ use std::io::Write;
 use std::marker::{Send, Sync};
 use std::sync::{Arc, Mutex, mpsc};
 use uci;
+use std::time;
 
 use rayon::prelude::*;
 
@@ -49,13 +51,13 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
             break;
         }
         println!("{:?}\nOpponent's turn.", board);
-        let start_time = time::get_time();
+        let start_time = time::Instant::now();
         
         let mut mctree = MonteCarloTree::new_root(&mut board);
         let mut searches = mctree.searches;
         let mut rng = rand::weak_rng();
         
-        while time::get_time() < start_time + time::Duration::seconds(20) {
+        while start_time.elapsed() < time::Duration::from_secs(20) {
             use std::ops::Add;
             mctree.select(&mut rng, searches, &mut SearchData::default());
             searches += 1;
@@ -104,7 +106,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
     where B: UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
-    let start_time = time::get_time();
+    let start_time = time::Instant::now();
     let mut rng = rand::weak_rng();
     for n in 1.. {
         for _ in 0..100 * (n as f64).sqrt() as usize {
@@ -122,15 +124,15 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                           format!("{} searches overall, but sum of searches of children is {}.\n{:?}",
                                   mc_tree.searches, searches_of_children, mc_tree));
         }
-        use uci::TimeRestriction::*;
-        use search_algorithms::board::Color::*;
-        let ms_taken = (time::get_time() - start_time).num_milliseconds();
+        
+        let time_taken = time::Instant::now() - start_time;
+        
         match time_limit {
             GameTime(info) => { 
                 if (board.to_move() == Black && 
-                    ms_taken as u32 > info.black_inc + info.black_time / 20) ||
+                    time_taken > info.black_inc + info.black_time / 20) ||
                     (board.to_move() == White && 
-                     ms_taken as u32 > info.white_inc / 5 + info.white_time / 20)
+                     time_taken > info.white_inc / 5 + info.white_time / 20)
                 {
                     break;
                 }
@@ -144,8 +146,8 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                 break
             }
             else { },
-            MoveTime(millis) => {
-                if ms_taken > millis {
+            MoveTime(time) => {
+                if time_taken > time {
                     break;
                 }
                 else { () }
@@ -161,13 +163,16 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
 }
 
 fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
-                    board: &mut B, start_time: time::Timespec,
+                    board: &mut B, start_time: time::Instant,
                     options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo>)
     where B: UciBoard + fmt::Debug
 {
     debug_assert_eq!(mc_tree.board, *board);
-    let ms_taken = (time::get_time() - start_time).num_milliseconds();
+
+    let time_taken = time::Instant::now() - start_time;
+    let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1000_000;
     let mut pvs = vec![];
+    
     for &(node, ref go_move) in mc_tree.children.iter()
         .map(Option::as_ref)
         .filter(Option::is_some)
@@ -192,7 +197,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         pvs.push((score, pv));
         board.undo_move(undo_move);
     }
-    let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken,
+    let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken as i64,
                                   nodes: mc_tree.searches, hashfull: 0.0, pvs: pvs };
     channel.send(uci_info).unwrap();
 }
@@ -202,7 +207,8 @@ pub fn search_position<B>(board: &mut B)
     where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(board);
-    let start_time = time::get_time();
+    let start_time = time::Instant::now();
+    
     let mut rng = rand::weak_rng();
     let mut total_depth : u64 = 0;
     let mut searches_last_print = 0;
@@ -225,10 +231,14 @@ pub fn search_position<B>(board: &mut B)
                                   mc_tree.searches, searches_of_children, mc_tree));
             if mc_tree.searches - searches_last_print > 4096 {
                 searches_last_print = mc_tree.searches;
-                let elapsed_seconds = (time::get_time() - start_time).num_seconds() as u64;
+                
+                let elapsed_time = start_time.elapsed();
+                let elapsed_seconds = elapsed_time.as_secs() as f32
+                    + elapsed_time.subsec_nanos() as f32 / 1000_0000_0000.0;
+                    
                 println!("{} total searches at {}nps, t={}s, {:.2}% draws, average depth {}.",
                          mc_tree.searches,
-                         mc_tree.searches / elapsed_seconds,
+                         (mc_tree.searches as f32 / elapsed_seconds) as u64,
                          elapsed_seconds,
                          100.0 * mc_tree.score.draws as f64 / mc_tree.searches as f64,
                          total_depth / mc_tree.searches);

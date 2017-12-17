@@ -11,7 +11,6 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 extern crate itertools;
-extern crate time;
 extern crate rand;
 extern crate ordered_float;
 extern crate rayon;
@@ -22,6 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::io;
 use std::fmt;
 use std::hash::Hash;
+use std::time;
 
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
@@ -162,7 +162,7 @@ fn play_game<B> (mut board : B)
     match board.game_result() {
         None => {
             let (handle, channel) = alpha_beta::start_uci_search(
-                board.clone(), uci::TimeRestriction::MoveTime(5000),
+                board.clone(), uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
                 uci::EngineOptions::new(),
                 Arc::new(Mutex::new(uci::EngineComm::new())), None);
             
@@ -215,7 +215,8 @@ fn play_human<B>(mut board : B)
             }
             else {
                 let (handle, channel) = alpha_beta::start_uci_search(
-                    board.clone(), uci::TimeRestriction::MoveTime(5000), uci::EngineOptions::new(),
+                    board.clone(), uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
+                    uci::EngineOptions::new(),
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 
                 let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();

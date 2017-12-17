@@ -1,5 +1,5 @@
 use std::fmt;
-use time;
+use std::time;
 use rand;
 
 use search_algorithms::mcts;
@@ -68,10 +68,10 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
 
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let mut searches = mc_tree.searches;
-    let start_time = time::get_time();
+    let start_time = time::Instant::now();
     let mut rng = rand::weak_rng();
     
-    while time::get_time() < start_time + time::Duration::seconds(60) {
+    while start_time.elapsed() < time::Duration::new(60, 0) {
         for _ in 0..10 {
             use std::ops::Add;
             mc_tree.select(&mut rng, searches, &mut mcts::SearchData::default());
