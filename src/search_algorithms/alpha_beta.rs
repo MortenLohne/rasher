@@ -51,9 +51,6 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         move_list: &Option<Vec<B::Move>>) 
     where B: UciBoard + fmt::Debug + Hash + Eq
 {
-    {
-        engine_comm.lock().unwrap().engine_is_running = true;
-    }
     
     let max_depth : u16 = match time_restriction {
         uci::TimeRestriction::Depth(d) => d,
@@ -67,7 +64,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
     let mut table = Table::new(options.hash_memory as usize * 1024 * 1024);
     
-    for depth in 1..(max_depth + 1) {
+    'depth_loop: for depth in 1..(max_depth + 1) {
         
         let mut pvs : Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
         let mut pv_moves : Vec<B::Move> = vec![]; // Moves that have been searched
@@ -117,7 +114,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 total_node_count = total_node_count + node_count;
             }
             else {
-                return; // The search has been stopped. Do not send any more data.
+                break 'depth_loop; // The search has been stopped. Do not send any more data.
             }
         
         }
@@ -154,12 +151,6 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             
         }
     }
-    {
-        // TODO: Makes this always get executed when the engine shuts down
-        let mut engine_comm = engine_comm.lock().unwrap();
-        engine_comm.engine_is_running = false;
-    }
-    
 }
 
 /// Returns a score, and a list of moves representing the best line it found
@@ -204,9 +195,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         // Check if the thread should stop
         if node_counter.total % 1024 == 0 {
             {
-                let mut engine_comm = engine_comm.lock().unwrap();
+                let engine_comm = engine_comm.lock().unwrap();
                 if engine_comm.engine_should_stop {
-                    engine_comm.engine_is_running = false;
                     return None // "Engine was told to stop"
                 }
             }
@@ -257,18 +247,11 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             node_counter.total += 1;
         }
 
-        match time_restriction {
-            GameTime(_) => (),
-            Depth(_) => (),
-            Nodes(n) => if node_counter.total > n {
-                engine_comm.lock().unwrap().engine_is_running = false;
-                // TODO: Actually stop here
-                //return (::score_board(&board), vec![]);
-            },
-            Mate(_) => (),
-            MoveTime(_) => (), //TODO: Might want to check the clock here, and not just on every depth increase
-            Infinite => (),
-        };
+        if let Nodes(n) = time_restriction {
+            if node_counter.total > n {
+                return None;
+            }
+        }
         
         // Helpful alias
         let color = board.to_move();

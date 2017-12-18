@@ -43,6 +43,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
     let mut engine_string = "minimax".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
     let mut engine_options = EngineOptions::new();
+    let mut search_thread : Option<thread::JoinHandle<()>> = None;
     
     // Listen to commands from GUI forever
     loop {
@@ -118,29 +119,32 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     engine_string = tokens[1].to_string();
                 },
             "stop" => {
-                let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));
-                engine_comm.engine_should_stop = true;
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = true;
+                }
+                // Block until engine has shut down
+                if let Some(handle) = search_thread.take() {
+                    if let Err(err) = handle.join() {
+                        error!("Search thread crashed.\n{:?}", err);
+                    };
+                };
             },
             "go" => {
-                loop {
-                    let engine_is_running = {
-                        let mut engine_comm = try!(engine_comm.lock().map_err(|err| err.to_string()));                          
-                        if !engine_comm.engine_is_running {
-                            engine_comm.engine_should_stop = false;
-                            break;
-                        }
-                        engine_comm.engine_is_running
+
+                // If engine is running, block until engine has shut down
+                if let Some(handle) = search_thread.take() {
+                    if let Err(err) = handle.join() {
+                        error!("Search thread crashed.\n{:?}", err);
                     };
-                    if engine_is_running {
-                        warn!("Engine was already running, cannot start new. Trying again later");
-                        thread::sleep(::std::time::Duration::from_millis(100));
-                        
-                    }
-                    
+                };
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = false;
                 }
                 let (time_restriction, searchmoves_input) = parse_go(&input)?;
                 
-                let (_, rx) = match engine_options.variant {
+                let (handle, rx) = match engine_options.variant {
                     ChessVariant::Standard => {
                         match engine_string.as_str() {
                             "minimax" => alpha_beta::start_uci_search(
@@ -236,6 +240,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                         }
                     }
                 });
+                search_thread = Some(handle);
             }
             "sjadam" => engine_options.variant = ChessVariant::Sjadam,
             "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
@@ -343,12 +348,11 @@ pub enum TimeRestriction {
 /// Struct for communicating with the engine from another thread
 pub struct EngineComm {
     pub engine_should_stop : bool,
-    pub engine_is_running : bool,
 }
 
 impl EngineComm {
     pub fn new() -> Self {
-        EngineComm{ engine_should_stop: false, engine_is_running: false }
+        EngineComm{ engine_should_stop: false }
     }
 }
 
