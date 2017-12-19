@@ -237,19 +237,20 @@ fn play_human<B>(mut board : B)
 pub struct NodeCount {
     intern: u64,
     leaf: u64,
-    total: u64,
 }
 
 impl NodeCount {
     fn new() -> Self {
-        NodeCount { intern: 0, leaf: 0, total: 0 }
+        NodeCount { intern: 0, leaf: 0 }
+    }
+    fn total(&self) -> u64 {
+        self.intern + self.leaf
     }
 }
 
 impl std::ops::Add for NodeCount {
     type Output = NodeCount;
     fn add(self, other: NodeCount) -> Self {
-        NodeCount { intern: self.intern + other.intern, leaf: self.leaf + other.leaf,
-                    total: self.total + other.total }
+        NodeCount { intern: self.intern + other.intern, leaf: self.leaf + other.leaf }
     }
 }

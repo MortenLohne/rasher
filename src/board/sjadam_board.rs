@@ -769,12 +769,14 @@ impl EvalBoard for SjadamBoard {
         debug_assert!(!self.is_empty(mv.from()));
     }
 
+    #[inline(never)]
     fn all_legal_moves(&self) -> Vec<Self::Move> {
         let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(&self);
         active_moves.append(&mut moves);
         active_moves
     }
 
+    #[inline(never)]
     fn active_moves (&self) -> Vec<Self::Move> {
         let (active_moves, _) = sjadam_move_gen::all_legal_moves(&self);
         active_moves
