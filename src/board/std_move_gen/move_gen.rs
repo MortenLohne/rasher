@@ -63,13 +63,10 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
     // Kingside castling
     if board.can_castle_kingside(board.to_move) {
         
-        let mut can_castle_here = true;
-        if is_attacked(board, square) {
-            can_castle_here = false;
-        }
+        let mut can_castle_here = !is_attacked(board, square);
         
         // Check that the two squares are empty and not in check
-        for n in [1, 2].iter() {
+        for n in &[1, 2] {
             debug_assert!(file == 4, format!("Error: King tried to castle from {} on:{}.",
                                              square, board));
             let square_checked = Square(square.0 + n);
@@ -85,12 +82,10 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
     
     // Queenside castling
     if board.can_castle_queenside(board.to_move) {
-        let mut can_castle_here = true;
-        if is_attacked(board, square) {
-            can_castle_here = false;
-        }
+        let mut can_castle_here = !is_attacked(board, square);
+
         // Check that the two squares are empty and not in check
-        for n in [1, 2].iter() {
+        for n in &[1, 2] {
             debug_assert!(file == 4, format!("Error: File is {}.", file));
             let square_checked = Square(square.0 - n);
             if !board.piece_at(square_checked).is_empty() ||
@@ -141,8 +136,8 @@ fn legal_moves_for_knight(board : &ChessBoard, square : Square, moves : &mut Vec
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
     
-    for &(i, j) in [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                    (1, -2), (1, 2), (2, -1), (2, 1)].iter() {
+    for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                    (1, -2), (1, 2), (2, -1), (2, 1)] {
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
@@ -176,7 +171,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         let take_square = Square((pos + direction * 8) as u8 - 1);
         if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
-                for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+                for piece_type in &[Queen, Rook, Bishop, Knight] {
                     let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
@@ -201,7 +196,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
         let piece = board[take_square].piece_type();
         if piece != Empty && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
-                for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+                for piece_type in &[Queen, Rook, Bishop, Knight] {
                     let c_move = ChessMove::new_prom(square, take_square, *piece_type);
                     add_if_legal(board, c_move,
                                  moves, king_pos, is_in_check);
@@ -226,7 +221,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
     
     if board.piece_at(square_in_front).is_empty() {
         if rank == prom_rank {
-            for piece_type in [Queen, Rook, Bishop, Knight].iter() {
+            for piece_type in &[Queen, Rook, Bishop, Knight] {
                 let c_move = ChessMove::new_prom(square, square_in_front, *piece_type);
                 add_if_legal(board, c_move,
                              moves, king_pos, is_in_check);
@@ -251,7 +246,7 @@ fn legal_moves_for_pawn(board : &ChessBoard, square : Square, moves : &mut Vec<C
 
 /// Checks that the move does not put the player in check
 /// , and add the move to the vector
-/// Does not work in some special cases, such as en passant. add_if_legal_simple should be used then
+/// Does not work in some special cases, such as en passant. `add_if_legal_simple` should be used then
 #[inline(never)]
 fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
                 king_pos_c : Square, is_in_check : bool) {
@@ -373,40 +368,42 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     let file = (square.0 & 0b0000_0111) as i8;
     let rank = (square.0 >> 3) as i8;
 
-    if file > 0 {
-        if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
-            let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
-            
-            if board[pawn_square].piece_type() == Pawn
-                && board[pawn_square].color().unwrap() != board.to_move {
-                return true;
-            }
-        }
-    }
-    if file < 7 {
-        if (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6) {
-            let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
-            
-            if board[pawn_square].piece_type() == Pawn
-                && board[pawn_square].color().unwrap() != board.to_move {
-                    return true;
-                }
-        }
-    }
-
-    for &(i, j) in [(0, 1), (1, 0), (0, -1), (-1, 0)].iter() {
-        if check_threats_in_direction (i, j, board, square, &vec![Queen, Rook]) {
-            return true;
-        }
-    }
-    for &(i, j) in [(1, 1), (1, -1), (-1, 1), (-1, -1)].iter() {
-        if check_threats_in_direction (i, j, board, square, &vec![Queen, Bishop]) {
+    if file > 0 && (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6)
+    {
+        let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
+        
+        if board[pawn_square].piece_type() == Pawn
+            && board[pawn_square].color().unwrap() != board.to_move
+        {
             return true;
         }
     }
     
-    for &(i, j) in [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                    (1, -2), (1, 2), (2, -1), (2, 1)].iter() {
+    if file < 7 && (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6)
+    {
+        let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
+        
+        if board[pawn_square].piece_type() == Pawn
+            && board[pawn_square].color().unwrap() != board.to_move
+        {
+            return true;
+        }
+    }
+    
+
+    for &(i, j) in& [(0, 1), (1, 0), (0, -1), (-1, 0)] {
+        if check_threats_in_direction (i, j, board, square, &[Queen, Rook]) {
+            return true;
+        }
+    }
+    for &(i, j) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+        if check_threats_in_direction (i, j, board, square, &[Queen, Bishop]) {
+            return true;
+        }
+    }
+    
+    for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                    (1, -2), (1, 2), (2, -1), (2, 1)] {
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
@@ -436,7 +433,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 }
 
 fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
-                               threats : &Vec<PieceType>) -> bool {
+                               threats : &[PieceType]) -> bool {
     let mut file = (square.0 & 0b0000_0111) as i8;
     let mut rank = (square.0 >> 3) as i8;
     loop {
@@ -450,14 +447,12 @@ fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Squ
             Empty => continue,
             piece_type => {
                 if piece.color().unwrap() == board.to_move { return false; }
-               // println!("Piece {} may be threatening.", piece);
+                
                 for threat in threats {
                     if piece_type == *threat {
-                        //println!("Piece {} was threatening!", piece);
                         return true;
                     }
                 }
-                //println!("Piece {} was not threatening.", piece);
                 return false;
             },
         }
@@ -466,14 +461,14 @@ fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Squ
 
 fn add_moves_diagonally (board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                          king_pos : Square, is_in_check : bool) {
-    for &(i, j) in [(1, 1), (1, -1), (-1, 1), (-1, -1)].iter() {
+    for &(i, j) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
         add_moves_in_direction(i, j, board, square, moves, king_pos, is_in_check);
     }
 }
 
 fn add_straight_moves(board : &ChessBoard, square : Square, moves : &mut Vec<ChessMove>,
                       king_pos : Square, is_in_check : bool) {
-    for &(i, j) in [(0, 1), (1, 0), (0, -1), (-1, 0)].iter() {
+    for &(i, j) in &[(0, 1), (1, 0), (0, -1), (-1, 0)] {
         add_moves_in_direction(i, j, board, square, moves, king_pos, is_in_check);
     }
 }

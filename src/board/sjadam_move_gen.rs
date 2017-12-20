@@ -18,7 +18,7 @@ lazy_static! {
             .map(BitBoard::from_u64)
         {
             for all_pieces in (0..256).map(BitBoard::from_u64) {
-                let mut target_squares = sjadam_squares.clone();
+                let mut target_squares = sjadam_squares;
                 for file in 0..8 {
                     if sjadam_squares.get(Square(file)) {
                         let mut cur_file = file.overflowing_sub(1).0;
@@ -59,7 +59,7 @@ lazy_static! {
         let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
         let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
 
-        for pieces in 0..256 {
+        for (pieces, entry) in table.iter_mut().enumerate() {
             let mut targets : u64 = 0;
             for file in 0..2 {
                 if (pieces >> file) % 2 != 0 {
@@ -79,7 +79,7 @@ lazy_static! {
                 }
             }
             
-            table[pieces] = targets;
+            *entry = targets;
         }
         table
     };
@@ -89,7 +89,7 @@ lazy_static! {
         let left_side = 0b11111100_11111100_11111100_11111100_11111100_11111100_11111100_11111100;
         let right_side = 0b00111111_00111111_00111111_00111111_00111111_00111111_00111111_00111111;
 
-        for pieces in 0..256 {
+        for (pieces, entry) in table.iter_mut().enumerate() {
             let mut targets : u64 = 0;
             if pieces % 2 != 0 {
                 targets |= right_side & (attacks >> 1);
@@ -105,7 +105,7 @@ lazy_static! {
                 targets |= left_side & (attacks << 6);
             }
             
-            table[pieces] = targets;
+            *entry = targets;
         }
         table
     };
@@ -124,7 +124,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
                             board.get_piece(Piece::new(piece_type, color))))
     {
         while let Some(square) = bitboard.first_piece() {
-            legal_moves_for_square(&board, square, piece.piece_type(),
+            legal_moves_for_square(board, square, piece.piece_type(),
                                    &mut moves, &mut active_moves, &mut winning_moves);
             bitboard.clear(square);
         }
@@ -186,7 +186,7 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
         },
         Knight => knight_moves(sjadam_squares, friendly_pieces),
         Pawn => {
-            let mut all_pieces_pawns = all_pieces.clone();
+            let mut all_pieces_pawns = all_pieces;
             if let Some(ep_square) = board.en_passant_square() {
                 all_pieces_pawns.set(ep_square);
             }
@@ -271,7 +271,7 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
     else if type3_mask & sjadam_squares.board != 0 { 8 }
     else { 9 };
     
-    let old_sjadam_squares = sjadam_squares.clone();
+    let old_sjadam_squares = *sjadam_squares;
     
     for i in [0, 2, 4, 6, 16, 18, 20, 22, 32, 34, 36, 38, 48, 50, 52, 54].iter()
         .map(|&i| i + color_offset)
@@ -360,7 +360,7 @@ fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
 #[inline(never)]
 fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
                 all_pieces: BitBoard) -> BitBoard {
-    let mut bishop_moves = sjadam_squares.clone();
+    let mut bishop_moves = sjadam_squares;
     let mut sjadam_squares_45 = sjadam_squares.rotate_45();
     
     let all_pieces_45 = all_pieces.rotate_45();
@@ -415,7 +415,7 @@ fn rook_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
     let mut rook_moves = sjadam_squares_rotated.rotate_270();
     
     rook_moves.board &= !friendly_pieces.board;
-    let mut horizontal_moves = sjadam_squares.clone();
+    let mut horizontal_moves = sjadam_squares;
     for rank in 0..8 {
         lookup_rook(rank, &mut horizontal_moves, all_pieces);
     }

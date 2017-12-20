@@ -137,22 +137,17 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                     break;
                 }
             },
-            Depth(n) => if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32) {
-                break
-            }
-            else { },
+            Depth(n) | Mate(n)
+                if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32)
+                => break,
             Nodes(n) => if mc_tree.searches >= n { break } else { },
-            Mate(n) => if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32) {
-                break
-            }
-            else { },
             MoveTime(time) => {
                 if time_taken > time {
                     break;
                 }
                 else { () }
             },
-            Infinite => (),
+            Infinite | Depth (_) | Mate(_) => (),
         }
         if engine_comm.lock().unwrap().engine_should_stop {
             break;
@@ -170,7 +165,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
     debug_assert_eq!(mc_tree.board, *board);
 
     let time_taken = time::Instant::now() - start_time;
-    let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1000_000;
+    let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1_000_000;
     let mut pvs = vec![];
     
     for &(node, ref go_move) in mc_tree.children.iter()
@@ -274,21 +269,13 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         let mut rng = rand::weak_rng();
         while !root.is_fully_expanded {
             root.expand(&mut rng, &mut SearchData::default());
-            if root.searches > 10000 {
+            if root.searches > 10_000 {
                 panic!("Failed to fully expand root node after 10000 searches")
             }
         }        
         root
     }
 
-    /*pub fn get_child(&self, index: usize) -> Option<&self> {
-        self.children[index].1.as_ref()
-    }
-
-    pub fn get_child_mut(&mut self, index: usize) -> Option<&mut self> {
-        self.children[index].1.as_mut()
-    }
-    */
     pub fn new_child(&self, board: B, num_of_children: usize) -> Box<Self> {
         Box::new(MonteCarloTree { children: vec![None; num_of_children],
                                   game_result: board.game_result(),
@@ -395,7 +382,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                              best_reply, 100.0 * *best_reply_node.score(),
                              best_reply_node.score.white_wins, best_reply_node.score.draws,
                              best_reply_node.score.black_wins, best_reply_node.searches);
-                    if node.searches > 10000 {
+                    if node.searches > 10_000 {
                         println!("Children//:");
                         padding.push_str("  ");
                         node.print_score(&board_after_move, padding);
@@ -664,7 +651,7 @@ impl Score {
 }
 
 /// Returns mutable references to two elements in a slice
-/// Returns None if either index is out of bounds, or the indices are not distinct
+/// Panics if either index is out of bounds, or the indices are not distinct
 fn get_two_mut<T>(slice: &mut[Option<T>], index1: usize, index2: usize) 
     -> (&mut T, &mut T) {
     

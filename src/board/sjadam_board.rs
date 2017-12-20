@@ -38,13 +38,13 @@ const ODD_FILES : BitBoard = BitBoard {
 lazy_static! {
     static ref DIAGONAL_NEIGHBOURS : [BitBoard; 64] = {
         let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
-        
+
         for i in 0..64 {
             let mut board = BitBoard::empty();
             let (file, rank) = Square(i).file_rank();
             
-            for &x in [u8::overflowing_sub(file, 1).0, file + 1].iter() {
-                for &y in [u8::overflowing_sub(rank, 1).0, rank + 1].iter() {
+            for &x in &[u8::overflowing_sub(file, 1).0, file + 1] {
+                for &y in &[u8::overflowing_sub(rank, 1).0, rank + 1] {
                     if x < 8 && y < 8 {
                         board.set(Square::from_ints(x, y));
                     }
@@ -418,20 +418,20 @@ impl SjadamBoard {
 
     pub fn disable_castling(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
+            White => self.castling_en_passant &= 0b1111_1100,
+            Black => self.castling_en_passant &= 0b1111_0011,
         }
     }
     pub fn disable_castling_queenside(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1101,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0111,
+            White => self.castling_en_passant &= 0b1111_1101,
+            Black => self.castling_en_passant &= 0b1111_0111,
         }
     }
     pub fn disable_castling_kingside(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1110,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_1011,
+            White => self.castling_en_passant &= 0b1111_1110,
+            Black => self.castling_en_passant &= 0b1111_1011,
         }
     }
     
@@ -464,10 +464,10 @@ impl SjadamBoard {
         match square {
             Some(square) => {
                 let (mut byte, _) = square.file_rank();
-                byte = byte | 0b1000_0000;
-                self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
+                byte |= 0b1000_0000;
+                self.castling_en_passant |= (byte << 4) | 0b1000_0000;
             },
-            None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
+            None => self.castling_en_passant &= 0b0000_1111,
         }
     }
 }
@@ -520,7 +520,7 @@ impl UciBoard for SjadamBoard {
         let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
         match input.len() {
             4 => Ok(SjadamMove::new(from, to, false)),
-            5 if input.as_bytes()[4] == 'c' as u8 => Ok(SjadamMove::new(from, to, true)),
+            5 if input.as_bytes()[4] == b'c' => Ok(SjadamMove::new(from, to, true)),
             _ => Err(format!("Couldn't parse move {}", input))
         }
     }
@@ -635,7 +635,7 @@ impl EvalBoard for SjadamBoard {
         debug_assert!(!self.is_empty(mv.from()),
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
 
-        let en_passant = mv.en_passant_bitboard(&self);
+        let en_passant = mv.en_passant_bitboard(self);
         // TODO: Store piece moved in move struct?
         let piece_moved = self.get_square(mv.from()).piece_type();
         let undo_move = SjadamUndoMove {
@@ -687,14 +687,11 @@ impl EvalBoard for SjadamBoard {
         if piece_moved == Pawn && mv.from().file() == mv.to().file()
             && i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8) == 2
             && !self.piece_at_square(Piece::new(Pawn, start_color), mid_sq)
-        {
-            if start_color == White && mv.from().rank() == 6 {
+            && (start_color == White && mv.from().rank() == 6
+            || start_color == Black && mv.from().rank() == 1)
+            {
                 self.set_en_passant_square(Some(mid_sq));
             }
-            else if start_color == Black && mv.from().rank() == 1 {
-                self.set_en_passant_square(Some(mid_sq));
-            }
-        }
         
         self.move_piece(Piece::new(piece_moved, start_color), mv.from(), mv.to());
         
@@ -771,14 +768,14 @@ impl EvalBoard for SjadamBoard {
 
     #[inline(never)]
     fn all_legal_moves(&self) -> Vec<Self::Move> {
-        let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(&self);
+        let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(self);
         active_moves.append(&mut moves);
         active_moves
     }
 
     #[inline(never)]
     fn active_moves (&self) -> Vec<Self::Move> {
-        let (active_moves, _) = sjadam_move_gen::all_legal_moves(&self);
+        let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
         active_moves
     }
     
@@ -854,7 +851,7 @@ impl EvalBoard for SjadamBoard {
                 dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
 
-                let pawns = self.bitboards[0 + (!color).disc()];
+                let pawns = self.bitboards[(!color).disc()];
                 dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
                 dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
 

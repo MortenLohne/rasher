@@ -70,16 +70,17 @@ impl PieceType {
 
 impl fmt::Display for PieceType {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        let _ = fmt.write_str(match self {
-            &Pawn => "Pawn",
-            &Knight => "Knight",
-            &Bishop => "Bishop",
-            &Rook => "Rook",
-            &Queen => "Queen",
-            &King => "King",
-            &Empty => "Empty square",
-        }
-                              );
+        let _ = fmt.write_str(
+            match *self {
+                Pawn => "Pawn",
+                Knight => "Knight",
+                Bishop => "Bishop",
+                Rook => "Rook",
+                Queen => "Queen",
+                King => "King",
+                Empty => "Empty square",
+            }
+        );
         Ok(())
     }
 }
@@ -158,9 +159,11 @@ impl Piece {
     pub fn color(self) -> Option<Color> {
         match self {
             Piece::Empty => None,
-            _ => match self as u32 % 2 == 0 {
-                true => Some(White),
-                false => Some(Black),
+            _ => if self as u32 % 2 == 0 {
+                Some(White)
+            }
+            else {
+                Some(Black)
             },
         }
     }
@@ -178,10 +181,10 @@ pub struct Square(pub u8);
 impl fmt::Display for Square {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let (file, rank) = self.file_rank();
-        let actual_rank = ((rank as i8 - 8).abs() as u8 + ('0' as u8)) as char;
+        let actual_rank = ((rank as i8 - 8).abs() as u8 + b'0') as char;
         
         let _ = fmt.write_str(&format!("{}{}",
-                                       (file + 'a' as u8) as char,
+                                       (file + b'a') as char,
                                        actual_rank));
         Ok(())   
     }
@@ -192,8 +195,8 @@ impl Square {
         if alg.len() != 2 { None }
         else {
             let (file, rank) = (alg.chars().nth(0).unwrap(), alg.chars().nth(1).unwrap());
-            let (file_u8, rank_u8) = (file as u8 - 'a' as u8,
-                                      8 - (rank as u8 - '0' as u8));
+            let (file_u8, rank_u8) = (file as u8 - b'a',
+                                      8 - (rank as u8 - b'0'));
             let square = rank_u8 * 8 + file_u8;
 
             if square > 64 { None } else { Some(Square(square)) }
@@ -287,7 +290,7 @@ impl IntoIterator for ChessBoard {
 /// of the pieces
 fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
     let mut board = [[Piece::empty(); 8]; 8];
-    let ranks : Vec<&str> = fen_board.split("/").collect();
+    let ranks : Vec<&str> = fen_board.split('/').collect();
     if ranks.len() != 8 {
         return Err(format!("Invalid FEN board string \"{}\": Had {} ranks instead of 8",
                            fen_board, ranks.len()));
@@ -313,9 +316,7 @@ fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
                                fen_board, cur_rank.len(), i))
         }
         else {
-            for j in 0..8 {
-                board[i][j] = *cur_rank.get(j).unwrap();
-            }
+            board[i][..8].clone_from_slice(&cur_rank[..8]);
         }
     }
     Ok(board)
@@ -351,7 +352,7 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
 impl UciBoard for ChessBoard {
     
     fn from_fen(fen : &str) -> Result<Self, String> {
-        let fen_split : Vec<&str> = fen.split(" ").collect();
+        let fen_split : Vec<&str> = fen.split(' ').collect();
         if fen_split.len() < 4 || fen_split.len() > 6 {
             return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
                                fen, fen_split.len()));
@@ -435,7 +436,7 @@ impl UciBoard for ChessBoard {
         if self.can_castle_queenside(Black) {
             string.push('q');
         }
-        if string.chars().last() == Some(' ') {
+        if string.ends_with(' ') {
             string.push('-');
         }
         
@@ -456,9 +457,9 @@ impl UciBoard for ChessBoard {
         let (file_from, rank_from) = mv.from.file_rank();
         let (file_to, rank_to) = mv.to.file_rank();
         let mut s : String = "".to_string();
-        s.push_str(&format!("{}{}{}{}", (file_from + 'a' as u8) as char,
-                            (8 - rank_from + '0' as u8) as char,
-                            (file_to + 'a' as u8) as char, (8 - rank_to + '0' as u8) as char));
+        s.push_str(&format!("{}{}{}{}", (file_from + b'a') as char,
+                            (8 - rank_from + b'0') as char,
+                            (file_to + b'a') as char, (8 - rank_to + b'0') as char));
         match mv.prom {
             Some(Queen) => s.push('q'),
             Some(Rook) => s.push('r'),
@@ -527,7 +528,7 @@ impl EvalBoard for ChessBoard {
             return Some(board::GameResult::Draw);
         }
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
-        if self.all_legal_moves().len() == 0 {            
+        if self.all_legal_moves().is_empty() {            
             if move_gen::is_attacked(self, self.king_pos(self.to_move())) {
                 if self.to_move == White {
                     Some(board::GameResult::BlackWin)
@@ -620,7 +621,6 @@ impl EvalBoard for ChessBoard {
         
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).piece_type()) {
-            (Pawn, _) => self.half_move_clock = 0,
             (_, Empty) => self.half_move_clock += 1,
             (_, _) => self.half_move_clock = 0,
         }
@@ -812,7 +812,7 @@ impl EvalBoard for ChessBoard {
 impl fmt::Display for ChessBoard {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmt.write_str("\n").unwrap();
-        for rank in self.board.iter() {
+        for rank in &self.board {
             for piece in rank.iter() {
                 write!(fmt, "[{}]", piece).unwrap();
             }
@@ -857,7 +857,7 @@ impl ChessBoard {
     
     // TODO: Remove in favour of indexing operator
     pub fn piece_at(&self, square : Square) -> Piece {
-        self[square].clone()
+        self[square]
     }
 
     pub fn king_pos(&self, color: Color) -> Square {
@@ -875,22 +875,25 @@ impl ChessBoard {
         }
         None
     }
+    
     pub fn disable_castling(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1100,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0011,
+            White => self.castling_en_passant &= 0b1111_1100,
+            Black => self.castling_en_passant &= 0b1111_0011,
         }
     }
+    
     pub fn disable_castling_queenside(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1101,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_0111,
+            White => self.castling_en_passant &= 0b1111_1101,
+            Black => self.castling_en_passant &= 0b1111_0111,
         }
     }
+    
     pub fn disable_castling_kingside(&mut self, color: Color) {
         match color {
-            White => self.castling_en_passant = self.castling_en_passant & 0b1111_1110,
-            Black => self.castling_en_passant = self.castling_en_passant & 0b1111_1011,
+            White => self.castling_en_passant &= 0b1111_1110,
+            Black => self.castling_en_passant &= 0b1111_1011,
         }
     }
     
@@ -923,13 +926,10 @@ impl ChessBoard {
         match square {
             Some(square) => {
                 let (mut byte, _) = square.file_rank();
-                byte = byte | 0b1000_0000;
-                //println!("byte << 4 was {:b}, byte={:b}", byte << 4, byte);
-                self.castling_en_passant = self.castling_en_passant | ((byte << 4) | 0b1000_0000);
-                //println!("Bitmap set to {:b}", self.castling_en_passant);
-                //panic!();
+                byte |= 0b1000_0000;
+                self.castling_en_passant |= (byte << 4) | 0b1000_0000;
             },
-            None => self.castling_en_passant = self.castling_en_passant & 0b0000_1111,
+            None => self.castling_en_passant &= 0b0000_1111,
         }
     }
 }

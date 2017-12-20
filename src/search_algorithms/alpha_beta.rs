@@ -53,8 +53,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 {
     
     let max_depth : u16 = match time_restriction {
-        uci::TimeRestriction::Depth(d) => d,
-        uci::TimeRestriction::Mate(d) => d,
+        uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
         _ => 128,
     };
     debug_assert!(max_depth > 1);
@@ -100,10 +99,10 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 
                 let mut pv_board = board.clone();
 
-                for mv in moves.iter() {
-                    pv_str.push_str(&pv_board.to_alg(&mv));
+                for mv in &moves {
+                    pv_str.push_str(&pv_board.to_alg(mv));
                     pv_str.push(' ');
-                    debug_assert!(pv_board.all_legal_moves().contains(&mv),
+                    debug_assert!(pv_board.all_legal_moves().contains(mv),
                                   "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
                                   mv, moves, pv_board, board);
                     pv_board.do_move(mv.clone());
@@ -119,7 +118,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         
         }
         let time_taken = time::Instant::now() - start_time;
-        let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1000_000;
+        let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1_000_000;
         
         let uci_info = uci::UciInfo {
             depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total(),
@@ -245,7 +244,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             if alpha < beta {
                 let active_moves = board.active_moves();
                 
-                for mv in active_moves.iter() {
+                for mv in active_moves {
                     let undo_move = board.do_move(mv.clone());
 
                     let new_alpha = decrement_score(alpha);
@@ -341,11 +340,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     && move_searched && !board.game_result().is_some() =>
                 {
                     let eval = board.eval_board();
-                    if !board.to_move() == White && eval < old_eval {
-                        board.undo_move(undo_move);
-                        continue;
-                    }
-                    else if !board.to_move() == Black && eval > old_eval {
+                    if color == White && eval < old_eval
+                        || color == Black && eval > old_eval
+                    {
                         board.undo_move(undo_move);
                         continue;
                     }
@@ -398,7 +395,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 Black => Ordering::Less,
             };
             table.insert(board.clone(), HashEntry {
-                best_reply: best_line.last().map(Clone::clone),
+                best_reply: best_line.last().cloned(),
                 score: (ordering, score), depth: depth
             });
         }
@@ -435,7 +432,7 @@ pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
 
     let active_moves = board.active_moves();
     
-    for mv in active_moves.iter() {
+    for mv in &active_moves {
         let undo_move = board.do_move(mv.clone());
         let score = quiescence_search(board, node_counter, alpha, beta);
         board.undo_move(undo_move);
@@ -600,8 +597,8 @@ impl Score {
         match self {
             Val(val) => (val * 100.0) as i16,
             Draw(_) => 0,
-            WhiteWin(n) => 12000 - n as i16,
-            BlackWin(n) => -12000 + n as i16,
+            WhiteWin(n) => 12_000 - n as i16,
+            BlackWin(n) => -12_000 + n as i16,
         }
     }
 }
@@ -611,7 +608,7 @@ impl fmt::Display for Score {
         match *self {
             Score::Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
             Score::WhiteWin(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
-            Score::BlackWin(n) => write!(fmt, "mate {}", ((1 + n as i16) / 2) * -1),
+            Score::BlackWin(n) => write!(fmt, "mate {}", -(1 + n as i16) / 2),
             Score::Draw(_) => write!(fmt, "0"),
         }
     }

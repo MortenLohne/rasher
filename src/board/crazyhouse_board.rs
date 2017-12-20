@@ -99,7 +99,7 @@ impl EvalBoard for CrazyhouseBoard {
         for square in board_iter.filter(|&sq| self.base_board[sq].is_empty()) {
             let to_move = self.to_move();
             if to_move == White {
-                for piece_type in self.white_available_pieces.iter() {
+                for piece_type in &self.white_available_pieces {
                     // Make sure you don't put pawns on the back ranks
                     let (_, rank) = square.file_rank(); 
                     if piece_type != &PieceType::Pawn || (rank > 0 && rank < 7) {
@@ -112,7 +112,7 @@ impl EvalBoard for CrazyhouseBoard {
                 }
             }
             else {
-                for piece_type in self.black_available_pieces.iter() {
+                for piece_type in &self.black_available_pieces {
                     let (_, rank) = square.file_rank();
                     if piece_type != &PieceType::Pawn || (rank > 0 && rank < 7) {
                         let mv = CrazyhouseMove::CrazyMove(
@@ -238,7 +238,7 @@ impl uci::UciBoard for CrazyhouseBoard {
             return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [5, 6, 7]",
                            fen, fen_split.len()));
         }
-        let mut ranks : Vec<&str> = fen_split[0].split("/").collect();
+        let mut ranks : Vec<&str> = fen_split[0].split('/').collect();
         if ranks.len() != 9 {
             return Err(format!("Invalid FEN string \"{}\": Found {} ranks, expected 9",
                                fen, ranks.len()));
@@ -287,20 +287,20 @@ impl uci::UciBoard for CrazyhouseBoard {
                 _ => return Err(format!("Couldn't parse move {}.", input)),
             };
             let square_str : String = input.chars().skip_while(|&c| c != '@').collect();
-            let square = Square::from_alg(&square_str).ok_or(
+            let square = Square::from_alg(&square_str).ok_or_else(||
                 format!("Failed to parse destination square for move {}", input));
             square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
         }
         else {
-            self.base_board.from_alg(input).map(|mv| CrazyhouseMove::NormalMove(mv))
+            self.base_board.from_alg(input).map(CrazyhouseMove::NormalMove)
         }
     }
     
     fn to_alg(&self, mv: &Self::Move) -> String {
         use board::std_board::PieceType::*;
-        match mv {
-            &CrazyhouseMove::NormalMove(mv) => self.base_board.to_alg(&mv),
-            &CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
+        match *mv {
+            CrazyhouseMove::NormalMove(mv) => self.base_board.to_alg(&mv),
+            CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
                 Knight => "N",
                 Bishop => "B",
                 Rook => "R",

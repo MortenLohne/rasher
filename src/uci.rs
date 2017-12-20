@@ -154,7 +154,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                             "minimax" => alpha_beta::start_uci_search(
                                 parse_position::<ChessBoard>(&board_string)?,
                                 time_restriction,
-                                engine_options.clone(),
+                                engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
@@ -165,7 +165,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                          )),
                             "mcts" => start_mcts_engine(
                                 parse_position::<ChessBoard>(&board_string)?,
-                                time_restriction, engine_options.clone(),
+                                time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
                         }
@@ -175,7 +175,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                             "minimax" => alpha_beta::start_uci_search(
                                 parse_position::<CrazyhouseBoard>(&board_string)?,
                                 time_restriction,
-                                engine_options.clone(),
+                                engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
@@ -186,7 +186,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                          )),
                             "mcts" => start_mcts_engine(
                                 parse_position::<CrazyhouseBoard>(&board_string)?,
-                                time_restriction, engine_options.clone(),
+                                time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
                         }
@@ -196,7 +196,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                             "minimax" => alpha_beta::start_uci_search(
                                 parse_position::<SjadamBoard>(&board_string)?,
                                 time_restriction,
-                                engine_options.clone(),
+                                engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
@@ -207,7 +207,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                                          )),
                             "mcts" => start_mcts_engine(
                                 parse_position::<SjadamBoard>(&board_string)?,
-                                time_restriction, engine_options.clone(),
+                                time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
                         }
@@ -408,8 +408,11 @@ fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), Stri
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
         "uci_standard" => options.variant = ChessVariant::Standard,
+        
         "uci_crazyhouse" => options.variant = ChessVariant::Crazyhouse,
+        
         "uci_sjadam" => options.variant = ChessVariant::Sjadam,
+        
         "threads" => {
             let threads = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
             options.threads = threads;
@@ -419,14 +422,15 @@ fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), Stri
             let hash = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
             options.hash_memory = hash;
         }
+        
         "multipv" => {
             let multipv = u32::from_str(&value).map_err(|e|format!("{:?}", e))?;
             options.multipv = multipv;
         }
+        
         "write debug log" => {
             match &value.to_lowercase()[..] {
-                "true" => (),
-                "false" => (),
+                "true" | "false" => (),
                 _ => warn!("Unrecognized value {} in option {}, ignoring...", 
                                      value, option_name),
             }
@@ -475,7 +479,6 @@ pub fn parse_go (input : &str)
     }
 
     match input.split_whitespace().nth(1) {
-        Some("infinite") => return Ok((TimeRestriction::Infinite, None)),
         Some("movetime") => return Ok((TimeRestriction::MoveTime(
             try!(parse_dur(input.split_whitespace().nth(2))
                  )), None)),
@@ -489,7 +492,7 @@ pub fn parse_go (input : &str)
             try!(parse_int(input.split_whitespace().nth(2))
             ) as u64), None)),
         Some("searchmoves") => return Ok((TimeRestriction::Infinite, Some(input.split_whitespace().skip(2).map(|s|s.to_string()).collect::<Vec<_>>()))),
-        None => return Ok((TimeRestriction::Infinite, None)),
+        Some("infinite") | None => return Ok((TimeRestriction::Infinite, None)),
         Some(_) => (),
     }
     
@@ -500,12 +503,12 @@ pub fn parse_go (input : &str)
     
     loop {
         match tokens_it.next() {
-            Some("moves_to_go") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
-            Some("movestogo") => moves_to_go = Some(try!(parse_int(tokens_it.next()))),
-            Some("btime") => black_time = Some(try!(parse_dur(tokens_it.next()))),
-            Some("wtime") => white_time = Some(try!(parse_dur(tokens_it.next()))),
-            Some("winc") => white_inc = Some(try!(parse_dur(tokens_it.next()))),
-            Some("binc") => black_inc = Some(try!(parse_dur(tokens_it.next()))),
+            Some("moves_to_go") | Some("movestogo")
+                => moves_to_go = Some(parse_int(tokens_it.next())?),
+            Some("btime") => black_time = Some(parse_dur(tokens_it.next())?),
+            Some("wtime") => white_time = Some(parse_dur(tokens_it.next())?),
+            Some("winc") => white_inc = Some(parse_dur(tokens_it.next())?),
+            Some("binc") => black_inc = Some(parse_dur(tokens_it.next())?),
             Some (s) => return Err(format!("Unknown token \"{}\" in go command", s)),
             None => break,
         }
@@ -553,7 +556,7 @@ pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
-fn parse_position<Board> (input : &String) -> Result<Board, String>
+fn parse_position<Board> (input : &str) -> Result<Board, String>
     where Board: 'static + UciBoard {
     
     let words : Vec<&str> = input.split_whitespace().collect();
