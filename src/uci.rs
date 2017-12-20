@@ -131,8 +131,12 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 };
             },
             "go" => {
-
                 // If engine is running, block until engine has shut down
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = true;
+                }
+                
                 if let Some(handle) = search_thread.take() {
                     if let Err(err) = handle.join() {
                         error!("Search thread crashed.\n{:?}", err);
