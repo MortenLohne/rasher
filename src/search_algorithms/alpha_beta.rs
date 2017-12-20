@@ -225,7 +225,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         // Helpful alias
         let color = board.to_move();
         let mut best_line = vec![];
-        let mut best_score = None;
         
         if depth == 0 {
             
@@ -238,42 +237,45 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
             let mut tried_score = Val(board.eval_board());
 
-            let active_moves = board.active_moves();
+            match color {
+                White => alpha = alpha.max(tried_score),
+                Black => beta = beta.min(tried_score),
+            }
             
-            for mv in active_moves.iter() {
-                let undo_move = board.do_move(mv.clone());
+            if alpha < beta {
+                let active_moves = board.active_moves();
+                
+                for mv in active_moves.iter() {
+                    let undo_move = board.do_move(mv.clone());
 
-                let new_alpha = decrement_score(alpha);
-                let new_beta = decrement_score(beta);
-                
-                let (score, best_moves) = find_best_move_ab_rec(
-                    board, depth, new_alpha, new_beta,
-                    engine_comm, time_restriction, options,
-                    start_time, node_counter, None, table)?;
-                
-                board.undo_move(undo_move);
-                if (board.to_move() == Black && score < tried_score)
-                    || (board.to_move() == White && score > tried_score)
-                {
-                    tried_score = score;
-                }
+                    let new_alpha = decrement_score(alpha);
+                    let new_beta = decrement_score(beta);
+                    
+                    let (score, best_moves) = find_best_move_ab_rec(
+                        board, depth, new_alpha, new_beta,
+                        engine_comm, time_restriction, options,
+                        start_time, node_counter, None, table)?;
+                    
+                    board.undo_move(undo_move);
+                    if (color == Black && score < tried_score)
+                        || (color == White && score > tried_score)
+                    {
+                        tried_score = score;
+                        best_line = best_moves;
+                        best_line.push(mv.clone());
+                    }
 
-                if color == White && score > alpha {
-                    alpha = score;
-                    tried_score = score;
-                    best_line = best_moves;
-                    best_line.push(mv.clone());
-                }
-                
-                else if color == Black && score < beta {
-                    beta = score;
-                    tried_score = score;
-                    best_line = best_moves;
-                    best_line.push(mv.clone());
-                }
-                
-                if alpha >= beta {
-                    break;
+                    if color == White && score > alpha {
+                        alpha = score;
+                    }
+                    
+                    else if color == Black && score < beta {
+                        beta = score;
+                    }
+                    
+                    if alpha >= beta {
+                        break;
+                    }
                 }
             }
             
@@ -295,6 +297,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         }
 
         debug_assert!(depth > 0);
+        let mut best_score = None;
         
         if let Nodes(n) = time_restriction {
             if node_counter.total() > n {
