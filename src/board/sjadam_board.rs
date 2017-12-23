@@ -15,6 +15,10 @@ use std::ops;
 use std::fmt;
 use uci::UciBoard;
 
+use rand;
+use rand::Rng;
+use rand::SeedableRng;
+
 const WHITE_SQUARES : BitBoard = BitBoard {
     board: 0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101
 };
@@ -84,6 +88,15 @@ lazy_static! {
                 board.set(Square::from_ints(file, rank + 1));
             }
             table[i as usize] = board;
+        }
+        table
+    };
+
+    static ref ZOBRIST_KEYS : [u64; 793] = {
+        let mut table = [0; 793];
+        let mut rng = rand::StdRng::from_seed(&[42]);
+        for entry in table.iter_mut() {
+            *entry = rng.next_u64();
         }
         table
     };
@@ -280,10 +293,44 @@ impl fmt::Debug for BitBoard {
     }
 }
 
+impl IntoIterator for BitBoard {
+    type Item = Square;
+    type IntoIter = BitBoardIterator;
+    
+    fn into_iter(self) -> Self::IntoIter {
+        BitBoardIterator::new(self)
+    }
+}
+
+pub struct BitBoardIterator {
+    board: BitBoard,
+}
+
+impl BitBoardIterator {
+    fn new(board: BitBoard) -> Self {
+        Self { board: board }
+    }
+}
+
+impl Iterator for BitBoardIterator {
+    type Item = Square;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next) = self.board.first_piece() {
+            self.board.clear(next);
+            Some(next)
+        }
+        else {
+            None
+        }
+        
+    }
+}
+
 #[derive(Clone)]
 pub struct SjadamBoard {
     white_pieces: BitBoard,
     black_pieces: BitBoard,
+    hash: u64,
     bitboards: [BitBoard; 12],
     to_move: Color,
     castling_en_passant: u8,
@@ -307,16 +354,33 @@ use std::hash::Hash;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.bitboards.hash(state);
-        self.to_move.hash(state);
-        self.castling_en_passant.hash(state);
+        state.write_u64(self.hash);
     }
 }
 
 impl SjadamBoard {
+
+    fn hash_from_scratch(&self) -> u64 {
+        let mut hash = 0;
+        for (i, bitboard) in self.bitboards.iter().enumerate() {
+            for Square(square) in bitboard.into_iter() {
+                hash ^= ZOBRIST_KEYS[i * 64 + square as usize];
+            }
+        }
+        if self.to_move == Black {
+            hash ^= ZOBRIST_KEYS[768];
+        }
+        if let Some(en_passant_square) = self.en_passant_square() {
+            hash ^= ZOBRIST_KEYS[769 + en_passant_square.file() as usize];
+        }
+        hash ^= ZOBRIST_KEYS[777 + (self.castling_en_passant & 0b1111) as usize];
+        hash
+    }
+    
     pub fn from_chess_board(other: &ChessBoard) -> Self {
         let mut board = Self { bitboards: [BitBoard::empty(); 12],
                                white_pieces: BitBoard::empty(), black_pieces: BitBoard::empty(),
+                               hash: 0,
                                to_move: other.to_move(),
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
@@ -326,6 +390,7 @@ impl SjadamBoard {
                 board.set_piece_at_square(other[square], square);
             }
         }
+        board.hash = board.hash_from_scratch();
         board
     }
 
@@ -396,6 +461,7 @@ impl SjadamBoard {
         else {
             self.black_pieces.set(square);
         }
+        self.hash ^= ZOBRIST_KEYS[(64 * (piece as u16 - 2) + square.0 as u16) as usize]
     }
 
     pub fn clear_piece_at_square(&mut self, piece: Piece, square: Square) {
@@ -407,6 +473,7 @@ impl SjadamBoard {
         else {
             self.black_pieces.clear(square);
         }
+        self.hash ^= ZOBRIST_KEYS[(64 * (piece as u16 - 2) + square.0 as u16) as usize]
     }
 
     pub fn move_piece(&mut self, piece: Piece, from: Square, to: Square) {
@@ -416,19 +483,31 @@ impl SjadamBoard {
         self.clear_piece_at_square(piece, from);
     }
 
+    fn castling_en_passant_key(&self) -> u64 {
+        let mut hash = 0;
+        if let Some(en_passant_square) = self.en_passant_square() {
+            hash ^= ZOBRIST_KEYS[769 + en_passant_square.file() as usize];
+        }
+        hash ^= ZOBRIST_KEYS[777 + (self.castling_en_passant & 0b1111) as usize];
+        hash
+    }
+
     pub fn disable_castling(&mut self, color: Color) {
+
         match color {
             White => self.castling_en_passant &= 0b1111_1100,
             Black => self.castling_en_passant &= 0b1111_0011,
         }
     }
     pub fn disable_castling_queenside(&mut self, color: Color) {
+        
         match color {
             White => self.castling_en_passant &= 0b1111_1101,
             Black => self.castling_en_passant &= 0b1111_0111,
         }
     }
     pub fn disable_castling_kingside(&mut self, color: Color) {
+        
         match color {
             White => self.castling_en_passant &= 0b1111_1110,
             Black => self.castling_en_passant &= 0b1111_1011,
@@ -460,7 +539,6 @@ impl SjadamBoard {
     }
 
     pub fn set_en_passant_square(&mut self, square: Option<Square>) {
-        
         match square {
             Some(square) => {
                 let (mut byte, _) = square.file_rank();
@@ -499,17 +577,20 @@ impl UciBoard for SjadamBoard {
                     let from = Square::from_alg(&input[1..3]).ok_or("Illegal square")?;
                     let to = Square::from_alg(&input[3..5]).ok_or("Illegal square")?;
                     // TODO: Check for castling
-                    return Ok(SjadamMove::new(from, to, false))
+                    return Ok(SjadamMove::new(from, to, false,
+                                              self.get_square(from).piece_type()))
                 }
                 let alg : String = chars.by_ref().collect();
                 let from = Square::from_alg(&alg[0..2]).ok_or("Illegal square")?;
                 let sjadam = Square::from_alg(&alg[2..4]).ok_or("Illegal square")?;
                 if alg.chars().last().unwrap() == '-' {
-                    return Ok(SjadamMove::new(from, sjadam, false));
+                    return Ok(SjadamMove::new(from, sjadam,
+                                              false, self.get_square(from).piece_type()));
                 }
                 else {
                     let to = Square::from_alg(&alg[4..]).ok_or("Illegal square")?;
-                    return Ok(SjadamMove::new(from, to, false));
+                    return Ok(SjadamMove::new(from, to, false,
+                                              self.get_square(from).piece_type()));
                 }
             }
         }
@@ -518,9 +599,13 @@ impl UciBoard for SjadamBoard {
         }
         let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
         let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
+        debug_assert!(!self.get_square(from).is_empty());
         match input.len() {
-            4 => Ok(SjadamMove::new(from, to, false)),
-            5 if input.as_bytes()[4] == b'c' => Ok(SjadamMove::new(from, to, true)),
+            4 => Ok(SjadamMove::new(from, to, false,
+                                    self.get_square(from).piece_type())),
+            5 if input.as_bytes()[4] == b'c' =>
+                Ok(SjadamMove::new(from, to, true,
+                                   self.get_square(from).piece_type())),
             _ => Err(format!("Couldn't parse move {}", input))
         }
     }
@@ -607,6 +692,7 @@ impl UciBoard for SjadamBoard {
 impl EvalBoard for SjadamBoard {
     type Move = SjadamMove;
     type UndoMove = SjadamUndoMove;
+    type HashBoard = u64;
     
     fn to_move(&self) -> Color {
         self.to_move
@@ -616,6 +702,10 @@ impl EvalBoard for SjadamBoard {
         Self::from_chess_board(&ChessBoard::start_board())
     }
 
+    fn hash_board(&self) -> Self::HashBoard {
+        self.hash
+    }
+    
     fn game_result(&self) -> Option<GameResult> {
         // In sjadam, king may be actually captured.
         // Check if the king is gone
@@ -636,23 +726,24 @@ impl EvalBoard for SjadamBoard {
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
 
         let en_passant = mv.en_passant_bitboard(self);
-        // TODO: Store piece moved in move struct?
-        let piece_moved = self.get_square(mv.from()).piece_type();
         let undo_move = SjadamUndoMove {
             from: mv.from(), to: mv.to(),
             castling: mv.castling(), en_passant: en_passant,
             capture: self.get_square(mv.to()).piece_type(),
-            piece_moved: piece_moved,
+            piece_moved: mv.piece_moved(),
             old_castling_en_passant: self.castling_en_passant,
-            old_half_move_clock: self.half_move_clock
+            old_half_move_clock: self.half_move_clock,
+            old_hash: self.hash
         };
-        debug_assert!(undo_move.piece_moved != PieceType::Empty,
+        debug_assert!(mv.piece_moved() != PieceType::Empty,
                       "Empty piece_moved when doing {} on \n{:?}", mv, self);
 
+        self.hash ^= self.castling_en_passant_key();
+        
         self.set_en_passant_square(None);
         
         // Remove castling priviledges on king moves
-        if undo_move.piece_moved == PieceType::King {
+        if mv.piece_moved() == PieceType::King {
             let color = self.to_move();
             self.disable_castling(color);
         }
@@ -684,7 +775,7 @@ impl EvalBoard for SjadamBoard {
 
         // Set en passant square
         let mid_sq = Square::from_ints(mv.to().file(), (mv.from().rank() + mv.to().rank()) / 2);
-        if piece_moved == Pawn && mv.from().file() == mv.to().file()
+        if mv.piece_moved() == Pawn && mv.from().file() == mv.to().file()
             && i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8) == 2
             && !self.piece_at_square(Piece::new(Pawn, start_color), mid_sq)
             && (start_color == White && mv.from().rank() == 6
@@ -692,8 +783,10 @@ impl EvalBoard for SjadamBoard {
             {
                 self.set_en_passant_square(Some(mid_sq));
             }
+
+        self.hash ^= self.castling_en_passant_key();
         
-        self.move_piece(Piece::new(piece_moved, start_color), mv.from(), mv.to());
+        self.move_piece(Piece::new(mv.piece_moved(), start_color), mv.from(), mv.to());
         
         if undo_move.capture != Empty {
             self.clear_piece_at_square(Piece::new(undo_move.capture, !start_color), mv.to());
@@ -718,14 +811,17 @@ impl EvalBoard for SjadamBoard {
             // Promote to queen
             debug_assert!(!self.is_empty(mv.to()));
             if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
-                self.clear_piece_at_square(Piece::new(piece_moved, start_color), mv.to());
+                self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
                 self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
             }
         }
         
         self.to_move = !self.to_move();
+        self.hash ^= ZOBRIST_KEYS[768];
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
+        debug_assert_eq!(self.hash, self.hash_from_scratch(),
+                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
         undo_move
     }
 
@@ -760,6 +856,7 @@ impl EvalBoard for SjadamBoard {
         
         self.half_move_clock = mv.old_half_move_clock;
         self.castling_en_passant = mv.old_castling_en_passant;
+        self.hash = mv.old_hash;
 
         self.to_move = !self.to_move();
         debug_assert_ne!(!start_color, self.to_move());

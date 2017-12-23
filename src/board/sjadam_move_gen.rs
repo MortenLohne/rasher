@@ -133,21 +133,21 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
     if color == White {
         if board.can_castle_kingside(White)
             && all_pieces.rank(7) & 0b01100000 == 0 {
-                moves.push(SjadamMove::new(Square::E1, Square::G1, true));
+                moves.push(SjadamMove::new(Square::E1, Square::G1, true, King));
             }
         if board.can_castle_queenside(White)
             && all_pieces.rank(7) & 0b1110 == 0 {
-                moves.push(SjadamMove::new(Square::E1, Square::C1, true));
+                moves.push(SjadamMove::new(Square::E1, Square::C1, true, King));
             }
     }
     else {
         if board.can_castle_kingside(Black)
             && all_pieces.rank(0) & 0b0110_0000 == 0 {
-                moves.push(SjadamMove::new(Square::E8, Square::G8, true));
+                moves.push(SjadamMove::new(Square::E8, Square::G8, true, King));
             }
         if board.can_castle_queenside(Black)
             && all_pieces.rank(0) & 0b1110 == 0 {
-                moves.push(SjadamMove::new(Square::E8, Square::C8, true));
+                moves.push(SjadamMove::new(Square::E8, Square::C8, true, King));
             }
     }
     winning_moves.append(&mut active_moves);
@@ -198,13 +198,13 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
             }
         },
         King => king_moves(sjadam_squares, friendly_pieces),
-        Empty => BitBoard::empty(),
+        Empty => panic!("Tried to generate moves for empty piece"),
     };
     
     moves.clear(square);
     while let Some(target_square) = moves.first_piece() {
         
-        let mv = SjadamMove::new(square, target_square, false);
+        let mv = SjadamMove::new(square, target_square, false, piece_type);
         if !opponent_pieces.get(target_square) {
             quiet_moves.push(mv);
         }

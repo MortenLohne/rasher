@@ -515,30 +515,42 @@ struct HashEntry<M> {
     depth: u16,
 }
 
-
 /// A transposition table for storing known positions, which only grows to a certain
 /// size in memory. 
-struct Table<B, M> {
-    hash_table: HashMap<B, HashEntry<M>>,
+struct Table<B: EvalBoard, M> {
+    hash_table: HashMap<<B as EvalBoard>::HashBoard, HashEntry<M>>,
+    //hasher: SimpleHasher,
     hits: u64, // Total hits in table
     lookups: u64, // Total lookups in table
     mem_usage: usize,
     max_memory: usize,
 }
 
-impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
-    
+impl<B: EvalBoard, M> Table<B, M> {
     #[inline(never)]
     pub fn new(max_memory: usize) -> Table<B, M> {
-        Table { hash_table: HashMap::with_capacity(6 * max_memory / (10 * Self::value_mem_usage())),
+
+        Table { hash_table: HashMap::with_capacity(
+            6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,
                 mem_usage: 0, max_memory: max_memory }
     }
 
+    pub fn clear(&mut self) {
+        self.hash_table.clear();
+        self.mem_usage = 0;
+    }
+
+    fn value_mem_usage() -> usize {
+        mem::size_of::<HashEntry<M>>() + mem::size_of::<u64>() + mem::size_of::<u64>()
+    }
+ 
     #[inline(never)]
-    pub fn get(&mut self, key: &B) -> Option<&HashEntry<M>> {
+    pub fn get(&mut self, key: &B) -> Option<&HashEntry<M>>
+        where B: EvalBoard + Eq + Hash {
         self.lookups += 1;
-        let result = self.hash_table.get(key);
+        //key.hash(&mut self.hasher);
+        let result = self.hash_table.get(&key.hash_board());
         if result.is_some() {
             self.hits += 1;
         }
@@ -546,9 +558,11 @@ impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
     }
     
     #[inline(never)]
-    pub fn insert(&mut self, key: B, value: HashEntry<M>) {
+    pub fn insert(&mut self, key: B, value: HashEntry<M>)
+        where B: EvalBoard + Eq + Hash {
         let extra_mem = Self::value_mem_usage();
-        match self.hash_table.entry(key) {
+        //key.hash(&mut self.hasher);
+        match self.hash_table.entry(key.hash_board()) {
             Entry::Occupied(mut entry) => *entry.get_mut() = value,
             Entry::Vacant(entry) => if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
                 self.mem_usage += extra_mem;
@@ -558,20 +572,13 @@ impl<B: EvalBoard + Eq + Hash, M> Table<B, M> {
     }
 
     #[allow(dead_code)]
-    pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>> {
-        self.hash_table.remove(key).map(|value| {
+    pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>>
+        where B: EvalBoard + Eq + Hash {
+        //key.hash(&mut self.hasher);
+        self.hash_table.remove(&key.hash_board()).map(|value| {
             self.mem_usage -= Self::value_mem_usage();
             value
         })
-    }
-
-    pub fn clear(&mut self) {
-        self.hash_table.clear();
-        self.mem_usage = 0;
-    }
-
-    fn value_mem_usage() -> usize {
-        mem::size_of::<HashEntry<M>>() + mem::size_of::<B>() + mem::size_of::<u64>()
     }
 }
 

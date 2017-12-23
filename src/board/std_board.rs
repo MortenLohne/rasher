@@ -514,6 +514,7 @@ impl EvalBoard for ChessBoard {
 
     type Move = std_move::ChessMove;
     type UndoMove = std_move::ChessUndoMove;
+    type HashBoard = Self;
     
     fn to_move(&self) -> Color {
         self.to_move
@@ -523,6 +524,10 @@ impl EvalBoard for ChessBoard {
         move_gen::all_legal_moves(self)
     }
 
+    fn hash_board(&self) -> Self {
+        self.clone()
+    }
+    
     fn game_result(&self) -> Option<board::GameResult> {
         if self.half_move_clock > 50 {
             return Some(board::GameResult::Draw);

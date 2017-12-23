@@ -55,14 +55,11 @@ impl PartialEq for CrazyhouseBoard {
 impl EvalBoard for CrazyhouseBoard {
 
     type Move = CrazyhouseMove;
-    type UndoMove = CrazyhouseUndoMove;    
+    type UndoMove = CrazyhouseUndoMove;
+    type HashBoard = Self;
     
     fn to_move(&self) -> Color {
         self.base_board.to_move()
-    }
-
-    fn game_result(&self) -> Option<board::GameResult> {
-        self.base_board.game_result()
     }
     
     fn start_board() -> Self {
@@ -70,6 +67,14 @@ impl EvalBoard for CrazyhouseBoard {
                          white_available_pieces: vec![],
                          black_available_pieces: vec![],
                          crazyhouse_moves: vec![]}
+    }
+
+    fn hash_board(&self) -> Self {
+        self.clone()
+    }
+
+    fn game_result(&self) -> Option<board::GameResult> {
+        self.base_board.game_result()
     }
 
     fn eval_board(&self) -> f32 {

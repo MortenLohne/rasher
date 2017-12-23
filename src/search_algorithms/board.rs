@@ -1,6 +1,8 @@
 use std::ops;
 use std::fmt;
 use self::Color::*;
+use std::hash;
+
 use rand;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -55,11 +57,14 @@ impl ops::Not for GameResult {
 pub trait EvalBoard : PartialEq + Clone {
     type Move : Clone + fmt::Debug + PartialEq + Eq;
     type UndoMove : Clone + fmt::Debug;
+    // A representation of the board that can be hashed. Can be Self, or unit if no hasing is desired.
+    type HashBoard : hash::Hash + Eq;
 
     /// Returns whose turn it is
     fn to_move(&self) -> Color;
 
     fn do_move(&mut self, Self::Move) -> Self::UndoMove;
+    
     fn undo_move(&mut self, Self::UndoMove);
 
     fn start_board() -> Self;
@@ -78,6 +83,8 @@ pub trait EvalBoard : PartialEq + Clone {
     
     fn eval_board(&self) -> f32;
 
+    fn hash_board(&self) -> Self::HashBoard;
+    
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
         let moves = self.all_legal_moves();
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
