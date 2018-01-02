@@ -360,17 +360,17 @@ impl UciBoard for ChessBoard {
 
         let mut board = ChessBoard { board: [[Piece::empty(); 8]; 8], to_move: White,
                                      castling_en_passant: 15, half_move_clock: 0, move_num: 0 };
-        board.board = try!(parse_fen_board(fen_split[0]));
+        board.board = parse_fen_board(fen_split[0])?;
         
         if fen_split[1].len() != 1 {
             return Err("Invalid FEN string: Error in side to move-field".to_string());
         }
 
         // Check side to move
-        board.to_move = try!(parse_fen_to_move(fen_split[1]));
+        board.to_move = parse_fen_to_move(fen_split[1])?;
 
         // Check castling rights field
-        try!(parse_fen_castling_rights(fen_split[2], &mut board));
+        parse_fen_castling_rights(fen_split[2], &mut board)?;
 
         // Check en passant field
         if fen_split[3] != "-" {
@@ -382,8 +382,8 @@ impl UciBoard for ChessBoard {
 
         let (half_clock, move_num) : (u8, u16) =
             if fen_split.len() > 4 {
-                (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
-                 try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
+                (fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")?,
+                 fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")?)
             }
         else {
             (0, 0)
@@ -391,6 +391,18 @@ impl UciBoard for ChessBoard {
 
         board.half_move_clock = half_clock;
         board.move_num = move_num;
+
+        if (board.can_castle_kingside(White) || board.can_castle_queenside(White))
+            && board[Square::E1] != Piece::new(King, White) {
+            return Err("FEN string has white castling rights, but white's king is not on e1"
+                       .to_string());
+            }
+
+        if (board.can_castle_kingside(Black) || board.can_castle_queenside(Black))
+            && board[Square::E8] != Piece::new(King, Black) {
+            return Err("FEN string has black castling rights, but black's king is not on e8"
+                       .to_string());
+        }
     
         Ok(board)
     }
