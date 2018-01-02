@@ -159,11 +159,10 @@ fn main() {
                             
                             "sjadam" => {
                                 let mut tree = OpeningTree::new_root();
-                                let root_eval = tree.eval(4, SjadamBoard::start_board());
-                                println!("Size before pruning: {}", tree.size());
-                                tree.prune(&mut SjadamBoard::start_board(), &mut HashSet::new());
-                                println!("Size after pruning: {}", tree.size());
-                                println!("Eval: {:?}", root_eval);
+                                let mut board = SjadamBoard::start_board();
+                                let root_eval = tree.eval(3, board.clone());
+                                tree.sort_tree(&mut board);
+                                
                                 for child in tree.children.as_ref().unwrap_or(&vec![]) {
 
                                     println!("Child eval for {:?}: {}",
@@ -174,8 +173,11 @@ fn main() {
                                                  grandchild.mv, grandchild.eval);
                                     }
                                 }
-                                tree.print_opening(&mut SjadamBoard::start_board(),
-                                                   &mut vec![]);
+                                println!("Size before pruning: {}", tree.size());
+                                tree.prune(&mut board, &mut HashSet::new());
+                                println!("Size after pruning: {}", tree.size());
+                                println!("Eval: {:?}", root_eval);
+                                tree.print_opening(&mut board, &mut vec![]);
 
                             },
                             
