@@ -14,7 +14,7 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
 use std::time;
-
+ 
 pub trait UciBoard: board::EvalBoard {
     fn from_fen(&str) -> Result<Self, String>;
     fn to_fen(&self) -> String;
@@ -291,8 +291,7 @@ pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>
 }
 
 #[allow(dead_code)]
-pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>,
-                                multipv: u32)
+pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
                              -> Result<Vec<(Score, String)>, (Option<Vec<(Score, String)>>, String)> {
     let mut last_info = None;
     loop { // The channel will return error when closed
@@ -311,11 +310,6 @@ pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciIn
                             (score, pv_string)
                         })
                         .collect::<Vec<_>>();
-                    if results.len() as u32 != multipv {
-                        return Err((Some(results.clone()),
-                                    format!("Engine returned {} moves, expected {}",
-                                            results.len() as u32, multipv)))
-                    }
                     if let Err(err) = handle.join() {
                         return Err((Some(results), format!("{:?}", err)))
                     }

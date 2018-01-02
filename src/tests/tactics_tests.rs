@@ -83,7 +83,7 @@ fn multipv_mates_test() {
         board.clone(), uci::TimeRestriction::Mate(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv(handle, channel, 4).unwrap();
+    let results = uci::get_uci_multipv(handle, channel).unwrap();
     assert_eq!(results[0].0.to_string(), "mate 1");
     assert_eq!(results[1].0.to_string(), "mate 2");
     assert_eq!(results[2].0.to_string(), "mate 3");
@@ -101,7 +101,7 @@ fn multipv_mates_test_long() {
         board.clone(), uci::TimeRestriction::Mate(7),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv(handle, channel, 6).unwrap();
+    let results = uci::get_uci_multipv(handle, channel).unwrap();
     assert_eq!(results[0].0.to_string(), "mate 1");
     assert_eq!(results[1].0.to_string(), "mate 2");
     assert_eq!(results[2].0.to_string(), "mate 3");
@@ -119,7 +119,7 @@ fn multipv_mates_test2() {
         board.clone(), uci::TimeRestriction::Mate(5),
         options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let results = uci::get_uci_multipv(handle, channel, 4).unwrap();
+    let results = uci::get_uci_multipv(handle, channel).unwrap();
     assert_eq!(results[0].0.to_string(), "mate -1");
     assert_eq!(results[1].0.to_string(), "mate -2");
     assert_eq!(results[2].0.to_string(), "mate -3");
