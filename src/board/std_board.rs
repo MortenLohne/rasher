@@ -8,7 +8,6 @@ use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use ::uci::UciBoard;
 
-use std::ascii::AsciiExt;
 use std::ops;
 use std::fmt;
 use std::fmt::Write;
