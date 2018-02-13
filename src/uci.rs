@@ -3,6 +3,7 @@ use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use search_algorithms::board;
+use search_algorithms::board::Color::*;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
@@ -14,6 +15,7 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
 use std::time;
+use std::hash::Hash;
  
 pub trait UciBoard: board::EvalBoard {
     fn from_fen(&str) -> Result<Self, String>;
@@ -245,6 +247,22 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 });
                 search_thread = Some(handle);
+            }
+            "eval_game" => {
+                match engine_options.variant {
+                    ChessVariant::Standard => {
+                        let board = parse_position::<ChessBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                    ChessVariant::Sjadam => {
+                        let board = parse_position::<SjadamBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                    ChessVariant::Crazyhouse => {
+                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                };
             }
             "sjadam" => engine_options.variant = ChessVariant::Sjadam,
             "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
@@ -522,6 +540,64 @@ pub fn parse_go (input : &str)
                               white_inc: white_inc.unwrap(), black_inc: black_inc.unwrap(),
                               moves_to_go: moves_to_go.map(|v| v as u16 )};
     Ok((TimeRestriction::GameTime(time_info), None))
+}
+
+pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
+    where Board: 'static + UciBoard + fmt::Debug + Send + Hash + Eq,
+<Board as board::EvalBoard>::Move: Send + Sync
+{
+
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+        EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
+        None);
+
+
+    let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
+    let mut last_eval = eval;
+    let mut last_correct_move = pv_str.split_whitespace()
+        .next()
+        .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
+    
+    for mv_str in moves {
+        let mv = board.from_alg(mv_str).unwrap();
+        assert!(board.all_legal_moves().contains(&mv));
+
+        board.do_move(mv.clone());
+        
+        let (handle, channel) = alpha_beta::start_uci_search(
+            board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+            EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
+            None);
+
+        let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
+                
+        let best_move = pv_str.split_whitespace()
+            .next()
+            .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
+        let delta_score = match board.to_move() {
+            White => eval.to_cp() - last_eval.to_cp(),
+            Black => last_eval.to_cp() - eval.to_cp(),
+        };
+        
+        if best_move != mv && delta_score > 0 {
+            let verdict = match delta_score {
+                0 ... 100 => "Inaccuracy",
+                100 ... 300 => "Mistake",
+                _ => "Blunder",
+            };
+            println!("{} ({}): {}, {} was better. ({} vs {}, delta={})",
+                     mv_str, !board.to_move(), verdict,
+                     board.to_alg(&last_correct_move), eval, last_eval, delta_score);
+        }
+        
+        else {
+            println!("{} ({}): {}", mv_str, board.to_move(), eval);
+        }
+        
+        last_eval = eval;
+        last_correct_move = best_move;
+    }
 }
 
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it

@@ -599,7 +599,8 @@ impl UciBoard for SjadamBoard {
         }
         let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
         let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
-        debug_assert!(!self.get_square(from).is_empty());
+        debug_assert!(!self.get_square(from).is_empty(), "Cannot parse move {} on \n{:?}",
+                      input, self);
         match input.len() {
             4 => Ok(SjadamMove::new(from, to, false,
                                     self.get_square(from).piece_type())),
