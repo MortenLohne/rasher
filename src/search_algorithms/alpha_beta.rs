@@ -490,7 +490,7 @@ pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
         _ => increment_score(best_score),
     }
 }
-    
+
 fn increment_score(score: Score) -> Score {
     match score {
         BlackWin(i) => BlackWin(i + 1),

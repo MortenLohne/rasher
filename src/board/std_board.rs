@@ -532,7 +532,14 @@ impl EvalBoard for ChessBoard {
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
-        move_gen::all_legal_moves(self)
+        let (mut active_moves, mut quiet_moves) = move_gen::all_legal_moves(self);
+        active_moves.append(&mut quiet_moves);
+        active_moves
+    }
+
+    fn active_moves(&self) -> Vec<Self::Move> {
+        let (active_moves, _) = move_gen::all_legal_moves(self);
+        active_moves
     }
 
     fn hash_board(&self) -> Self {
