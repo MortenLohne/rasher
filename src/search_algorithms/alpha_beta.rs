@@ -200,20 +200,25 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 }
             }
             // If we've spent more than half of our time, abort immediately
-            if let uci::TimeRestriction::GameTime(info) = time_restriction {
-
-                let time_taken = time::Instant::now() - start_time;
-                let time_left = match board.to_move() {
-                    White => info.white_time,
-                    Black => info.black_time,
-                };
+            match time_restriction {
+                Nodes(n) if node_counter.total() > n
+                    => return None,
+                GameTime(info) => {
                 
-                if time_taken > time_left / 2 {
-                    return None;
+                    let time_taken = time::Instant::now() - start_time;
+                    let time_left = match board.to_move() {
+                    White => info.white_time,
+                        Black => info.black_time,
+                    };
+                    
+                    if time_taken > time_left / 2 {
+                        return None;
+                    }
                 }
+                _ => (),
             }
         }
-        
+            
         match board.game_result() {
             Some(GameResult::WhiteWin) => return Some((WhiteWin(0), vec![])),
             Some(GameResult::BlackWin) => return Some((BlackWin(0), vec![])),
@@ -246,12 +251,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 
                 for mv in active_moves {
                     let undo_move = board.do_move(mv.clone());
-
-                    let new_alpha = decrement_score(alpha);
-                    let new_beta = decrement_score(beta);
                     
                     let (score, best_moves) = find_best_move_ab_rec(
-                        board, depth, new_alpha, new_beta,
+                        board, depth, decrement_score(alpha), decrement_score(beta),
                         engine_comm, time_restriction, options,
                         start_time, node_counter, None, table)?;
                     
@@ -290,19 +292,11 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             });
             return Some((score, best_line));  
         }
-            
-        else {
-            node_counter.intern += 1;
-        }
-
         debug_assert!(depth > 0);
-        let mut best_score = None;
         
-        if let Nodes(n) = time_restriction {
-            if node_counter.total() > n {
-                return None;
-            }
-        }
+        node_counter.intern += 1;
+
+        let mut best_score = None;
     
         let mut legal_moves = if move_list.is_some() {
             move_list.take().unwrap()
@@ -312,27 +306,27 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         };
         
         // If there is mate or stalemate on the board, we should already have returned
-        assert!(!legal_moves.is_empty(), "Found 0 legal moves, but game result was {:?} on \n{:?}",
-                board.game_result(), board);
+        debug_assert!(!legal_moves.is_empty(),
+                       "Found 0 legal moves, but game result was {:?} on \n{:?}",
+                       board.game_result(), board);
+        
         if let Some(mv) = first_candidate {
-            // Process candidate move first for better pruning
+            // Process hash move first for better pruning
             if let Some(position) = legal_moves.iter().position(|e| *e == mv) {
                 legal_moves.swap(0, position);
             }
         }
-        debug_assert!(!legal_moves.is_empty());
 
         let old_eval = board.eval_board();
-        let mut move_searched = false; // ensure at least one move gets searched in zugswang
+        let mut move_searched = false; // ensure not all moves are pruned as null moves
         
         for c_move in legal_moves {
-            // Score is greater than the minimizer will ever allow OR
-            // Score is lower than the maximizer will ever allow
             
             let old_board = board.clone();
-            let undo_move : <B as EvalBoard>::UndoMove = board.do_move(c_move.clone());
+            let undo_move = board.do_move(c_move.clone());
 
             match (alpha, beta, color) {
+                // Do null-move pruning
                 // Do not prune if you are getting mated
                 (_, Score::WhiteWin(_), Black) |
                 (Score::BlackWin(_), _, White) => (),
@@ -350,20 +344,17 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 _ => (),
             }
             move_searched = true;
-            
-            let new_alpha = decrement_score(alpha);
-            let new_beta = decrement_score(beta);
-
 
             let (tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
-                                      new_alpha, new_beta,
+                                      decrement_score(alpha), decrement_score(beta),
                                       engine_comm, time_restriction, options,
                                       start_time, node_counter, None, table)?;
             board.undo_move(undo_move);
             debug_assert_eq!(board, &old_board,
                              "Failed to restore board after move {:?}", c_move);
-            if best_score.is_none() {
+            
+            if best_score.is_none() { // For the first searched move
                 best_score = Some(tried_score);
                 best_line = tried_line.clone();
                 best_line.push(c_move.clone());
