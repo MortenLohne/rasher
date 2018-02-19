@@ -82,7 +82,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 
             if let Some((score, moves, node_count)) =
             // If all moves are preserved, send None to the function
-            // This means the root position will still be hashed correctly
+                // This means the root position will still be hashed correctly
                 if moves_to_search.len() == board.all_legal_moves().len() {
                     find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                       options, start_time, None, &mut table)
@@ -107,7 +107,6 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                                   mv, moves, pv_board, board);
                     pv_board.do_move(mv.clone());
                 }
-
                 pv_moves.push(moves[0].clone());
                 pvs.push((score, pv_str));
                 total_node_count = total_node_count + node_count;
@@ -179,8 +178,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
             = table.get(board) {
-                if entry_depth >= depth && (
-                    ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
+                if entry_depth >= depth
+                    && (ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
                 {
                     return Some((score, best_reply.iter().cloned().collect()))
                 }
@@ -399,6 +398,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                               time_restriction, options, start_time,
                               &mut node_counter, move_list, table)
     {
+        debug_assert!(!moves.is_empty(),
+                      "Found empty pv at depth {}, score was {:?}",
+                      depth, score);
         moves.reverse();
         Some((score, moves, node_counter))
     }

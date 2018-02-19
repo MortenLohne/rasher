@@ -547,7 +547,7 @@ impl EvalBoard for ChessBoard {
     }
     
     fn game_result(&self) -> Option<board::GameResult> {
-        if self.half_move_clock > 50 {
+        if self.half_move_clock > 100 {
             return Some(board::GameResult::Draw);
         }
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
