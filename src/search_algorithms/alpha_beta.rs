@@ -10,10 +10,12 @@ use std::collections::hash_map::Entry;
 use std::hash::Hash;
 use std::cmp::Ordering;
 use std::f32;
+use std::ops;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
+use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use self::Score::*;
 use std::thread;
@@ -122,7 +124,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         let uci_info = uci::UciInfo {
             depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total(),
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
-            pvs: pvs };
+            pvs: pvs, color: board.to_move() };
         channel.send(uci_info).unwrap();
         
         match time_restriction {
@@ -172,7 +174,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                  -> Option<(Score, Vec<B::Move>)>
         where B: UciBoard + fmt::Debug + Hash + Eq
     {
-        debug_assert!(alpha <= beta, "alpha={}, beta={}, depth={}, board:\n{:?}",
+        debug_assert!(alpha <= beta, "alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board); 
         use uci::TimeRestriction::*;
         let first_candidate =
@@ -217,12 +219,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 _ => (),
             }
         }
-            
-        match board.game_result() {
-            Some(GameResult::WhiteWin) => return Some((WhiteWin(0), vec![])),
-            Some(GameResult::BlackWin) => return Some((BlackWin(0), vec![])),
-            Some(GameResult::Draw) => return Some((Draw(0), vec![])),
-            None => (),
+
+        if let Some(result) = board.game_result() {
+            return Some((Score::from_game_result(result, board.to_move()), Vec::new()))
         }
 
         // Helpful alias
@@ -235,16 +234,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 return Some((Val(board.eval_board()), vec![]));
             }
 
+            return Some((Val(board.eval_board()), vec![]));
+            
             // Do quiescence search
             node_counter.intern += 1;
 
-            let mut tried_score = Val(board.eval_board());
+            let mut tried_score = Val(board.eval_board() * color.multiplier() as f32);
 
-            match color {
-                White => alpha = alpha.max(tried_score),
-                Black => beta = beta.min(tried_score),
-            }
-            
+            alpha = alpha.max(tried_score);
+
             if alpha < beta {
                 let active_moves = board.active_moves();
                 
@@ -252,7 +250,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     let undo_move = board.do_move(mv.clone());
                     
                     let (score, best_moves) = find_best_move_ab_rec(
-                        board, depth, decrement_score(alpha), decrement_score(beta),
+                        board, depth, !decrement_score(beta), !decrement_score(alpha),
                         engine_comm, time_restriction, options,
                         start_time, node_counter, None, table)?;
                     
@@ -260,17 +258,13 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     if (color == Black && score < tried_score)
                         || (color == White && score > tried_score)
                     {
-                        tried_score = score;
+                        tried_score = !score;
                         best_line = best_moves;
                         best_line.push(mv.clone());
                     }
 
-                    if color == White && score > alpha {
-                        alpha = score;
-                    }
-                    
-                    else if color == Black && score < beta {
-                        beta = score;
+                    if color == White && !score > alpha {
+                        alpha = !score;
                     }
                     
                     if alpha >= beta {
@@ -324,18 +318,17 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             let old_board = board.clone();
             let undo_move = board.do_move(c_move.clone());
 
-            match (alpha, beta, color) {
+            match alpha {
                 // Do null-move pruning
                 // Do not prune if you are getting mated
-                (_, Score::WhiteWin(_), Black) |
-                (Score::BlackWin(_), _, White) => (),
+                // TODO: Verify sanity
+                Loss(_) => (),
                 _ if depth < 3 && options.null_move_pruning
                     && move_searched && !board.game_result().is_some() =>
                 {
                     let eval = board.eval_board();
                     if color == White && eval < old_eval
-                        || color == Black && eval > old_eval
-                    {
+                    || color == Black && eval < old_eval {
                         board.undo_move(undo_move);
                         continue;
                     }
@@ -344,11 +337,14 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             }
             move_searched = true;
 
-            let (tried_score, tried_line) =
+            let (mut tried_score, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
-                                      decrement_score(alpha), decrement_score(beta),
+                                      !decrement_score(beta), !decrement_score(alpha),
                                       engine_comm, time_restriction, options,
                                       start_time, node_counter, None, table)?;
+
+            tried_score = !tried_score;
+            
             board.undo_move(undo_move);
             debug_assert_eq!(board, &old_board,
                              "Failed to restore board after move {:?}", c_move);
@@ -358,14 +354,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 best_line = tried_line.clone();
                 best_line.push(c_move.clone());
             }
-            if color == White && tried_score > alpha {
+            if tried_score > alpha {
                 alpha = tried_score;
-                best_line = tried_line;
-                best_line.push(c_move.clone());
-                best_score = Some(tried_score);
-            }
-            else if color == Black && tried_score < beta {
-                beta = tried_score;
                 best_line = tried_line;
                 best_line.push(c_move.clone());
                 best_score = Some(tried_score);
@@ -394,7 +384,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     };
     let mut node_counter = NodeCount::new();
     if let Some((score, mut moves)) =
-        find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0), engine_comm,
+        find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
                               time_restriction, options, start_time,
                               &mut node_counter, move_list, table)
     {
@@ -408,7 +398,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         None
     }
 }
-
+/*
 #[inline(never)]
 pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
                         mut alpha: Score, mut beta: Score) -> Score
@@ -483,11 +473,12 @@ pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
         _ => increment_score(best_score),
     }
 }
+ */
 
 fn increment_score(score: Score) -> Score {
     match score {
-        BlackWin(i) => BlackWin(i + 1),
-        WhiteWin(i) => WhiteWin(i + 1),
+        Loss(i) => Loss(i + 1),
+        Win(i) => Win(i + 1),
         Draw(i) => Draw(i + 1),
         Val(n) => Val(n),
     }
@@ -495,8 +486,8 @@ fn increment_score(score: Score) -> Score {
 
 fn decrement_score(score: Score) -> Score {
     match score {
-        BlackWin(i) => BlackWin(u16::saturating_sub(i, 1)),
-        WhiteWin(i) => WhiteWin(u16::saturating_sub(i, 1)),
+        Loss(i) => Loss(u16::saturating_sub(i, 1)),
+        Win(i) => Win(u16::saturating_sub(i, 1)),
         Draw(i) => Draw(u16::saturating_sub(i, 1)),
         Val(n) => Val(n),
     }
@@ -576,40 +567,66 @@ impl<B: EvalBoard, M> Table<B, M> {
 }
 
 /// The evaluation of a position. May be extact (A player wins in n moves) or an approximate evaluation. 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Score {
     Val(f32),
     Draw(u16),
-    WhiteWin(u16),
-    BlackWin(u16),
+    Win(u16),
+    Loss(u16),
 }
 
 impl Score {
-    pub fn from_game_result(result: GameResult) -> Self {
-        match result {
-            GameResult::WhiteWin => WhiteWin(0),
-            GameResult::BlackWin => BlackWin(0),
-            GameResult::Draw => Draw(0),
+    pub fn from_game_result(result: GameResult, to_move: Color) -> Self {
+        match (result, to_move) {
+            (GameResult::WhiteWin, White) => Win(0),
+            (GameResult::WhiteWin, Black) => Loss(0),
+            (GameResult::BlackWin, Black) => Win(0),
+            (GameResult::BlackWin, White) => Loss(0),
+            (GameResult::Draw, _) => Draw(0),
         }
     }
     #[allow(dead_code)]
-    pub fn to_cp(self) -> i16 {
+    pub fn to_cp(self, to_move: Color) -> i16 {
         match self {
-            Val(val) => (val * 100.0) as i16,
+            Val(val) => (val * 100.0) as i16 * to_move.multiplier() as i16,
             Draw(_) => 0,
-            WhiteWin(n) => 12_000 - n as i16,
-            BlackWin(n) => -12_000 + n as i16,
+            Win(n) => (12_000 - n as i16) * to_move.multiplier() as i16,
+            Loss(n) => (-12_000 + n as i16) * to_move.multiplier() as i16,
+        }
+    }
+
+    pub fn uci_string(mut self, to_move: Color) -> String {
+        if to_move == Black {
+            self = !self;
+        }
+        match self {
+            Val(f) => format!("cp {}", (100.0 * f) as i16),
+            Win(n) => format!("mate {}", (1 + n as i16) / 2),
+            Loss(n) => format!("mate -{}", (1 + n as i16) / 2),
+            Draw(_) => format!("0"),
         }
     }
 }
 
+impl ops::Not for Score {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Val(val) => Val(-val),
+            Draw(n) => Draw(n),
+            Win(n) => Loss(n),
+            Loss(n) => Win(n),
+        }
+    }
+}
+/*
 impl fmt::Display for Score {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            Score::Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
-            Score::WhiteWin(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
-            Score::BlackWin(n) => write!(fmt, "mate {}", -(1 + n as i16) / 2),
-            Score::Draw(_) => write!(fmt, "0"),
+            Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
+            Win(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
+            Loss(n) => write!(fmt, "mate {}", -(1 + n as i16) / 2),
+            Draw(_) => write!(fmt, "0"),
         }
     }
 }
@@ -619,25 +636,25 @@ impl fmt::Debug for Score {
         fmt::Display::fmt(self, fmt)
     }
 }
-
+*/
 impl PartialOrd for Score {
     fn partial_cmp (&self, other: &Score) -> Option<cmp::Ordering> {
         match (*self, *other) {
-            (WhiteWin(n1), WhiteWin(n2)) => Some((&n2).cmp(&n1)),
-            (WhiteWin(_), _) => Some(Ordering::Greater),
+            (Win(n1), Win(n2)) => Some((&n2).cmp(&n1)),
+            (Win(_), _) => Some(Ordering::Greater),
             
-            (Val(_), WhiteWin(_)) => Some(Ordering::Less),
-            (Val(_), BlackWin(_)) => Some(Ordering::Greater),
+            (Val(_), Win(_)) => Some(Ordering::Less),
+            (Val(_), Loss(_)) => Some(Ordering::Greater),
             (Val(n1), Val(n2)) => (&n1).partial_cmp(&n2),
             (Val(n1), Draw(_)) => (&n1).partial_cmp(&0.0),
 
             (Draw(_), Val(n1)) => (&0.0).partial_cmp(&n1),
             (Draw(_), Draw(_)) => Some(Ordering::Equal),
-            (Draw(_), WhiteWin(_)) => Some(Ordering::Less),
-            (Draw(_), BlackWin(_)) => Some(Ordering::Greater),
+            (Draw(_), Win(_)) => Some(Ordering::Less),
+            (Draw(_), Loss(_)) => Some(Ordering::Greater),
             
-            (BlackWin(n1), BlackWin(n2)) => Some(n1.cmp(&n2)),
-            (BlackWin(_), _) => Some(Ordering::Less),
+            (Loss(n1), Loss(n2)) => Some(n1.cmp(&n2)),
+            (Loss(_), _) => Some(Ordering::Less),
             
         }
     }

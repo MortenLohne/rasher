@@ -34,6 +34,10 @@ impl Color {
     pub fn disc(self) -> usize {
         self as u16 as usize
     }
+
+    pub fn multiplier(self) -> isize {
+        self as u16 as isize * 2 - 1
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]

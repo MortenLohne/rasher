@@ -8,7 +8,6 @@ use super::super::board::std_move_gen::move_gen;
 
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::{Black, White};
-use search_algorithms::alpha_beta::Score::{Val, BlackWin, WhiteWin};
 
 use tests::tactics_tests::basic_tactics_prop;
 
@@ -39,16 +38,6 @@ fn test_piece_at () {
 fn test_square () {
     assert_eq!(Square::from_alg("a3").unwrap(), Square::from_ints(0, 5));
     assert_eq!(Square::from_alg("e1").unwrap(), Square::from_ints(4, 7));
-}
-
-#[test]
-fn test_score () {
-    assert!(Val(0.0) > Val(-1.0));
-    assert!(WhiteWin(2) >= Val(100.0));
-    assert!(WhiteWin(3) < WhiteWin(2));
-    assert!(BlackWin(2) <= BlackWin(3));
-    assert!(BlackWin(3) <= BlackWin(3));
-    assert!(BlackWin(2) <= WhiteWin(2));
 }
 
 #[test]

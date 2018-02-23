@@ -193,7 +193,8 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         board.undo_move(undo_move);
     }
     let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken as i64,
-                                  nodes: mc_tree.searches, hashfull: 0.0, pvs: pvs };
+                                  nodes: mc_tree.searches, hashfull: 0.0, pvs: pvs,
+                                  color: board.to_move() };
     channel.send(uci_info).unwrap();
 }
 
