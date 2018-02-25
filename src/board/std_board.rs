@@ -644,6 +644,7 @@ impl EvalBoard for ChessBoard {
         
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).piece_type()) {
+            (Pawn, _) => self.half_move_clock = 0,
             (_, Empty) => self.half_move_clock += 1,
             (_, _) => self.half_move_clock = 0,
         }
