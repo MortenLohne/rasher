@@ -231,11 +231,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         if depth == 0 {
             
             if let Mate(_) = time_restriction {
-                return Some((Val(board.eval_board()), vec![]));
+                return Some((Val(board.eval_board() * color.multiplier() as f32), vec![]));
             }
 
-            return Some((Val(board.eval_board()), vec![]));
-            
             // Do quiescence search
             node_counter.intern += 1;
 

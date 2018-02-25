@@ -36,7 +36,7 @@ impl Color {
     }
 
     pub fn multiplier(self) -> isize {
-        self as u16 as isize * 2 - 1
+        self as u16 as isize * -2 + 1
     }
 }
 
