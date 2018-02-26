@@ -172,6 +172,13 @@ fn king_in_check_test() {
 }
 
 #[test]
+fn capture_from_check() {
+    let board = ChessBoard::from_fen("7Q/5p1k/P5p1/5p2/7q/K7/8/8 b - - 1 41").unwrap();
+    let moves = board.all_legal_moves();
+    assert_eq!(moves, vec![board.from_alg("h7h8").unwrap()]);
+}
+
+#[test]
 fn castling_test () {
     // Checks that white kingside castle works
     let board1 = ChessBoard::from_fen("5k1r/6pp/4Q3/8/8/8/8/4K2R w K - 0 1").unwrap();
@@ -390,19 +397,19 @@ pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n
 }
 
 #[allow(dead_code)]
-    pub fn perf_prop<B: EvalBoard + Eq + fmt::Debug>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
+pub fn perf_prop<B: EvalBoard + Eq + fmt::Debug>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
     where <B as EvalBoard>::Move: fmt::Display
 {
-        let mut results = vec![];
-        let old_board = board.clone();
+    let mut results = vec![];
+    let old_board = board.clone();
     for c_move in board.all_legal_moves() {
         let undo_move = board.do_move(c_move.clone());
         results.push((c_move.clone(), legal_moves_after_plies(board, n - 1)));
         board.undo_move(undo_move);
         debug_assert_eq!(old_board, *board,
-                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
-                             c_move, old_board, board);
+                         "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
+                         c_move, old_board, board);
     }
     results
 }
-    
+

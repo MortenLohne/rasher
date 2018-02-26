@@ -397,16 +397,16 @@ pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : 
 /// Returns whether a square is under attack by the side not to move
 #[inline(never)]
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
+    
     // Direction enemy pawns are coming from
-    let pawn_direction = if board.to_move == White { -1 } else { 1 };
-    let pos = square.0 as i8;
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
-
-    if file > 0 && (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6)
+    let pawn_direction : i8 = if board.to_move == White { -1 } else { 1 };
+    let file = square.file() as i8;
+    let rank = square.rank() as i8;
+    
+    if file > 0 && ((board.to_move() == White && rank > 1) || (board.to_move() == Black && rank < 6))
     {
-        let pawn_square = Square((pos + pawn_direction * 8) as u8 - 1);
-        
+        let pawn_square = Square::from_ints(file as u8 - 1, (rank as i8 + pawn_direction) as u8);
+
         if board[pawn_square].piece_type() == Pawn
             && board[pawn_square].color().unwrap() != board.to_move
         {
@@ -414,10 +414,11 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
         }
     }
     
-    if file < 7 && (board.to_move == White && rank > 1) || (board.to_move == Black && rank < 6)
+    if file < 7 && ((board.to_move() == White && rank > 1) || (board.to_move() == Black && rank < 6))
     {
-        let pawn_square = Square((pos + pawn_direction * 8) as u8 + 1);
         
+        let pawn_square = Square::from_ints(file as u8 + 1, (rank as i8 + pawn_direction) as u8);
+
         if board[pawn_square].piece_type() == Pawn
             && board[pawn_square].color().unwrap() != board.to_move
         {
@@ -426,7 +427,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     }
     
 
-    for &(i, j) in& [(0, 1), (1, 0), (0, -1), (-1, 0)] {
+    for &(i, j) in &[(0, 1), (1, 0), (0, -1), (-1, 0)] {
         if check_threats_in_direction (i, j, board, square, &[Queen, Rook]) {
             return true;
         }
@@ -438,7 +439,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     }
     
     for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                    (1, -2), (1, 2), (2, -1), (2, 1)] {
+                     (1, -2), (1, 2), (2, -1), (2, 1)] {
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
@@ -446,8 +447,8 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 
         if board[new_pos].piece_type() == Knight
             && board[new_pos].color().unwrap() != board.to_move {
-            return true;
-        }
+                return true;
+            }
     }
     for i in -1..2 {
         for j in -1..2 {
@@ -460,8 +461,8 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             // Check that there is no enemy king around
             if board[new_pos].piece_type() == King
                 && board[new_pos].color().unwrap() != board.to_move {
-                return true;
-            }
+                    return true;
+                }
         }
     }
     false
