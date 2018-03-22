@@ -70,8 +70,8 @@ pub fn legal_moves_for_piece(board: &mut ChessBoard, square: Square,
 #[inline(never)]
 fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut Vec<ChessMove>) {
     
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
+    let file = square.file() as i8;
+    let rank = square.rank() as i8;
     // If the king and the two castling squares are not in check, castling is allowed
     // There must be no pieces between the castling pieces
 
@@ -129,17 +129,17 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
             let new_pos = Square(((rank + j) * 8 + file + i) as u8);
 
             // Check that the square is not occupied by a friendly piece
-            let c_move = ChessMove::new(square, new_pos);
+            let mv = ChessMove::new(square, new_pos);
             if board[new_pos].is_empty() {
                 let old_piece = board[square];
                 board[square] = Piece::empty();
                 if !is_attacked(board, new_pos) {
-                    moves.push(c_move);
+                    moves.push(mv);
                 }
                 board[square] = old_piece;
             }
             else if board[new_pos].color().unwrap() != board.to_move {
-                add_if_legal_simple(board, c_move, moves);
+                add_if_legal_simple(board, mv, moves);
             }
         }
     }
@@ -149,8 +149,8 @@ fn legal_moves_for_king(board : &mut ChessBoard, square : Square, moves : &mut V
 fn legal_moves_for_knight(board: &ChessBoard, square: Square, winning_moves: &mut Vec<ChessMove>,
                           active_moves: &mut Vec<ChessMove>, quiet_moves: &mut Vec<ChessMove>,
                           is_in_check: bool, king_pos: Square) {
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
+    let file = square.file() as i8;
+    let rank = square.rank() as i8;
     
     for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
                     (1, -2), (1, 2), (2, -1), (2, 1)] {
@@ -160,23 +160,18 @@ fn legal_moves_for_knight(board: &ChessBoard, square: Square, winning_moves: &mu
         let new_pos = Square(((rank + j) * 8 + file + i) as u8);
         
         let piece_to = board[new_pos];
-        let c_move = ChessMove::new(square, new_pos);
+        let mv = ChessMove::new(square, new_pos);
         
         if board[new_pos].color() != Some(board.to_move) {
             match piece_to.value().abs().partial_cmp(&board[square].value().abs()).unwrap() {
                 Ordering::Less =>
-                    add_if_legal(board, c_move, quiet_moves, king_pos, is_in_check),
+                    add_if_legal(board, mv, quiet_moves, king_pos, is_in_check),
                 Ordering::Equal =>
-                    add_if_legal(board, c_move, active_moves, king_pos, is_in_check),
+                    add_if_legal(board, mv, active_moves, king_pos, is_in_check),
                 Ordering::Greater =>
-                    add_if_legal(board, c_move, winning_moves, king_pos, is_in_check),
+                    add_if_legal(board, mv, winning_moves, king_pos, is_in_check),
             }
         }
-        //if piece_to.piece_type() == Empty || board[new_pos].color().unwrap() != board.to_move {
-            //println!("Knight can move to {}, onto a {} {}, on: {}",
-            //             Square(new_pos), color_to, piece_to, board);
-            
-        //}
     }
 }
 
@@ -185,12 +180,14 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
                         _active_moves: &mut Vec<ChessMove>, quiet_moves: &mut Vec<ChessMove>,
                         is_in_check: bool, king_pos: Square) {
     // Helper variables
-    let file = (square.0 & 0b0000_0111) as i8;
-    let rank = (square.0 >> 3) as i8;
+    let file = square.file() as i8;
+    let rank = square.rank() as i8;
     let pos = square.0 as i8;
+    
     let (start_rank, prom_rank, direction) =
         if board.to_move == White { (6, 1, -1) } else { (1, 6, 1) };
-    debug_assert!(rank > 0 && rank < 7);;
+    debug_assert!(rank > 0 && rank < 7);
+    
     // Checks if there are any pieces available for capture to the left,
     // including en passant capture
     if file > 0 {
@@ -198,19 +195,19 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
         if !board[take_square].is_empty() && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
                 for piece_type in &[Queen, Rook, Bishop, Knight] {
-                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
-                    add_if_legal(board, c_move,
+                    let mv = ChessMove::new_prom(square, take_square, *piece_type);
+                    add_if_legal(board, mv,
                                  winning_moves, king_pos, is_in_check);
                 }
             }
             else {
-                let c_move = ChessMove::new(square, take_square);
+                let mv = ChessMove::new(square, take_square);
                 if board[take_square].piece_type() == Pawn {
-                    add_if_legal(board, c_move, quiet_moves,
+                    add_if_legal(board, mv, quiet_moves,
                                  king_pos, is_in_check);
                 }
                 else {
-                    add_if_legal(board, c_move, winning_moves,
+                    add_if_legal(board, mv, winning_moves,
                                  king_pos, is_in_check);
                 }
             }
@@ -218,8 +215,8 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(square, take_square);
-            add_if_legal_simple(board, c_move, quiet_moves);
+            let mv = ChessMove::new(square, take_square);
+            add_if_legal_simple(board, mv, quiet_moves);
         }
     }
     // Ditto, but to the right
@@ -229,25 +226,25 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
         if piece != Empty && board[take_square].color().unwrap() != board.to_move {
             if rank == prom_rank {
                 for piece_type in &[Queen, Rook, Bishop, Knight] {
-                    let c_move = ChessMove::new_prom(square, take_square, *piece_type);
-                    add_if_legal(board, c_move, winning_moves, king_pos, is_in_check);
+                    let mv = ChessMove::new_prom(square, take_square, *piece_type);
+                    add_if_legal(board, mv, winning_moves, king_pos, is_in_check);
                 }
             }
             else {
-                let c_move = ChessMove::new(square, take_square);
+                let mv = ChessMove::new(square, take_square);
                 if board[take_square].piece_type() == Pawn {
-                    add_if_legal(board, c_move, quiet_moves, king_pos, is_in_check);
+                    add_if_legal(board, mv, quiet_moves, king_pos, is_in_check);
                 }
                 else {
-                    add_if_legal(board, c_move, winning_moves, king_pos, is_in_check);
+                    add_if_legal(board, mv, winning_moves, king_pos, is_in_check);
                 }
             }
         }
         if board.en_passant_square().is_some()
             && take_square == board.en_passant_square().unwrap()
         {
-            let c_move = ChessMove::new(square, take_square);
-            add_if_legal_simple(board, c_move, quiet_moves);
+            let mv = ChessMove::new(square, take_square);
+            add_if_legal_simple(board, mv, quiet_moves);
         }
     }
 
@@ -257,22 +254,22 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
     if board.piece_at(square_in_front).is_empty() {
         if rank == prom_rank {
             for piece_type in &[Queen, Rook, Bishop, Knight] {
-                let c_move = ChessMove::new_prom(square, square_in_front, *piece_type);
-                add_if_legal(board, c_move,
+                let mv = ChessMove::new_prom(square, square_in_front, *piece_type);
+                add_if_legal(board, mv,
                              winning_moves, king_pos, is_in_check);
             }
         }
         else {
-            let c_move = ChessMove::new(square, square_in_front);
-            add_if_legal(board, c_move, quiet_moves, king_pos,
+            let mv = ChessMove::new(square, square_in_front);
+            add_if_legal(board, mv, quiet_moves, king_pos,
                          is_in_check);
         }
         if rank == start_rank {
             let square_2_in_front = Square::from_ints(file as u8,
                                                       (rank + direction * 2) as u8);
-            let c_move = ChessMove::new(square, square_2_in_front);
+            let mv = ChessMove::new(square, square_2_in_front);
             if board.piece_at(square_2_in_front).is_empty() {
-                add_if_legal(board, c_move, quiet_moves,
+                add_if_legal(board, mv, quiet_moves,
                              king_pos, is_in_check);
             }
         }
@@ -283,15 +280,15 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
 /// , and add the move to the vector
 /// Does not work in some special cases, such as en passant. `add_if_legal_simple` should be used then
 #[inline(never)]
-fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>,
+fn add_if_legal(board : &ChessBoard, mv : ChessMove, moves : &mut Vec<ChessMove>,
                 king_pos_c : Square, is_in_check : bool) {
-    if is_in_check || is_pinned_to_piece(board, c_move.from, king_pos_c) {
-        add_if_legal_simple(board, c_move, moves);
+    if is_in_check || is_pinned_to_piece(board, mv.from, king_pos_c) {
+        add_if_legal_simple(board, mv, moves);
     }
     else {
         debug_assert!(!is_attacked(board, king_pos_c));
 
-        moves.push(c_move);
+        moves.push(mv);
     }
 }
 
@@ -299,14 +296,14 @@ fn add_if_legal(board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessM
 /// , and add the move to the vector
 /// This check is more expensive, but works for _all_ positions
 #[inline(never)]
-fn add_if_legal_simple (board : &ChessBoard, c_move : ChessMove, moves : &mut Vec<ChessMove>) {
+fn add_if_legal_simple (board : &ChessBoard, mv : ChessMove, moves : &mut Vec<ChessMove>) {
     let mut cloned = board.clone();
-    cloned.do_move(c_move);
+    cloned.do_move(mv);
 
     cloned.to_move = !cloned.to_move;
 
     if !is_attacked(&cloned, king_pos(&cloned)) {
-        moves.push(c_move);
+        moves.push(mv);
     }
 }
 
@@ -530,19 +527,19 @@ fn add_moves_in_direction (i: i8, j: i8, board: &ChessBoard, square: Square,
         let target_square = Square::from_ints(file as u8, rank as u8);
         let piece_to = board.piece_at(target_square);
 
-        let c_move = ChessMove::new(square, target_square);
+        let mv = ChessMove::new(square, target_square);
         if piece_to.is_empty() {
-            add_if_legal(board, c_move, quiet_moves, king_pos, is_in_check);
+            add_if_legal(board, mv, quiet_moves, king_pos, is_in_check);
         }
         else {
             if piece_to.color().unwrap() != board.to_move {
                 match piece_to.value().abs().partial_cmp(&board[square].value().abs()).unwrap() {
                     Ordering::Less =>
-                        add_if_legal(board, c_move, quiet_moves, king_pos, is_in_check),
+                        add_if_legal(board, mv, quiet_moves, king_pos, is_in_check),
                     Ordering::Equal =>
-                        add_if_legal(board, c_move, active_moves, king_pos, is_in_check),
+                        add_if_legal(board, mv, active_moves, king_pos, is_in_check),
                     Ordering::Greater =>
-                        add_if_legal(board, c_move, winning_moves, king_pos, is_in_check),
+                        add_if_legal(board, mv, winning_moves, king_pos, is_in_check),
                 }
             }
             break; // Break after finding a piece, friend or foe
