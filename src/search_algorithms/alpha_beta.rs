@@ -469,83 +469,6 @@ fn insert_killer_move<T: Eq>(moves: &mut[Option<T>; 2], new_move: T) {
     }
 }
 
-/*
-#[inline(never)]
-pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
-                        mut alpha: Score, mut beta: Score) -> Score
-    where B: EvalBoard + fmt::Debug {
-    node_counter.intern += 1;
-
-    let stand_pat = match board.game_result() {
-        Some(result) => return Score::from_game_result(result),
-        None => Val(board.eval_board()),
-    };
-
-    let mut best_score = stand_pat;
-    let color = board.to_move();
-
-    let active_moves = board.active_moves();
-    
-    for mv in &active_moves {
-        let undo_move = board.do_move(mv.clone());
-        let score = quiescence_search(board, node_counter, alpha, beta);
-        board.undo_move(undo_move);
-        if (board.to_move() == Black && score < best_score)
-            || (board.to_move() == White && score > best_score)
-        {
-            best_score = score;
-        }
-
-        if color == White && score > alpha {
-            alpha = score;
-            best_score = score;
-        }
-        
-        else if color == Black && score < beta {
-            beta = score;
-            best_score = score;
-        }
-        if alpha >= beta {
-            break; 
-        }
-    }
-
-    // If all active moves lead to being mated, re-examine with all moves
-    // TODO: Avoid re-computing move list
-    match (best_score, color) {
-        (Score::WhiteWin(_), Black) | (Score::BlackWin(_), White) => {
-            for mv in board.all_legal_moves().iter()
-                .filter(|mv| !active_moves.contains(mv)){
-                let undo_move = board.do_move(mv.clone());
-                let score = quiescence_search(board, node_counter, alpha, beta);
-                board.undo_move(undo_move);
-                if (board.to_move() == Black && score < best_score)
-                    || (board.to_move() == White && score > best_score)
-                {
-                    best_score = score;
-                }
-
-                if color == White && score > alpha {
-                    alpha = score;
-                    best_score = score;
-                }
-                
-                else if color == Black && score < beta {
-                    beta = score;
-                    best_score = score;
-                }
-                if alpha >= beta {
-                    break; 
-                }
-            }
-            increment_score(best_score)
-
-        },
-        _ => increment_score(best_score),
-    }
-}
- */
-
 fn increment_score(score: Score) -> Score {
     match score {
         Loss(i) => Loss(i + 1),
@@ -690,24 +613,7 @@ impl ops::Not for Score {
         }
     }
 }
-/*
-impl fmt::Display for Score {
-    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
-            Win(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
-            Loss(n) => write!(fmt, "mate {}", -(1 + n as i16) / 2),
-            Draw(_) => write!(fmt, "0"),
-        }
-    }
-}
 
-impl fmt::Debug for Score {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt::Display::fmt(self, fmt)
-    }
-}
-*/
 impl PartialOrd for Score {
     fn partial_cmp (&self, other: &Score) -> Option<cmp::Ordering> {
         match (*self, *other) {
