@@ -537,6 +537,10 @@ impl EvalBoard for ChessBoard {
         active_moves
     }
 
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        self.all_legal_moves().contains(&mv)
+    }
+
     fn active_moves(&self) -> Vec<Self::Move> {
         let (active_moves, _) = move_gen::all_legal_moves(self);
         active_moves
