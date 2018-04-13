@@ -44,12 +44,11 @@ quickcheck! {
     fn rotation_45_preserves_pieces(bitboard: BitBoard) -> bool {
         bitboard.rotate_45().board.count_ones() == bitboard.board.count_ones()
     }
+
     fn diagonals_preserve_pieces(bitboard: BitBoard) -> bool {
-        println!("Bitcounts: {}, {}",
-                 (0..15).map(|n| bitboard.diagonal(n)).map(u8::count_ones).sum::<u32>(),
-                 bitboard.popcount());
         (0..15).map(|n| bitboard.diagonal(n)).map(u8::count_ones).sum::<u32>() == bitboard.popcount()
     }
+
     fn rotation_315_preserves_pieces(bitboard: BitBoard) -> bool {
         bitboard.rotate_315().board.count_ones() == bitboard.board.count_ones()
     }
@@ -59,9 +58,11 @@ quickcheck! {
             .map(u8::count_ones)
             .sum::<u32>() == bitboard.popcount()
     }
+
     fn rotate_315_back(bitboard: BitBoard) -> bool {
         (0..8).fold(bitboard, |board, _| board.rotate_315()) == bitboard
     }
+
     fn rotate_45_back(bitboard: BitBoard) -> bool {
         (0..8).fold(bitboard, |board, _| board.rotate_45()) == bitboard
     }
@@ -70,10 +71,6 @@ quickcheck! {
 #[test]
 fn rank() {
     let start_board = BitBoard::all_from_board(&ChessBoard::start_board());
-    println!("{:?}", start_board);
-    for rank in 0..8 {
-        println!("{}", start_board.rank(rank));
-    }
     assert_eq!(start_board.rank(0), 255);
     assert_eq!(start_board.rank(1), 255);
     assert_eq!(start_board.rank(2), 0);
