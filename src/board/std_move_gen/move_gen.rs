@@ -277,17 +277,33 @@ fn legal_moves_for_pawn(board: &ChessBoard, square: Square, winning_moves: &mut 
 }
 
 /// Checks that the move does not put the player in check
+/// Does not work in some special cases, such as en passant. `add_if_legal_simple` should be used then
+fn move_is_not_check(board: &ChessBoard, mv: ChessMove,
+                 king_pos: Square, is_in_check: bool) -> bool {
+    !(is_in_check || is_pinned_to_piece(board, mv.from, king_pos)) ||
+        move_is_not_check_simple(board, mv)
+
+}
+
+/// Checks that the move does not put the player in check
+/// This check is more expensive, but works for _all_ positions
+fn move_is_not_check_simple(board: &ChessBoard, mv: ChessMove) -> bool {
+    let mut cloned = board.clone();
+    cloned.do_move(mv);
+
+    cloned.to_move = !cloned.to_move;
+
+    !is_attacked(&cloned, king_pos(&cloned))
+}
+
+/// Checks that the move does not put the player in check
 /// , and add the move to the vector
 /// Does not work in some special cases, such as en passant. `add_if_legal_simple` should be used then
 #[inline(never)]
 fn add_if_legal(board : &ChessBoard, mv : ChessMove, moves : &mut Vec<ChessMove>,
-                king_pos_c : Square, is_in_check : bool) {
-    if is_in_check || is_pinned_to_piece(board, mv.from, king_pos_c) {
-        add_if_legal_simple(board, mv, moves);
-    }
-    else {
-        debug_assert!(!is_attacked(board, king_pos_c));
+                king_pos : Square, is_in_check : bool) {
 
+    if move_is_not_check(board, mv, king_pos, is_in_check) {
         moves.push(mv);
     }
 }
@@ -297,12 +313,8 @@ fn add_if_legal(board : &ChessBoard, mv : ChessMove, moves : &mut Vec<ChessMove>
 /// This check is more expensive, but works for _all_ positions
 #[inline(never)]
 fn add_if_legal_simple (board : &ChessBoard, mv : ChessMove, moves : &mut Vec<ChessMove>) {
-    let mut cloned = board.clone();
-    cloned.do_move(mv);
 
-    cloned.to_move = !cloned.to_move;
-
-    if !is_attacked(&cloned, king_pos(&cloned)) {
+    if move_is_not_check_simple(board, mv) {
         moves.push(mv);
     }
 }
@@ -457,7 +469,8 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 
             // Check that there is no enemy king around
             if board[new_pos].piece_type() == King
-                && board[new_pos].color().unwrap() != board.to_move {
+                && board[new_pos].color().unwrap() != board.to_move
+                {
                     return true;
                 }
         }

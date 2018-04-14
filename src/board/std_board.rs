@@ -538,7 +538,24 @@ impl EvalBoard for ChessBoard {
     }
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
-        self.all_legal_moves().contains(&mv)
+
+        if self[mv.from].color() != Some(self.to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+        let king_pos = move_gen::king_pos(&self);
+        let is_in_check = move_gen::is_attacked(&self, king_pos);
+        move_gen::legal_moves_for_piece(&mut self.clone(), mv.from,
+                                        &mut moves1, &mut moves2, &mut moves3,
+                                        is_in_check, king_pos);
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            debug_assert!(self.all_legal_moves().contains(&mv),
+            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
 
     fn active_moves(&self) -> Vec<Self::Move> {

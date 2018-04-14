@@ -300,7 +300,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             let score = increment_score(alpha);
             
             table.insert(board.clone(), HashEntry {
-                best_reply: best_line.last().cloned(), score: (node_type, score), depth: depth
+                best_reply: best_line.last().cloned(), score: (node_type, score), depth
             });
             return Some((score, killer_move, best_line));  
         }
@@ -321,27 +321,17 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         debug_assert!(!legal_moves.is_empty(),
                        "Found 0 legal moves, but game result was {:?} on \n{:?}",
                        board.game_result(), board);
-        
+
+        let mut moves = vec![];
+
         if let Some(mv) = first_candidate {
-            // Process hash move first for better pruning
-            if let Some(position) = legal_moves.iter().position(|e| *e == mv) {
-                legal_moves.swap(0, position);
-            }
+            moves.push(mv);
         }
-        if let Some(ref k1) = killer_moves[0] {
-            if let Some(position) = legal_moves.iter().position(|e| e == k1) {
-                if legal_moves.len() >= 2 {
-                    legal_moves.swap(1, position);
-                }
-            }
-        }
-        if let Some(ref k2) = killer_moves[1] {
-            if let Some(position) = legal_moves.iter().position(|e| e == k2) {
-                if legal_moves.len() >= 3 {
-                    legal_moves.swap(2, position);
-                }
-            }
-        }
+        moves.extend(killer_moves.iter()
+                     .flat_map(|mv| mv.iter())
+                     .cloned()
+                     .filter(|mv| board.move_is_legal(mv.clone())));
+        moves.append(&mut legal_moves);
 
         let old_eval = board.eval_board() * color.multiplier() as f32;
         let mut move_searched = false; // ensure not all moves are pruned as null moves
@@ -356,7 +346,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
         let mut child_killer_moves = [None, None];
         
-        for c_move in legal_moves {
+        for c_move in moves {
             
             let old_board = board.clone();
             let undo_move = board.do_move(c_move.clone());
@@ -427,7 +417,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             // In that case, do not overwrite it
             table.insert(board.clone(), HashEntry {
                 best_reply: best_line.last().cloned(),
-                score: (node_type, score), depth: depth
+                score: (node_type, score), depth
             });
         }
         let killer_move = if node_type == Ordering::Greater {
@@ -437,8 +427,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             None
         };
         Some((score, killer_move, best_line))
+    }
             
-    };
     let mut node_counter = NodeCount::new();
     if let Some((score, _, mut moves)) =
         find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
@@ -511,7 +501,8 @@ impl<B: EvalBoard, M> Table<B, M> {
         Table { hash_table: HashMap::with_capacity(
             6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,
-                mem_usage: 0, max_memory: max_memory }
+                mem_usage: 0, max_memory
+        }
     }
 
     pub fn clear(&mut self) {
