@@ -169,10 +169,6 @@ fn capture_from_check() {
 
 #[test]
 fn castling_test () {
-    // Checks that white kingside castle works
-    let board1 = ChessBoard::from_fen("5k1r/6pp/4Q3/8/8/8/8/4K2R w K - 0 1").unwrap();
-    let move1 = board1.from_alg("e1g1").unwrap();
-    basic_tactics_prop(&board1, move1);
 
     // Checks that white can't castle while in check
     let board2 = ChessBoard::from_fen("k3r3/8/8/8/8/8/3P1PPP/3RK2R w K - 0 1").unwrap();
@@ -194,7 +190,7 @@ fn castling_test () {
     move_is_available_prop(&mut board4, mv2);
     move_is_unavailable_prop(&mut board4, mv3);
 
-    // Positions were castling is legal, but rook is attacked
+    // Positions where castling is legal, but rook is attacked
     let mut board5 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
     let mv4 = board5.from_alg("e1g1").unwrap();
@@ -254,7 +250,8 @@ fn correct_move_gen_test1() {
 fn correct_move_gen_test2() {
     let mut board2 = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board2, 1), 48);
+    assert_eq!(legal_moves_after_plies(&mut board2, 1), 48,
+    "Expected 48 legal moves on:\n{}\nGot: {:?}", board2, board2.all_legal_moves());
     
     let mut temp_board = board2.clone();
     let mv = ChessMove::new(Square(48), Square(32));
