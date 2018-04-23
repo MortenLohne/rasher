@@ -155,7 +155,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
 }
 
 #[inline(never)]
-fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
+pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
                           quiet_moves: &mut Vec<SjadamMove>,
                           active_moves: &mut Vec<SjadamMove>,
                           winning_moves: &mut Vec<SjadamMove>) {
