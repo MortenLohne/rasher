@@ -111,6 +111,7 @@ lazy_static! {
     };
 }
 
+#[inline(never)]
 pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>) {
     let mut moves = Vec::with_capacity(250);
     let mut active_moves = Vec::with_capacity(50);

@@ -3,7 +3,6 @@ use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use search_algorithms::board;
-use search_algorithms::board::Color::*;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
