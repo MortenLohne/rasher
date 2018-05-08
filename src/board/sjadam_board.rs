@@ -872,6 +872,28 @@ impl EvalBoard for SjadamBoard {
     }
 
     #[inline(never)]
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        let piece_moved = self.get_square(mv.from());
+
+        if piece_moved.color() != Some(self.to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+
+        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
+                                                &mut moves1, &mut moves2, &mut moves3);
+
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            debug_assert!(self.all_legal_moves().contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
+    }
+
+    #[inline(never)]
     fn active_moves (&self) -> Vec<Self::Move> {
         let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
         active_moves

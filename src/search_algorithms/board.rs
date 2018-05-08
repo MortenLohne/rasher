@@ -34,6 +34,10 @@ impl Color {
     pub fn disc(self) -> usize {
         self as u16 as usize
     }
+
+    pub fn multiplier(self) -> isize {
+        self as u16 as isize * -2 + 1
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
@@ -70,6 +74,10 @@ pub trait EvalBoard : PartialEq + Clone {
     fn start_board() -> Self;
 
     fn all_legal_moves(&self) -> Vec<Self::Move>;
+
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        self.all_legal_moves().contains(&mv)
+    }
 
     fn active_moves(&self) -> Vec<Self::Move> {
         vec![]

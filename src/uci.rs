@@ -3,7 +3,6 @@ use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use search_algorithms::board;
-use search_algorithms::board::Color::*;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
@@ -77,6 +76,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 };
             }
+            /*
             "quiet_eval" => {
                 let mut node_counter = ::NodeCount::new();
                 match engine_options.variant {
@@ -100,6 +100,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 };
             }
+             */
             "fen" => {
                 match engine_options.variant {
                     ChessVariant::Standard => {
@@ -575,10 +576,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
         let best_move = pv_str.split_whitespace()
             .next()
             .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
-        let delta_score = match board.to_move() {
-            White => eval.to_cp() - last_eval.to_cp(),
-            Black => last_eval.to_cp() - eval.to_cp(),
-        };
+        let delta_score = eval.to_cp(board.to_move()) - last_eval.to_cp(board.to_move());
         
         if best_move != mv && delta_score > 0 {
             let verdict = match delta_score {
@@ -588,11 +586,13 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             };
             println!("{} ({}): {}, {} was better. ({} vs {}, delta={})",
                      mv_str, !board.to_move(), verdict,
-                     board.to_alg(&last_correct_move), eval, last_eval, delta_score);
+                     board.to_alg(&last_correct_move),
+                     eval.uci_string(board.to_move()), last_eval.uci_string(board.to_move()),
+                     delta_score);
         }
         
         else {
-            println!("{} ({}): {}", mv_str, board.to_move(), eval);
+            println!("{} ({}): {}", mv_str, board.to_move(), eval.uci_string(board.to_move()));
         }
         
         last_eval = eval;
@@ -679,6 +679,7 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 /// Trait representing an algorithm returning uci-compatible output
 #[derive(Debug, PartialEq, Clone)]
 pub struct UciInfo {
+    pub color: board::Color,
     pub depth: u16,
     pub seldepth: u16,
     pub time: i64,
@@ -693,15 +694,15 @@ impl UciInfo {
         let mut string = String::new();
         if self.pvs.len() == 1 {
             write!(string, "info depth {} seldepth {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                   self.depth, self.seldepth, self.pvs[0].0, self.nodes,
-                   (self.hashfull * 1000.0) as i64,
+                   self.depth, self.seldepth, self.pvs[0].0.uci_string(self.color),
+                   self.nodes, (self.hashfull * 1000.0) as i64,
                    self.time, (1000 * self.nodes) as i64 / (self.time + 1), self.pvs[0].1).unwrap();
         } // Add one to self.time to avoid division by zero
         else {
             for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
                 write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                       self.depth, self.seldepth, n + 1, score, self.nodes,
-                       (self.hashfull * 1000.0) as i64,
+                       self.depth, self.seldepth, n + 1, score.uci_string(self.color),
+                       self.nodes, (self.hashfull * 1000.0) as i64,
                        self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
             }
         }

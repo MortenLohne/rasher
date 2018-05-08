@@ -4,6 +4,7 @@ use search_algorithms::alpha_beta;
 use board::sjadam_move::SjadamMove;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
+use search_algorithms::board::Color::*;
 use uci;
 use std::sync;
 
@@ -27,7 +28,7 @@ fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
     let game_move = board.from_alg(&move_str).unwrap();
     
     assert_eq!(game_move, best_move,
-               "Best move was {:?} with score {}, expected {:?}, board:\n{:?}",
+               "Best move was {:?} with score {:?}, expected {:?}, board:\n{:?}",
                game_move, score,
                best_move, board);
 }
@@ -157,11 +158,11 @@ fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
     let game_move = board.from_alg(&move_str).unwrap();
     
     assert_eq!(game_move, best_move,
-               "Best move was {:?} with score {}, expected {:?}, board:\n{:?}",
+               "Best move was {:?} with score {:?}, expected {:?}, board:\n{:?}",
                game_move, score,
                best_move, board);
     match board.to_move() {
-        Color::White => assert_eq!(score.to_string(), "mate 2"),
-        Color::Black => assert_eq!(score.to_string(), "mate -2"),
+        Color::White => assert_eq!(score.uci_string(White), "mate 2"),
+        Color::Black => assert_eq!(score.uci_string(Black), "mate -2"),
     }
 }

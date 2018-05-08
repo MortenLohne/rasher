@@ -10,10 +10,12 @@ use std::collections::hash_map::Entry;
 use std::hash::Hash;
 use std::cmp::Ordering;
 use std::f32;
+use std::ops;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
+use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use self::Score::*;
 use std::thread;
@@ -122,7 +124,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         let uci_info = uci::UciInfo {
             depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total(),
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
-            pvs: pvs };
+            pvs: pvs, color: board.to_move() };
         channel.send(uci_info).unwrap();
         
         match time_restriction {
@@ -161,27 +163,37 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 {
     
     fn find_best_move_ab_rec<B> (board: &mut B, depth : u16,
-                                 mut alpha: Score, mut beta : Score,
+                                 mut alpha: Score, beta : Score,
                                  engine_comm: &Mutex<uci::EngineComm>,
                                  time_restriction: uci::TimeRestriction,
                                  options: uci::EngineOptions,
                                  start_time: time::Instant,
                                  node_counter: &mut NodeCount,
                                  mut move_list: Option<Vec<B::Move>>,
+                                 killer_moves: &[Option<B::Move>; 2],
                                  table: &mut Table<B, B::Move>)
-                                 -> Option<(Score, Vec<B::Move>)>
+                                 -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
         where B: UciBoard + fmt::Debug + Hash + Eq
     {
-        debug_assert!(alpha <= beta, "alpha={}, beta={}, depth={}, board:\n{:?}",
+        debug_assert!(alpha <= beta, "alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board); 
         use uci::TimeRestriction::*;
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
             = table.get(board) {
-                if entry_depth >= depth
-                    && (ordering == Ordering::Equal || alpha.partial_cmp(&score) != Some(ordering))
-                {
-                    return Some((score, best_reply.iter().cloned().collect()))
+                if entry_depth >= depth {
+                    match ordering {
+                        Ordering::Equal =>
+                            return Some((score, None,
+                                         best_reply.iter().cloned().collect())),
+                        Ordering::Less if score < alpha =>
+                            return Some((score, None,
+                                         best_reply.iter().cloned().collect())),
+                        Ordering::Greater if score > beta =>
+                            return Some((score, None,
+                                         best_reply.iter().cloned().collect())),
+                        _ => best_reply.clone()
+                    }
                 }
                 else {
                     best_reply.clone()
@@ -217,12 +229,10 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 _ => (),
             }
         }
-            
-        match board.game_result() {
-            Some(GameResult::WhiteWin) => return Some((WhiteWin(0), vec![])),
-            Some(GameResult::BlackWin) => return Some((BlackWin(0), vec![])),
-            Some(GameResult::Draw) => return Some((Draw(0), vec![])),
-            None => (),
+
+        if let Some(result) = board.game_result() {
+            return Some((Score::from_game_result(result, board.to_move()),
+                         None, Vec::new()))
         }
 
         // Helpful alias
@@ -232,70 +242,73 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         if depth == 0 {
             
             if let Mate(_) = time_restriction {
-                return Some((Val(board.eval_board()), vec![]));
+                return Some((Val(board.eval_board() * color.multiplier() as f32),
+                             None, vec![]));
             }
 
             // Do quiescence search
             node_counter.intern += 1;
 
-            let mut tried_score = Val(board.eval_board());
+            let stand_pat = Val(board.eval_board() * color.multiplier() as f32);
 
-            match color {
-                White => alpha = alpha.max(tried_score),
-                Black => beta = beta.min(tried_score),
+            if stand_pat >= beta {
+                return Some((beta, None, vec![]));
             }
-            
-            if alpha < beta {
-                let active_moves = board.active_moves();
-                
-                for mv in active_moves {
-                    let undo_move = board.do_move(mv.clone());
-                    
-                    let (score, best_moves) = find_best_move_ab_rec(
-                        board, depth, decrement_score(alpha), decrement_score(beta),
-                        engine_comm, time_restriction, options,
-                        start_time, node_counter, None, table)?;
-                    
-                    board.undo_move(undo_move);
-                    if (color == Black && score < tried_score)
-                        || (color == White && score > tried_score)
-                    {
-                        tried_score = score;
-                        best_line = best_moves;
-                        best_line.push(mv.clone());
-                    }
 
-                    if color == White && score > alpha {
-                        alpha = score;
-                    }
-                    
-                    else if color == Black && score < beta {
-                        beta = score;
-                    }
-                    
-                    if alpha >= beta {
-                        break;
-                    }
+            alpha = alpha.max(stand_pat);
+            let mut node_type = if alpha == Loss(0) && beta == Win(0) {
+                Ordering::Equal // It is currently a pv node
+            }
+            else {
+                Ordering::Less // All-node: True value is < score
+            };
+
+            let active_moves = board.active_moves();
+
+            for mv in active_moves {
+                let undo_move = board.do_move(mv.clone());
+                
+                let (mut score, _, best_moves) = find_best_move_ab_rec(
+                    board, depth, !decrement_score(beta), !decrement_score(alpha),
+                    engine_comm, time_restriction, options,
+                    start_time, node_counter, None, &[None, None], table)?;
+
+                score = !score;
+                board.undo_move(undo_move);
+                
+                if score >= beta {
+                    node_type = Ordering::Greater; // True value is >= beta
+                    alpha = score; // TODO: Could be beta as well. Test.
+                    best_line = best_moves;
+                    best_line.push(mv.clone());
+                    break;
+                }
+                if score > alpha {
+                    alpha = score;
+                    best_line = best_moves;
+                    best_line.push(mv.clone());
                 }
             }
-            
-            let score = increment_score(tried_score);
-            
-            let ordering = match board.to_move() {
-                White => Ordering::Greater,
-                Black => Ordering::Less,
+
+            let killer_move = if node_type == Ordering::Greater {
+                best_line.last().cloned()
+            }
+            else {
+                None
             };
+
+            let score = increment_score(alpha);
             
             table.insert(board.clone(), HashEntry {
-                best_reply: best_line.last().cloned(), score: (ordering, score), depth: depth
+                best_reply: best_line.last().cloned(), score: (node_type, score), depth
             });
-            return Some((score, best_line));  
+            return Some((score, killer_move, best_line));  
         }
         debug_assert!(depth > 0);
         
         node_counter.intern += 1;
 
-        let mut best_score = None;
+        //let mut best_score = None;
     
         let mut legal_moves = if move_list.is_some() {
             move_list.take().unwrap()
@@ -308,95 +321,119 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         debug_assert!(!legal_moves.is_empty(),
                        "Found 0 legal moves, but game result was {:?} on \n{:?}",
                        board.game_result(), board);
-        
-        if let Some(mv) = first_candidate {
-            // Process hash move first for better pruning
-            if let Some(position) = legal_moves.iter().position(|e| *e == mv) {
-                legal_moves.swap(0, position);
-            }
-        }
 
-        let old_eval = board.eval_board();
+        let mut moves = vec![];
+
+        if let Some(mv) = first_candidate {
+            moves.push(mv);
+        }
+        moves.extend(killer_moves.iter()
+                     .flat_map(|mv| mv.iter())
+                     .cloned()
+                     .filter(|mv| board.move_is_legal(mv.clone())));
+        moves.append(&mut legal_moves);
+
+        let old_eval = board.eval_board() * color.multiplier() as f32;
         let mut move_searched = false; // ensure not all moves are pruned as null moves
+
+        let mut node_type = if alpha == Loss(0) && beta == Win(0) {
+            //println!("PV node, alpha={:?}, beta={:?}, board\n{:?}", alpha, beta, board);
+            Ordering::Equal // It is currently a pv node
+        }
+        else {
+            Ordering::Less // All-node: True value is < score
+        };
+
+        let mut child_killer_moves = [None, None];
         
-        for c_move in legal_moves {
+        for c_move in moves {
             
             let old_board = board.clone();
             let undo_move = board.do_move(c_move.clone());
 
-            match (alpha, beta, color) {
+            match alpha {
                 // Do null-move pruning
                 // Do not prune if you are getting mated
-                (_, Score::WhiteWin(_), Black) |
-                (Score::BlackWin(_), _, White) => (),
+                // TODO: Verify sanity
+                Loss(_) => (),
                 _ if depth < 3 && options.null_move_pruning
                     && move_searched && !board.game_result().is_some() =>
                 {
-                    let eval = board.eval_board();
-                    if color == White && eval < old_eval
-                        || color == Black && eval > old_eval
-                    {
+                    let eval = board.eval_board() * color.multiplier() as f32;
+                    if eval < old_eval {
                         board.undo_move(undo_move);
+                        //println!("Null-move pruned {:?} on board\n{:?}", c_move, board);
                         continue;
                     }
                 }
                 _ => (),
             }
-            move_searched = true;
-
-            let (tried_score, tried_line) =
+            
+            let (mut tried_score, child_killer_move, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
-                                      decrement_score(alpha), decrement_score(beta),
+                                      !decrement_score(beta), !decrement_score(alpha),
                                       engine_comm, time_restriction, options,
-                                      start_time, node_counter, None, table)?;
+                                      start_time, node_counter, None, &child_killer_moves, table)?;
+
+            if let Some(mv) = child_killer_move {
+                insert_killer_move(&mut child_killer_moves, mv);
+            }
+            //println!("Killer moves: {:?}:\n{:?}", child_killer_moves, board);
+            
+            tried_score = !tried_score;
+            
             board.undo_move(undo_move);
             debug_assert_eq!(board, &old_board,
                              "Failed to restore board after move {:?}", c_move);
             
-            if best_score.is_none() { // For the first searched move
-                best_score = Some(tried_score);
+            //println!("Searched move {:?} on board, alpha={:?}, score={:?}\n{:?}",
+            //             c_move, alpha, tried_score, board);
+            if !move_searched {
+                alpha = alpha.max(tried_score);
                 best_line = tried_line.clone();
                 best_line.push(c_move.clone());
+                move_searched = true;
             }
-            if color == White && tried_score > alpha {
+            
+            if tried_score >= beta {
+                node_type = Ordering::Greater; // True value is >= beta
+                alpha = tried_score;
+                best_line = tried_line.clone();
+                best_line.push(c_move.clone());
+                break;
+            }
+            
+            if tried_score > alpha {
                 alpha = tried_score;
                 best_line = tried_line;
                 best_line.push(c_move.clone());
-                best_score = Some(tried_score);
-            }
-            else if color == Black && tried_score < beta {
-                beta = tried_score;
-                best_line = tried_line;
-                best_line.push(c_move.clone());
-                best_score = Some(tried_score);
-            }
-            if alpha >= beta {
-                break; 
             }
         }
 
-        let score = increment_score(best_score.unwrap());
+        let score = increment_score(alpha);
         
         if move_list == None {
             // When doing multipv search, the position may already be in the hash
             // In that case, do not overwrite it
-            let ordering = match board.to_move() {
-                White => Ordering::Greater,
-                Black => Ordering::Less,
-            };
             table.insert(board.clone(), HashEntry {
                 best_reply: best_line.last().cloned(),
-                score: (ordering, score), depth: depth
+                score: (node_type, score), depth
             });
         }
-        Some((score, best_line))
+        let killer_move = if node_type == Ordering::Greater {
+            best_line.last().cloned()
+        }
+        else {
+            None
+        };
+        Some((score, killer_move, best_line))
+    }
             
-    };
     let mut node_counter = NodeCount::new();
-    if let Some((score, mut moves)) =
-        find_best_move_ab_rec(board, depth, BlackWin(0), WhiteWin(0), engine_comm,
+    if let Some((score, _, mut moves)) =
+        find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
                               time_restriction, options, start_time,
-                              &mut node_counter, move_list, table)
+                              &mut node_counter, move_list, &[None, None], table)
     {
         debug_assert!(!moves.is_empty(),
                       "Found empty pv at depth {}, score was {:?}",
@@ -409,85 +446,23 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     }
 }
 
-#[inline(never)]
-pub fn quiescence_search<B>(board: &mut B, node_counter: &mut NodeCount,
-                        mut alpha: Score, mut beta: Score) -> Score
-    where B: EvalBoard + fmt::Debug {
-    node_counter.intern += 1;
-
-    let stand_pat = match board.game_result() {
-        Some(result) => return Score::from_game_result(result),
-        None => Val(board.eval_board()),
-    };
-
-    let mut best_score = stand_pat;
-    let color = board.to_move();
-
-    let active_moves = board.active_moves();
-    
-    for mv in &active_moves {
-        let undo_move = board.do_move(mv.clone());
-        let score = quiescence_search(board, node_counter, alpha, beta);
-        board.undo_move(undo_move);
-        if (board.to_move() == Black && score < best_score)
-            || (board.to_move() == White && score > best_score)
-        {
-            best_score = score;
-        }
-
-        if color == White && score > alpha {
-            alpha = score;
-            best_score = score;
-        }
-        
-        else if color == Black && score < beta {
-            beta = score;
-            best_score = score;
-        }
-        if alpha >= beta {
-            break; 
-        }
+fn insert_killer_move<T: Eq>(moves: &mut[Option<T>; 2], new_move: T) {
+    if moves[0].is_none() {
+        moves[0] = Some(new_move);
     }
-
-    // If all active moves lead to being mated, re-examine with all moves
-    // TODO: Avoid re-computing move list
-    match (best_score, color) {
-        (Score::WhiteWin(_), Black) | (Score::BlackWin(_), White) => {
-            for mv in board.all_legal_moves().iter()
-                .filter(|mv| !active_moves.contains(mv)){
-                let undo_move = board.do_move(mv.clone());
-                let score = quiescence_search(board, node_counter, alpha, beta);
-                board.undo_move(undo_move);
-                if (board.to_move() == Black && score < best_score)
-                    || (board.to_move() == White && score > best_score)
-                {
-                    best_score = score;
-                }
-
-                if color == White && score > alpha {
-                    alpha = score;
-                    best_score = score;
-                }
-                
-                else if color == Black && score < beta {
-                    beta = score;
-                    best_score = score;
-                }
-                if alpha >= beta {
-                    break; 
-                }
-            }
-            increment_score(best_score)
-
-        },
-        _ => increment_score(best_score),
+    else if moves[1].is_none() && &new_move != moves[0].as_ref().unwrap() {
+        moves[1] = Some(new_move)
+    }
+    else if moves[0].as_ref().unwrap() != &new_move {
+        moves.swap(1, 0);
+        moves[0] = Some(new_move);
     }
 }
 
 fn increment_score(score: Score) -> Score {
     match score {
-        BlackWin(i) => BlackWin(i + 1),
-        WhiteWin(i) => WhiteWin(i + 1),
+        Loss(i) => Loss(i + 1),
+        Win(i) => Win(i + 1),
         Draw(i) => Draw(i + 1),
         Val(n) => Val(n),
     }
@@ -495,8 +470,8 @@ fn increment_score(score: Score) -> Score {
 
 fn decrement_score(score: Score) -> Score {
     match score {
-        BlackWin(i) => BlackWin(u16::saturating_sub(i, 1)),
-        WhiteWin(i) => WhiteWin(u16::saturating_sub(i, 1)),
+        Loss(i) => Loss(u16::saturating_sub(i, 1)),
+        Win(i) => Win(u16::saturating_sub(i, 1)),
         Draw(i) => Draw(u16::saturating_sub(i, 1)),
         Val(n) => Val(n),
     }
@@ -526,7 +501,8 @@ impl<B: EvalBoard, M> Table<B, M> {
         Table { hash_table: HashMap::with_capacity(
             6 * max_memory / (10 * Self::value_mem_usage())),
                 hits: 0, lookups: 0,
-                mem_usage: 0, max_memory: max_memory }
+                mem_usage: 0, max_memory
+        }
     }
 
     pub fn clear(&mut self) {
@@ -576,68 +552,77 @@ impl<B: EvalBoard, M> Table<B, M> {
 }
 
 /// The evaluation of a position. May be extact (A player wins in n moves) or an approximate evaluation. 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Score {
     Val(f32),
     Draw(u16),
-    WhiteWin(u16),
-    BlackWin(u16),
+    Win(u16),
+    Loss(u16),
 }
 
 impl Score {
-    pub fn from_game_result(result: GameResult) -> Self {
-        match result {
-            GameResult::WhiteWin => WhiteWin(0),
-            GameResult::BlackWin => BlackWin(0),
-            GameResult::Draw => Draw(0),
+    pub fn from_game_result(result: GameResult, to_move: Color) -> Self {
+        match (result, to_move) {
+            (GameResult::WhiteWin, White) => Win(0),
+            (GameResult::WhiteWin, Black) => Loss(0),
+            (GameResult::BlackWin, Black) => Win(0),
+            (GameResult::BlackWin, White) => Loss(0),
+            (GameResult::Draw, _) => Draw(0),
         }
     }
     #[allow(dead_code)]
-    pub fn to_cp(self) -> i16 {
+    pub fn to_cp(self, to_move: Color) -> i16 {
         match self {
-            Val(val) => (val * 100.0) as i16,
+            Val(val) => (val * 100.0) as i16 * to_move.multiplier() as i16,
             Draw(_) => 0,
-            WhiteWin(n) => 12_000 - n as i16,
-            BlackWin(n) => -12_000 + n as i16,
+            Win(n) => (12_000 - n as i16) * to_move.multiplier() as i16,
+            Loss(n) => (-12_000 + n as i16) * to_move.multiplier() as i16,
+        }
+    }
+
+    pub fn uci_string(mut self, to_move: Color) -> String {
+        if to_move == Black {
+            self = !self;
+        }
+        match self {
+            Val(f) => format!("cp {}", (100.0 * f) as i16),
+            Win(n) => format!("mate {}", (1 + n as i16) / 2),
+            Loss(n) => format!("mate -{}", (1 + n as i16) / 2),
+            Draw(_) => format!("0"),
         }
     }
 }
 
-impl fmt::Display for Score {
-    fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            Score::Val(f) => write!(fmt, "cp {}", (100.0 * f) as i16),
-            Score::WhiteWin(n) => write!(fmt, "mate {}", (1 + n as i16) / 2),
-            Score::BlackWin(n) => write!(fmt, "mate {}", -(1 + n as i16) / 2),
-            Score::Draw(_) => write!(fmt, "0"),
+impl ops::Not for Score {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Val(val) => Val(-val),
+            Draw(n) => Draw(n),
+            Win(n) => Loss(n),
+            Loss(n) => Win(n),
         }
-    }
-}
-
-impl fmt::Debug for Score {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt::Display::fmt(self, fmt)
     }
 }
 
 impl PartialOrd for Score {
     fn partial_cmp (&self, other: &Score) -> Option<cmp::Ordering> {
         match (*self, *other) {
-            (WhiteWin(n1), WhiteWin(n2)) => Some((&n2).cmp(&n1)),
-            (WhiteWin(_), _) => Some(Ordering::Greater),
+            (Win(n1), Win(n2)) => Some((&n2).cmp(&n1)),
+            (Win(_), _) => Some(Ordering::Greater),
             
-            (Val(_), WhiteWin(_)) => Some(Ordering::Less),
-            (Val(_), BlackWin(_)) => Some(Ordering::Greater),
+            (Val(_), Win(_)) => Some(Ordering::Less),
+            (Val(_), Loss(_)) => Some(Ordering::Greater),
             (Val(n1), Val(n2)) => (&n1).partial_cmp(&n2),
             (Val(n1), Draw(_)) => (&n1).partial_cmp(&0.0),
 
             (Draw(_), Val(n1)) => (&0.0).partial_cmp(&n1),
             (Draw(_), Draw(_)) => Some(Ordering::Equal),
-            (Draw(_), WhiteWin(_)) => Some(Ordering::Less),
-            (Draw(_), BlackWin(_)) => Some(Ordering::Greater),
+            (Draw(_), Win(_)) => Some(Ordering::Less),
+            (Draw(_), Loss(_)) => Some(Ordering::Greater),
             
-            (BlackWin(n1), BlackWin(n2)) => Some(n1.cmp(&n2)),
-            (BlackWin(_), _) => Some(Ordering::Less),
+            (Loss(n1), Loss(n2)) => Some(n1.cmp(&n2)),
+            (Loss(_), _) => Some(Ordering::Less),
             
         }
     }
