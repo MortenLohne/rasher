@@ -7,6 +7,7 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
 
+use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
 use board::sjadam_board::BitBoard;
 
@@ -52,6 +53,7 @@ lazy_static! {
         }
         table
     };
+
     static ref KNIGHT_TABLE : [u64; 256] = {
         let mut table = [0; 256];
         let c = 1 << 18;
@@ -83,6 +85,7 @@ lazy_static! {
         }
         table
     };
+
     static ref KING_TABLE : [u64; 256] = {
         let mut table = [0; 256];
         let attacks = 0b11100000_11100000_111;
@@ -297,6 +300,16 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
                 }
             }
         }
+    }
+}
+// possible sjadam squares. Always 16 squares marked
+pub fn possible_sjadam_squares(square: Square) -> BitBoard{
+    let (file, rank) = square.file_rank();
+    match (file % 2 == 0, rank % 2 == 0) {
+        (false, false) => sjadam_board::SJADAM_SQUARE_TYPES[3],
+        (true, false) => sjadam_board::SJADAM_SQUARE_TYPES[2],
+        (false, true) => sjadam_board::SJADAM_SQUARE_TYPES[1],
+        (true, true) => sjadam_board::SJADAM_SQUARE_TYPES[0],
     }
 }
 

@@ -25,18 +25,19 @@ const WHITE_SQUARES : BitBoard = BitBoard {
 const BLACK_SQUARES : BitBoard = BitBoard {
     board: 0b01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010
 };
-const EVEN_RANKS : BitBoard = BitBoard {
-    board: 0b11111111_00000000_11111111_00000000_11111111_00000000_11111111_00000000
-};
-const ODD_RANKS : BitBoard = BitBoard {
-    board: 0b00000000_11111111_00000000_11111111_00000000_11111111_00000000_11111111
-};
-const EVEN_FILES : BitBoard = BitBoard {
-    board: 0b10101010_10101010_10101010_10101010_10101010_10101010_10101010_10101010
-};
-const ODD_FILES : BitBoard = BitBoard {
-    board: 0b01010101_01010101_01010101_01010101_01010101_01010101_01010101_01010101
-};
+pub const SJADAM_SQUARE_TYPES : [BitBoard; 4] =
+    [   BitBoard {
+        board: 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101
+    },
+        BitBoard {
+            board: 0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010
+        },
+        BitBoard {
+            board: 0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000
+        },
+    BitBoard {
+        board: 0b10101010_00000000_10101010_00000000_10101010_00000000_10101010_00000000
+    }];
 
 
 lazy_static! {
@@ -88,6 +89,15 @@ lazy_static! {
                 board.set(Square::from_ints(file, rank + 1));
             }
             table[i as usize] = board;
+        }
+        table
+    };
+
+    static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+
+        for i in 0..64 {
+            table[i] = RANK_NEIGHBOURS[i] | FILE_NEIGHBOURS[i];
         }
         table
     };
@@ -265,12 +275,8 @@ impl BitBoard {
         DIAGONAL_NEIGHBOURS[square.0 as usize]
     }
 
-    pub fn rank_neighbours(square: Square) -> BitBoard {
-        RANK_NEIGHBOURS[square.0 as usize]
-    }
-
-    pub fn file_neighbours(square: Square) -> BitBoard {
-        FILE_NEIGHBOURS[square.0 as usize]
+    pub fn orthogonal_neighbours(square: Square) -> BitBoard {
+        ORTHOGONAL_NEIGHBOURS[square.0 as usize]
     }
 
     pub fn first_piece(&self) -> Option<Square> {
@@ -949,7 +955,8 @@ impl EvalBoard for SjadamBoard {
             else {
                 self.black_pieces()
             };
-            
+
+            // Penalty for king being on same colored diagonal as enemy queens/bishops/pawns
             {
                 let mut dia_penalty = 0.0;
                 
@@ -980,55 +987,25 @@ impl EvalBoard for SjadamBoard {
             }
 
             {
-                let mut file_penalty = 0.0;
-                let files = if (kings & EVEN_FILES).is_empty() {
-                    ODD_FILES
-                }
-                else {
-                    EVEN_FILES
-                };
+                let mut orthogonal_penalty: f32 = 0.0;
 
-                let friendly_file_neighbours = BitBoard::file_neighbours(king_pos)
-                    & friendly_pieces;
-                let open_file_neighbours = BitBoard::file_neighbours(king_pos).popcount() - friendly_file_neighbours.popcount();
+                let neighbour_squares = BitBoard::orthogonal_neighbours(kings.first_piece().unwrap());
+                let open_neighbours_squares = neighbour_squares & (!friendly_pieces);
 
                 let rooks = self.bitboards[6 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
 
-                file_penalty -= ROOK_VAL * (rooks & files).popcount() as f32;
-                file_penalty -= ROOK_VAL * (rooks & !files).popcount() as f32 * 0.3;
-                file_penalty -= QUEEN_VAL * (queens & files).popcount() as f32;
-                file_penalty -= QUEEN_VAL * (queens & !files).popcount() as f32 * 0.4;
-
-                file_penalty *= open_file_neighbours as f32;
-                penalty += file_penalty;
-            }
-
-            {
-                let mut rank_penalty = 0.0;
-                let ranks = if (kings & EVEN_RANKS).is_empty() {
-                    ODD_RANKS
+                for square in open_neighbours_squares {
+                    orthogonal_penalty -= ROOK_VAL * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= ROOK_VAL * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                    orthogonal_penalty -= QUEEN_VAL * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= QUEEN_VAL * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.4;
                 }
-                else {
-                    EVEN_RANKS
-                };
 
-                let friendly_rank_neighbours = BitBoard::rank_neighbours(king_pos)
-                    & friendly_pieces;
-                let open_rank_neighbours = BitBoard::rank_neighbours(king_pos).popcount() - friendly_rank_neighbours.popcount();
+                penalty += orthogonal_penalty;
 
-                let rooks = self.bitboards[6 + (!color).disc()];
-                let queens = self.bitboards[8 + (!color).disc()];
-
-                rank_penalty -= ROOK_VAL * (rooks & ranks).popcount() as f32;
-                rank_penalty -= ROOK_VAL * (rooks & !ranks).popcount() as f32 * 0.3;
-                rank_penalty -= QUEEN_VAL * (queens & ranks).popcount() as f32;
-                rank_penalty -= QUEEN_VAL * (queens & !ranks).popcount() as f32 * 0.4;
-
-                rank_penalty *= open_rank_neighbours as f32;
-                penalty += rank_penalty;
             }
-            
+
             penalty
         })
             .collect::<Vec<_>>();
