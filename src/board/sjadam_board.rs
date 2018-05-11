@@ -941,6 +941,7 @@ impl EvalBoard for SjadamBoard {
         const QUEEN_VAL : f32 = 0.5;
         const ROOK_VAL : f32 = 0.5;
         const BISHOP_VAL : f32 = 0.5;
+        const KNIGHT_VAL : f32 = 0.5;
         const PAWN_VAL : f32 = 0.05;
 
         let king_safety_penalties = [White, Black].iter().map(|&color| {
@@ -991,6 +992,7 @@ impl EvalBoard for SjadamBoard {
 
                 let neighbour_squares = BitBoard::orthogonal_neighbours(kings.first_piece().unwrap());
                 let open_neighbours_squares = neighbour_squares & (!friendly_pieces);
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
 
                 let rooks = self.bitboards[6 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
@@ -1006,6 +1008,23 @@ impl EvalBoard for SjadamBoard {
 
             }
 
+            // Penalty when king can be hit by opponent knights
+            {
+                let mut knight_penalty = 0.0;
+
+                let open_neighbours_squares = sjadam_move_gen::knight_moves(kings, friendly_pieces);
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
+
+                let knights = self.bitboards[2 + (!color).disc()];
+
+                for square in open_neighbours_squares {
+                    knight_penalty -= KNIGHT_VAL * (knights & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    knight_penalty -= KNIGHT_VAL * (knights & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                }
+
+                penalty += knight_penalty;
+            }
+            
             penalty
         })
             .collect::<Vec<_>>();

@@ -328,7 +328,7 @@ fn king_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
 }
 
 #[inline(never)]
-fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+pub fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
     let mut moves = 0;
     for rank in 0..2 {
         let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;
