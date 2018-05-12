@@ -66,6 +66,18 @@ quickcheck! {
     fn rotate_45_back(bitboard: BitBoard) -> bool {
         (0..8).fold(bitboard, |board, _| board.rotate_45()) == bitboard
     }
+
+    fn iterator_iterates_all(bitboard: BitBoard) -> bool {
+        bitboard.into_iter().count() == bitboard.popcount() as usize
+    }
+
+    fn iterator(bitboard: BitBoard) -> bool {
+        let mut board = BitBoard::empty();
+        for square in bitboard {
+            board.set(square);
+        }
+        board == bitboard
+    }
 }
 
 #[test]
