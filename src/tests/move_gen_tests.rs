@@ -18,14 +18,11 @@ fn test_piece_at () {
     let square = |str| Square::from_alg(str).unwrap();
     
     let start_board = ChessBoard::start_board();
-    println!("{}", start_board);
     let d1 = square("d1");
     let e1 = square("e1");
     let a1 = square("a1");
     let h8 = square("h8");
     let e4 = square("e4");
-    
-    println!("e1: {}", e1);
 
     assert_eq!(start_board.piece_at(d1), Piece::new(Queen, White));
     assert_eq!(start_board.piece_at(e1), Piece::new(King, White));
@@ -216,7 +213,6 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
 #[test]
 fn starting_position_perf_test() {
     let mut board1 = ChessBoard::start_board().clone();
-    println!("{}", board1);
     assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
@@ -241,7 +237,6 @@ fn starting_position_perf_test_long() {
 fn correct_move_gen_test1() {
     let mut board = ChessBoard::from_fen(
         "rnbqkbnr/pp2pppp/8/2pp4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1").unwrap();
-    println!("{}", board);
     assert_eq!(legal_moves_after_plies(&mut board, 1), 30);
     assert_eq!(legal_moves_after_plies(&mut board, 2), 895);
 }
