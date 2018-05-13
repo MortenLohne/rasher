@@ -93,11 +93,26 @@ lazy_static! {
         table
     };
 
+
     static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
         let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
 
         for i in 0..64 {
             table[i] = RANK_NEIGHBOURS[i] | FILE_NEIGHBOURS[i];
+        }
+        table
+    };
+
+    /// For each square and color, store squares from which the player's pawns can attack the square
+    /// Always has 1 or 2 bits set
+    static ref PAWN_ATTACK_SQUARES : [[BitBoard; 2]; 64] = {
+        let mut table : [[BitBoard; 2]; 64] = [[BitBoard::empty(); 2]; 64];
+
+        for i in 0..64 {
+            let square = Square(i as u8);
+            let dia_neighbours = BitBoard::diagonal_neighbours(square);
+            table[i][0] = dia_neighbours.into_iter().filter(|sq| sq.rank() > square.rank()).collect();
+            table[i][1] = dia_neighbours.into_iter().filter(|sq| sq.rank() < square.rank()).collect();
         }
         table
     };
@@ -279,6 +294,10 @@ impl BitBoard {
         ORTHOGONAL_NEIGHBOURS[square.0 as usize]
     }
 
+    pub fn pawn_attack_squares(square: Square, color: Color) -> BitBoard {
+        PAWN_ATTACK_SQUARES[square.0 as usize][color.disc()]
+    }
+
     pub fn first_piece(&self) -> Option<Square> {
         let square = self.board.trailing_zeros();
         if square == 64 {
@@ -305,6 +324,16 @@ impl IntoIterator for BitBoard {
     
     fn into_iter(self) -> Self::IntoIter {
         BitBoardIterator::new(self)
+    }
+}
+
+impl FromIterator<Square> for BitBoard {
+    fn from_iter<T: IntoIterator<Item=Square>>(iter: T) -> Self {
+        let mut board = Self::empty();
+        for square in iter {
+            board.set(square);
+        }
+        board
     }
 }
 
@@ -357,6 +386,7 @@ impl Eq for SjadamBoard {}
 
 use std::hash::Hasher;
 use std::hash::Hash;
+use std::iter::FromIterator;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -942,7 +972,7 @@ impl EvalBoard for SjadamBoard {
         const ROOK_VAL : f32 = 0.5;
         const BISHOP_VAL : f32 = 0.5;
         const KNIGHT_VAL : f32 = 0.5;
-        const PAWN_VAL : f32 = 0.05;
+        const PAWN_VAL : f32 = 0.2;
 
         let king_safety_penalties = [White, Black].iter().map(|&color| {
 
@@ -957,7 +987,7 @@ impl EvalBoard for SjadamBoard {
                 self.black_pieces()
             };
 
-            // Penalty for king being on same colored diagonal as enemy queens/bishops/pawns
+            // Penalty for king being on same colored diagonal as enemy queens/bishops
             {
                 let mut dia_penalty = 0.0;
                 
@@ -978,10 +1008,6 @@ impl EvalBoard for SjadamBoard {
                 dia_penalty -= BISHOP_VAL * (bishops & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
-
-                let pawns = self.bitboards[(!color).disc()];
-                dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
-                dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
 
                 dia_penalty *= open_dia_neighbours as f32;
                 penalty += dia_penalty
@@ -1008,7 +1034,8 @@ impl EvalBoard for SjadamBoard {
 
             }
 
-            // Penalty when king can be hit by opponent knights
+            // Penalty when king has open knight-jump squares around it,
+            // which a knight may be able to sjadam-jump to
             {
                 let mut knight_penalty = 0.0;
 
@@ -1018,13 +1045,33 @@ impl EvalBoard for SjadamBoard {
                 let knights = self.bitboards[2 + (!color).disc()];
 
                 for square in open_neighbours_squares {
-                    knight_penalty -= KNIGHT_VAL * (knights & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    knight_penalty -= KNIGHT_VAL * (knights & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    knight_penalty -= KNIGHT_VAL * (knights & sjadam_squares).popcount() as f32;
+                    knight_penalty -= KNIGHT_VAL * (knights & !sjadam_squares).popcount() as f32 * 0.3;
                 }
 
                 penalty += knight_penalty;
             }
-            
+
+            // Penalty when king can has open pawn-capture squares,
+            // which a pawn may be able to sjadam-jump to
+            {
+                let mut pawn_penalty = 0.0;
+
+                let open_neighbours_squares = BitBoard::pawn_attack_squares(kings.first_piece().unwrap(), !color) & !friendly_pieces;
+
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
+
+                let pawns = self.bitboards[(!color).disc()];
+
+                for square in open_neighbours_squares {
+                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    pawn_penalty -= PAWN_VAL * (pawns & sjadam_squares).popcount() as f32;
+                    pawn_penalty -= PAWN_VAL * (pawns & !sjadam_squares).popcount() as f32 * 0.2;
+                }
+
+                penalty += pawn_penalty;
+            }
             penalty
         })
             .collect::<Vec<_>>();

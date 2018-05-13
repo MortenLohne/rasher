@@ -40,6 +40,12 @@ impl Arbitrary for BitBoard {
     }
 }
 
+impl Arbitrary for Square {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        Square((g.next_u64() % 64) as u8)
+    }
+}
+
 quickcheck! {
     fn rotation_45_preserves_pieces(bitboard: BitBoard) -> bool {
         bitboard.rotate_45().board.count_ones() == bitboard.board.count_ones()
@@ -77,6 +83,16 @@ quickcheck! {
             board.set(square);
         }
         board == bitboard
+    }
+
+    fn from_to_iterator(bitboard: BitBoard) -> bool {
+        bitboard.into_iter().collect::<BitBoard>() == bitboard
+    }
+
+    fn pawn_attacks_both_ways(square: Square) -> bool {
+        let attacks = BitBoard::pawn_attack_squares(square, White) | BitBoard::pawn_attack_squares(square, Black);
+        assert!(!attacks.is_empty());
+        attacks == BitBoard::diagonal_neighbours(square)
     }
 }
 
