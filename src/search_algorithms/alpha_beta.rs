@@ -65,7 +65,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     
     let mut table = Table::new(options.hash_memory as usize * 1024 * 1024);
     
-    'depth_loop: for depth in 1..(max_depth + 1) {
+    'depth_loop: for depth in 1..=max_depth {
         
         let mut pvs : Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
         let mut pv_moves : Vec<B::Move> = vec![]; // Moves that have been searched
@@ -77,25 +77,27 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             else {
                 board.all_legal_moves()
             };
+
             moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
             if moves_to_search.is_empty() {
                 continue;
             }
 
             if let Some((score, moves, node_count)) =
-            // If all moves are preserved, send None to the function
-                // This means the root position will still be hashed correctly
+                // If all moves are to be searched, send None to the function
+                // This way, the root position will still be hashed correctly
                 if moves_to_search.len() == board.all_legal_moves().len() {
                     find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                       options, start_time, None, &mut table)
                 }
-            else {
-                // TODO: Clearing the hash table loses a ton of performance in multipv mode
-                table.clear();
-                //table.remove(&board);
-                find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction, options,
-                                  start_time, Some(moves_to_search.clone()), &mut table)
-            }
+                else {
+                    // In multipv search, the hash table needs to be cleared for correct behaviour. Don't know why.
+                    // TODO: Fix this. Clearing the hash table loses a ton of performance in multipv mode
+                    table.clear();
+                    //table.remove(&board);
+                    find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction, options,
+                                      start_time, Some(moves_to_search.clone()), &mut table)
+                }
             {
                 let mut pv_str = String::new();
                 
@@ -126,7 +128,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
             pvs: pvs, color: board.to_move() };
         channel.send(uci_info).unwrap();
-        
+
+        // If we're playing a time control, don't start searching deeper
+        // if we have little time left
         match time_restriction {
             uci::TimeRestriction::GameTime(info) => {
 
@@ -143,7 +147,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             }
             
             uci::TimeRestriction::MoveTime(time) =>
-                if time_taken > time / (B::branch_factor() as u32 / 5) {
+                if time_taken > time / (B::branch_factor() as u32 / 10) {
                     break
                 },
             
@@ -210,13 +214,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     return None // "Engine was told to stop"
                 }
             }
+            let time_taken = time::Instant::now() - start_time;
+
             // If we've spent more than half of our time, abort immediately
             match time_restriction {
                 Nodes(n) if node_counter.total() > n
                     => return None,
                 GameTime(info) => {
                 
-                    let time_taken = time::Instant::now() - start_time;
+
                     let time_left = match board.to_move() {
                     White => info.white_time,
                         Black => info.black_time,
@@ -226,6 +232,11 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                         return None;
                     }
                 }
+                // If on movetime restriction, abort if we are getting close to our time limit
+                uci::TimeRestriction::MoveTime(time) =>
+                    if time_taken > time - time::Duration::from_millis(10) {
+                        return None;
+                    },
                 _ => (),
             }
         }
@@ -238,15 +249,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         // Helpful alias
         let color = board.to_move();
         let mut best_line = vec![];
-        
-        if depth == 0 {
-            
+
+        if depth == 0 { // Quiescence search
+
+            // If searching for mate, don't do quiescence search
             if let Mate(_) = time_restriction {
                 return Some((Val(board.eval_board() * color.multiplier() as f32),
                              None, vec![]));
             }
 
-            // Do quiescence search
             node_counter.intern += 1;
 
             let stand_pat = Val(board.eval_board() * color.multiplier() as f32);
@@ -257,7 +268,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
             alpha = alpha.max(stand_pat);
             let mut node_type = if alpha == Loss(0) && beta == Win(0) {
-                Ordering::Equal // It is currently a pv node
+                Ordering::Equal // Pv-node
             }
             else {
                 Ordering::Less // All-node: True value is < score
@@ -277,7 +288,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 board.undo_move(undo_move);
                 
                 if score >= beta {
-                    node_type = Ordering::Greater; // True value is >= beta
+                    node_type = Ordering::Greater; // Cute-node: True value is >= beta
                     alpha = score; // TODO: Could be beta as well. Test.
                     best_line = best_moves;
                     best_line.push(mv.clone());
