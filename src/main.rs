@@ -16,6 +16,8 @@ extern crate ordered_float;
 extern crate rayon;
 #[cfg(feature = "logging")]
 extern crate log4rs;
+#[cfg(feature = "profile")]
+extern crate cpuprofiler;
 
 use std::sync::{Arc, Mutex};
 use std::io;
@@ -39,6 +41,9 @@ use log4rs::config::{Appender, Config, Root};
 #[cfg(feature = "logging")]
 use std::io::Write;
 
+#[cfg(feature = "profile")]
+use cpuprofiler::PROFILER;
+
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
     let appender = log4rs::append::file::FileAppender::builder().append(true).build("rasher.log")?;
@@ -55,6 +60,10 @@ fn main() {
     init_log().unwrap_or_else(|err| {
         let _ = writeln!(&mut io::stderr(), "Failed to open log file: {}", err);
     });
+
+    #[cfg(feature = "profile")]
+    PROFILER.lock().unwrap().start("./my-prof.profile").unwrap();
+
     let mut stdin = io::BufReader::new(io::stdin());
     info!("Opened log");
     loop {

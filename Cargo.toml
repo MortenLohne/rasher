@@ -7,6 +7,7 @@ license = "MIT"
 [features]
 default = ["logging"]
 logging = ["log4rs"]
+profile = ["cpuprofiler"]
 legacy_sjadam_move_format = []
 
 [dependencies]
@@ -22,6 +23,10 @@ version = "0.7.*"
 optional = true
 default-features = false # do not include the default features
 features = ["file_appender"]
+
+[dependencies.cpuprofiler]
+version = "0.0.3"
+optional = true
 
 [dev-dependencies]
 quickcheck = "0.5"
