@@ -161,7 +161,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
                          time_restriction: uci::TimeRestriction, options: uci::EngineOptions,
                          start_time: time::Instant, move_list: Option<Vec<B::Move>>,
-                         table: &mut Table<B, B::Move>)
+                         table: &mut Table<B::HashBoard, B::Move>)
                           -> Option<(Score, Vec<B::Move>, NodeCount)>
     where B: UciBoard + fmt::Debug + Hash + Eq
 {
@@ -175,7 +175,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                  node_counter: &mut NodeCount,
                                  mut move_list: Option<Vec<B::Move>>,
                                  killer_moves: &[Option<B::Move>; 2],
-                                 table: &mut Table<B, B::Move>)
+                                 table: &mut Table<B::HashBoard, B::Move>)
                                  -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
         where B: UciBoard + fmt::Debug + Hash + Eq
     {
@@ -184,7 +184,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         use uci::TimeRestriction::*;
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
-            = table.get(board) {
+            = table.get(&board.hash_board()) {
                 if entry_depth >= depth {
                     match ordering {
                         Ordering::Equal =>
@@ -310,7 +310,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
             let score = increment_score(alpha);
             
-            table.insert(board.clone(), HashEntry {
+            table.insert(board.hash_board(), HashEntry {
                 best_reply: best_line.last().cloned(), score: (node_type, score), depth
             });
             return Some((score, killer_move, best_line));  
@@ -426,7 +426,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         if move_list == None {
             // When doing multipv search, the position may already be in the hash
             // In that case, do not overwrite it
-            table.insert(board.clone(), HashEntry {
+            table.insert(board.hash_board(), HashEntry {
                 best_reply: best_line.last().cloned(),
                 score: (node_type, score), depth
             });
@@ -496,16 +496,15 @@ struct HashEntry<M> {
 
 /// A transposition table for storing known positions, which only grows to a certain
 /// size in memory. 
-struct Table<B: EvalBoard, M> {
-    hash_table: HashMap<<B as EvalBoard>::HashBoard, HashEntry<M>>,
-    //hasher: SimpleHasher,
+struct Table<B, M> {
+    hash_table: HashMap<B, HashEntry<M>>,
     hits: u64, // Total hits in table
     lookups: u64, // Total lookups in table
     mem_usage: usize,
     max_memory: usize,
 }
 
-impl<B: EvalBoard, M> Table<B, M> {
+impl<B: Eq + Hash, M> Table<B, M> {
     #[inline(never)]
     pub fn new(max_memory: usize) -> Table<B, M> {
 
@@ -527,10 +526,9 @@ impl<B: EvalBoard, M> Table<B, M> {
  
     #[inline(never)]
     pub fn get(&mut self, key: &B) -> Option<&HashEntry<M>>
-        where B: EvalBoard + Eq + Hash {
+        where B: Eq + Hash {
         self.lookups += 1;
-        //key.hash(&mut self.hasher);
-        let result = self.hash_table.get(&key.hash_board());
+        let result = self.hash_table.get(&key);
         if result.is_some() {
             self.hits += 1;
         }
@@ -539,10 +537,10 @@ impl<B: EvalBoard, M> Table<B, M> {
     
     #[inline(never)]
     pub fn insert(&mut self, key: B, value: HashEntry<M>)
-        where B: EvalBoard + Eq + Hash {
+        where B: Eq + Hash {
         let extra_mem = Self::value_mem_usage();
-        //key.hash(&mut self.hasher);
-        match self.hash_table.entry(key.hash_board()) {
+
+        match self.hash_table.entry(key) {
             Entry::Occupied(mut entry) => *entry.get_mut() = value,
             Entry::Vacant(entry) => if self.mem_usage + extra_mem < 6 * self.max_memory / 10 {
                 self.mem_usage += extra_mem;
@@ -555,7 +553,7 @@ impl<B: EvalBoard, M> Table<B, M> {
     pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>>
         where B: EvalBoard + Eq + Hash {
         //key.hash(&mut self.hasher);
-        self.hash_table.remove(&key.hash_board()).map(|value| {
+        self.hash_table.remove(key).map(|value| {
             self.mem_usage -= Self::value_mem_usage();
             value
         })
