@@ -117,8 +117,10 @@ lazy_static! {
         table
     };
 
-    static ref ZOBRIST_KEYS : [u64; 793] = {
-        let mut table = [0; 793];
+    // 768 keys for each piece on square, 8 for en passant squares,
+    // 1 for side to move, 16 for castling rights, 5 for repetitions
+    static ref ZOBRIST_KEYS : [u64; 798] = {
+        let mut table = [0; 798];
         let mut rng = rand::StdRng::from_seed(&[42]);
         for entry in table.iter_mut() {
             *entry = rng.next_u64();
@@ -357,7 +359,6 @@ impl Iterator for BitBoardIterator {
         else {
             None
         }
-        
     }
 }
 
@@ -371,6 +372,8 @@ pub struct SjadamBoard {
     castling_en_passant: u8,
     half_move_clock: u8,
     move_num: u16,
+    move_history: Vec<u64>,
+    repetitions: u8, // starts at 1 ("number of occurrences")
 }
 
 impl PartialEq for SjadamBoard {
@@ -378,6 +381,7 @@ impl PartialEq for SjadamBoard {
         self.bitboards == other.bitboards
             && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
+            && self.repetitions == other.repetitions
     }
 }
 
@@ -410,6 +414,8 @@ impl SjadamBoard {
             hash ^= ZOBRIST_KEYS[769 + en_passant_square.file() as usize];
         }
         hash ^= ZOBRIST_KEYS[777 + (self.castling_en_passant & 0b1111) as usize];
+        debug_assert!(self.repetitions > 0 && self.repetitions <= 5);
+        hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
         hash
     }
     
@@ -420,13 +426,17 @@ impl SjadamBoard {
                                to_move: other.to_move(),
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
-                               move_num: other.move_num };
+                               move_num: other.move_num,
+                               move_history: vec![],
+                               repetitions: 1};
+
         for square in BoardIter::new() {
             if !other[square].is_empty() {
                 board.set_piece_at_square(other[square], square);
             }
         }
         board.hash = board.hash_from_scratch();
+        debug_assert!(board.half_move_clock <= 100);
         board
     }
 
@@ -588,7 +598,9 @@ impl SjadamBoard {
 
 impl fmt::Debug for SjadamBoard {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt::Debug::fmt(&self.to_chess_board(), fmt)
+        fmt::Debug::fmt(&self.to_chess_board(), fmt)?;
+        write!(fmt, "Hash: {}, repetitions: {}\n", self.hash, self.repetitions)?;
+        write!(fmt, "Move history: {:?}", self.move_history)
     }
 }
 
@@ -751,8 +763,18 @@ impl EvalBoard for SjadamBoard {
             (true, false) => Some(GameResult::WhiteWin),
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
-            (true, true) if self.half_move_clock > 50 => Some(GameResult::Draw),
-            (true, true) => None,
+            (true, true) => {
+                if self.half_move_clock > 100 {
+                    Some(GameResult::Draw)
+                }
+                else if self.repetitions >= 3 {
+                    Some(GameResult::Draw)
+                }
+                else {
+                    None
+                }
+
+            },
         }
     }
 
@@ -762,6 +784,8 @@ impl EvalBoard for SjadamBoard {
         debug_assert!(!self.is_empty(mv.from()),
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
 
+
+
         let en_passant = mv.en_passant_bitboard(self);
         let undo_move = SjadamUndoMove {
             from: mv.from(), to: mv.to(),
@@ -770,10 +794,16 @@ impl EvalBoard for SjadamBoard {
             piece_moved: mv.piece_moved(),
             old_castling_en_passant: self.castling_en_passant,
             old_half_move_clock: self.half_move_clock,
+            old_repetitions: self.repetitions,
             old_hash: self.hash
         };
         debug_assert!(mv.piece_moved() != PieceType::Empty,
                       "Empty piece_moved when doing {} on \n{:?}", mv, self);
+
+        self.move_history.push(self.hash);
+        debug_assert!(self.half_move_clock <= 100, "half_move_clock was {}", self.half_move_clock);
+        self.half_move_clock += 1; // Gets zeroed later on on captures or promotions
+        debug_assert!(self.half_move_clock <= 100, "half_move_clock was {}", self.half_move_clock);
 
         self.hash ^= self.castling_en_passant_key();
         
@@ -827,8 +857,9 @@ impl EvalBoard for SjadamBoard {
         
         if undo_move.capture != Empty {
             self.clear_piece_at_square(Piece::new(undo_move.capture, !start_color), mv.to());
+            self.half_move_clock = 0;
         }
-        
+
         if mv.castling() {
             // Move the rook too
             let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
@@ -847,14 +878,38 @@ impl EvalBoard for SjadamBoard {
         {
             // Promote to queen
             debug_assert!(!self.is_empty(mv.to()));
+
             if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
                 self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
                 self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
             }
+            self.half_move_clock = 0;
         }
         
         self.to_move = !self.to_move();
         self.hash ^= ZOBRIST_KEYS[768];
+
+        // Last step: Detect repetitions
+        // The hash is now fully updated, *except* for any possible repetition
+        // Remove repetition from hash entirely
+        self.hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
+
+        for repetition in 1.. {
+            let key = ZOBRIST_KEYS[792 + repetition];
+            self.hash ^= key;
+
+            if self.move_history.iter().rev()
+                .take(self.half_move_clock as usize)
+                .any(|&hash| hash == self.hash)
+                {
+                    self.hash ^= key;
+                }
+            else {
+                self.repetitions = repetition as u8;
+                break;
+            }
+        }
+
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
@@ -864,6 +919,10 @@ impl EvalBoard for SjadamBoard {
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
         let start_color = !self.to_move();
+
+        let old_hash = self.move_history.pop();
+        debug_assert!(old_hash.is_some());
+
         if mv.piece_moved != Queen
             && self.piece_at_square(Piece::new(Queen, start_color), mv.to()) {
                 self.clear_piece_at_square(Piece::new(Queen, start_color), mv.to());
@@ -898,6 +957,9 @@ impl EvalBoard for SjadamBoard {
         self.to_move = !self.to_move();
         debug_assert_ne!(!start_color, self.to_move());
         debug_assert!(!self.is_empty(mv.from()));
+        debug_assert_eq!(self.hash, self.hash_from_scratch(),
+                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
+        debug_assert_eq!(old_hash, Some(self.hash));
     }
 
     #[inline(never)]

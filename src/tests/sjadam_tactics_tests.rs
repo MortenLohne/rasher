@@ -7,6 +7,7 @@ use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use uci;
 use std::sync;
+use search_algorithms::alpha_beta::Score;
 
 /// Promotes a pawn through a sjadam move, which mates
 #[test]
@@ -143,6 +144,29 @@ fn sjadammate18() {
     let board = SjadamBoard::from_fen("7k/1pppp1pr/1pn3P1/8/1rNb2NP/2P1PPP1/1P1PQ3/R6K b - - 0 1").unwrap();
     let correct_move = board.from_alg("d7g6").unwrap();
     is_mate_in_one(&board, correct_move);
+}
+
+#[test]
+fn repetitions_score_0() {
+    let board = SjadamBoard::from_fen("q3pr1k/R7/K5R1/8/7P/8/8/7q w - -").unwrap();
+    let engine_comm = sync::Arc::new(sync::Mutex::new(uci::EngineComm::new()));
+
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Infinite,
+        uci::EngineOptions::new(),
+        engine_comm.clone(), None);
+
+    loop {
+        let info = channel.recv().unwrap();
+        if let Score::Draw(_) = info.pvs[0].0 {
+            engine_comm.lock().unwrap().engine_should_stop = true;
+            handle.join().unwrap();
+            return;
+        }
+        else if info.nodes > 1_000_000 {
+            panic!("Expected draw score, got: {}", info.to_info_string());
+        }
+    }
 }
 
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {

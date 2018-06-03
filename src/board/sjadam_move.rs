@@ -16,6 +16,7 @@ pub struct SjadamUndoMove {
     pub capture: PieceType,
     pub old_castling_en_passant: u8,
     pub old_half_move_clock: u8,
+    pub old_repetitions: u8,
     pub old_hash: u64,
 }
 
