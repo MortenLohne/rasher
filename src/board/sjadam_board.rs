@@ -953,6 +953,7 @@ impl EvalBoard for SjadamBoard {
         self.half_move_clock = mv.old_half_move_clock;
         self.castling_en_passant = mv.old_castling_en_passant;
         self.hash = mv.old_hash;
+        self.repetitions = mv.old_repetitions;
 
         self.to_move = !self.to_move();
         debug_assert_ne!(!start_color, self.to_move());
