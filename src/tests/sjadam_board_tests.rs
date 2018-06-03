@@ -51,17 +51,16 @@ fn repetitions_do_not_preserve_hash() {
 fn repetitions_are_drawn() {
     let mut board = SjadamBoard::start_board();
 
-    for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8"].iter() {
-        let mv = board.from_alg(mv_str).unwrap();
-        board.do_move(mv);
-    }
-
-    assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
-
-    for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8"].iter() {
+    for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8", "c1c3", "c8c6", "c3c1", "c6c8"].iter() {
+        assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
         let mv = board.from_alg(mv_str).unwrap();
         board.do_move(mv);
     }
 
     assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
+
+    let mv = board.from_alg("g1e3").unwrap();
+    board.do_move(mv);
+    
+    assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
 }
