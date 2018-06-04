@@ -100,7 +100,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 }
             {
                 let mut pv_str = String::new();
-                
+
                 let mut pv_board = board.clone();
 
                 for mv in &moves {
@@ -358,7 +358,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         let mut child_killer_moves = [None, None];
         
         for c_move in moves {
-            
+
+            #[cfg(debug_assertions)]
             let old_board = board.clone();
             let undo_move = board.do_move(c_move.clone());
 
@@ -373,7 +374,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     let eval = board.eval_board() * color.multiplier() as f32;
                     if eval < old_eval {
                         board.undo_move(undo_move);
-                        //println!("Null-move pruned {:?} on board\n{:?}", c_move, board);
                         continue;
                     }
                 }
@@ -389,16 +389,15 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             if let Some(mv) = child_killer_move {
                 insert_killer_move(&mut child_killer_moves, mv);
             }
-            //println!("Killer moves: {:?}:\n{:?}", child_killer_moves, board);
             
             tried_score = !tried_score;
             
             board.undo_move(undo_move);
+
+            #[cfg(debug_assertions)]
             debug_assert_eq!(board, &old_board,
-                             "Failed to restore board after move {:?}", c_move);
-            
-            //println!("Searched move {:?} on board, alpha={:?}, score={:?}\n{:?}",
-            //             c_move, alpha, tried_score, board);
+                            "Failed to restore board after move {:?}", c_move);
+
             if !move_searched {
                 alpha = alpha.max(tried_score);
                 best_line = tried_line.clone();
