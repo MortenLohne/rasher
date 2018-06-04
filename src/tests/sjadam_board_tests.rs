@@ -15,14 +15,16 @@ fn hash_stays_equal() {
     let start_hash = hasher.finish();
 
     for mv in board.all_legal_moves() {
-        let undo_move = board.do_move(mv);
+        let undo_move = board.do_move(mv.clone());
         board.undo_move(undo_move);
 
         hasher = DefaultHasher::new();
         board.hash(&mut hasher);
         let new_hash = hasher.finish();
 
-        assert_eq!(start_hash, new_hash);
+        assert_eq!(start_hash, new_hash,
+                   "\nHash was not preserved after undoing move {} on \n{:?}",
+                   board.to_alg(&mv), board);
 
     }
 }
@@ -63,4 +65,18 @@ fn repetitions_are_drawn() {
     board.do_move(mv);
     
     assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
+}
+
+#[test]
+fn pawn_moves_can_repeat() {
+    let mut board = SjadamBoard::start_board();
+
+    // There is no repetition from move 1, because of en passant
+    for mv_str in ["e2e4", "e7e5", "c2e2", "c7e7", "e2c2", "e7c7", "c2e2", "c7e7", "e2c2", "e7c7", "c2e2"].iter() {
+        assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
+        let mv = board.from_alg(mv_str).unwrap();
+        board.do_move(mv);
+    }
+
+    assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
 }
