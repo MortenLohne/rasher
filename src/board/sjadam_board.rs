@@ -387,7 +387,6 @@ impl PartialEq for SjadamBoard {
 
 impl Eq for SjadamBoard {}
 
-
 use std::hash::Hasher;
 use std::hash::Hash;
 use std::iter::FromIterator;
@@ -427,7 +426,7 @@ impl SjadamBoard {
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
                                move_num: other.move_num,
-                               move_history: vec![],
+                               move_history: Vec::with_capacity(10),
                                repetitions: 1};
 
         for square in BoardIter::new() {
@@ -894,20 +893,26 @@ impl EvalBoard for SjadamBoard {
         // Remove repetition from hash entirely
         self.hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
 
-        for repetition in 1.. {
-            let key = ZOBRIST_KEYS[792 + repetition];
-            self.hash ^= key;
+        if self.half_move_clock >= 4 {
+            for repetition in 1.. {
+                let key = ZOBRIST_KEYS[792 + repetition];
+                self.hash ^= key;
 
-            if self.move_history.iter().rev()
-                .take(self.half_move_clock as usize)
-                .any(|&hash| hash == self.hash)
-                {
-                    self.hash ^= key;
+                if self.move_history.iter().rev()
+                    .take(self.half_move_clock as usize)
+                    .skip(3)
+                    .any(|&hash| hash == self.hash)
+                    {
+                        self.hash ^= key;
+                    } else {
+                    self.repetitions = repetition as u8;
+                    break;
                 }
-            else {
-                self.repetitions = repetition as u8;
-                break;
             }
+        }
+        else {
+            self.repetitions = 1;
+            self.hash ^= ZOBRIST_KEYS[793];
         }
 
         debug_assert_ne!(start_color, self.to_move());
