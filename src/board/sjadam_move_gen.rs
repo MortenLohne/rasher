@@ -222,10 +222,14 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
                 else if target.value().abs() == piece_type.value().abs() {
                     active_moves.push(mv);
                 }
+                else if Some(target_square) == board.last_move().map(|m|m.to()) {
+                    active_moves.push(mv);
+                }
                 else {
                     quiet_moves.push(mv);
                 }
             }
+                // TODO: Make pawn captures active if they recapture a pawn?
             else {
                 quiet_moves.push(mv);
             }

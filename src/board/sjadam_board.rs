@@ -369,6 +369,7 @@ pub struct SjadamBoard {
     hash: u64,
     bitboards: [BitBoard; 12],
     to_move: Color,
+    last_move: Option<SjadamMove>,
     castling_en_passant: u8,
     half_move_clock: u8,
     move_num: u16,
@@ -423,6 +424,7 @@ impl SjadamBoard {
                                white_pieces: BitBoard::empty(), black_pieces: BitBoard::empty(),
                                hash: 0,
                                to_move: other.to_move(),
+                               last_move: None,
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
                                move_num: other.move_num,
@@ -488,6 +490,8 @@ impl SjadamBoard {
     pub fn black_pieces(&self) -> BitBoard {
         self.black_pieces
     }
+
+    pub fn last_move(&self) -> Option<SjadamMove> { self.last_move.clone() }
 
     pub fn all_pieces(&self) -> BitBoard {
         BitBoard::from_u64(self.white_pieces().board | self.black_pieces().board)
@@ -790,6 +794,7 @@ impl EvalBoard for SjadamBoard {
             from: mv.from(), to: mv.to(),
             castling: mv.castling(), en_passant: en_passant,
             capture: self.get_square(mv.to()).piece_type(),
+            old_last_move: Some(mv.clone()),
             piece_moved: mv.piece_moved(),
             old_castling_en_passant: self.castling_en_passant,
             old_half_move_clock: self.half_move_clock,
@@ -963,6 +968,7 @@ impl EvalBoard for SjadamBoard {
         self.castling_en_passant = mv.old_castling_en_passant;
         self.hash = mv.old_hash;
         self.repetitions = mv.old_repetitions;
+        self.last_move = mv.old_last_move.clone();
 
         self.to_move = !self.to_move();
         debug_assert_ne!(!start_color, self.to_move());
