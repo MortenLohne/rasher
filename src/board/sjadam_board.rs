@@ -22,9 +22,11 @@ use rand::SeedableRng;
 const WHITE_SQUARES : BitBoard = BitBoard {
     board: 0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101
 };
+
 const BLACK_SQUARES : BitBoard = BitBoard {
     board: 0b01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010
 };
+
 pub const SJADAM_SQUARE_TYPES : [BitBoard; 4] =
     [   BitBoard {
         board: 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101
@@ -38,7 +40,6 @@ pub const SJADAM_SQUARE_TYPES : [BitBoard; 4] =
     BitBoard {
         board: 0b10101010_00000000_10101010_00000000_10101010_00000000_10101010_00000000
     }];
-
 
 lazy_static! {
     static ref DIAGONAL_NEIGHBOURS : [BitBoard; 64] = {
@@ -113,6 +114,17 @@ lazy_static! {
             let dia_neighbours = BitBoard::diagonal_neighbours(square);
             table[i][0] = dia_neighbours.into_iter().filter(|sq| sq.rank() > square.rank()).collect();
             table[i][1] = dia_neighbours.into_iter().filter(|sq| sq.rank() < square.rank()).collect();
+        }
+        table
+    };
+
+    pub static ref SQUARE_SQUARES : [BitBoard; 16] = {
+        let mut table = [BitBoard::empty(); 16];
+        for i in 0..16 {
+            let square : u8 = (i % 4) * 2 + (i / 4) * 16;
+            for j in [0, 1, 8, 9].iter() {
+                table[i as usize].set(Square(square + j));
+            }
         }
         table
     };
@@ -1038,7 +1050,10 @@ impl EvalBoard for SjadamBoard {
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
 
-        let tempo_bonus = (white_val + black_val.abs()) / 200.0;
+        let tempo_bonus = match self.to_move() {
+            White => (white_val + black_val.abs()) / 200.0,
+            Black => -(white_val + black_val.abs()) / 200.0,
+        };
 
         const QUEEN_VAL : f32 = 0.5;
         const ROOK_VAL : f32 = 0.5;
@@ -1148,12 +1163,18 @@ impl EvalBoard for SjadamBoard {
         })
             .collect::<Vec<_>>();
 
-        match self.to_move {
-            White => white_val - black_val + tempo_bonus
-                + king_safety_penalties[0] - king_safety_penalties[1],
-            Black => white_val - black_val - tempo_bonus
-                + king_safety_penalties[0] - king_safety_penalties[1],
-        } 
+        const SPREAD: f32 = 0.2;
+
+        let white_spread_bonus = SQUARE_SQUARES.iter()
+            .filter(|&&bitboard| !(bitboard & self.white_pieces).is_empty())
+            .count() as f32 * SPREAD;
+
+        let black_spread_bonus = SQUARE_SQUARES.iter()
+            .filter(|&&bitboard| !(bitboard & self.black_pieces).is_empty())
+            .count() as f32 * SPREAD;
+
+        white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
+            + king_safety_penalties[0] - king_safety_penalties[1]
         /*
         TODO: Put pawn advancement eval back
         let pawn_val = match self.board[rank][file].piece_type() {
