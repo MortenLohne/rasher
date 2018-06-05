@@ -59,12 +59,43 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         _ => 128,
     };
     debug_assert!(max_depth > 1);
+
+    // Normally, the root position should never already be decided
+    // If the root position is drawn *anyway*, try to make a move that preserves the draw
+    // If no move is found, return null move
+    match board.game_result() {
+        Some(GameResult::Draw) => {
+            for mv in board.all_legal_moves() {
+                let undo_move = board.do_move(mv.clone());
+
+                if board.game_result() == Some(GameResult::Draw) {
+                    let uci_info = uci::UciInfo {
+                        depth: 1, seldepth: 1, time: 0, nodes: 1,
+                        hashfull: 0.0,
+                        pvs: vec![(Score::Draw(0), board.to_alg(&mv))], color: board.to_move() };
+                    channel.send(uci_info).unwrap();
+                    return;
+                }
+
+                board.undo_move(undo_move);
+            }
+
+            let uci_info = uci::UciInfo {
+                depth: 1, seldepth: 1, time: 0, nodes: 1,
+                hashfull: 0.0,
+                pvs: vec![(Score::Draw(0), "null".to_string())], color: board.to_move() };
+            channel.send(uci_info).unwrap();
+
+            return;
+        },
+        _ => (),
+    }
     
     let mut total_node_count = NodeCount::new();
     let start_time = time::Instant::now();
     
     let mut table = Table::new(options.hash_memory as usize * 1024 * 1024);
-    
+
     'depth_loop: for depth in 1..=max_depth {
         
         let mut pvs : Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
