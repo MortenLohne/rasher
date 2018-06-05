@@ -69,6 +69,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 let undo_move = board.do_move(mv.clone());
 
                 if board.game_result() == Some(GameResult::Draw) {
+                    board.undo_move(undo_move);
                     let uci_info = uci::UciInfo {
                         depth: 1, seldepth: 1, time: 0, nodes: 1,
                         hashfull: 0.0,
