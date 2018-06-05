@@ -894,17 +894,21 @@ impl EvalBoard for SjadamBoard {
         self.hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
 
         if self.half_move_clock >= 4 {
-            for repetition in 1.. {
+            for repetition in 1..=5 {
                 let key = ZOBRIST_KEYS[792 + repetition];
                 self.hash ^= key;
 
-                if self.move_history.iter().rev()
+                if repetition == 5 {
+                    self.repetitions = 5;
+                }
+                else if self.move_history.iter().rev()
                     .take(self.half_move_clock as usize)
                     .skip(3)
                     .any(|&hash| hash == self.hash)
                     {
                         self.hash ^= key;
-                    } else {
+                    }
+                else {
                     self.repetitions = repetition as u8;
                     break;
                 }
