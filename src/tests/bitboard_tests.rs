@@ -1,3 +1,4 @@
+use board::sjadam_board;
 use board::sjadam_board::BitBoard;
 use board::sjadam_board::SjadamBoard;
 use board::std_board::ChessBoard;
@@ -165,6 +166,15 @@ fn diagonal_neighbours() {
     let mut board = BitBoard::empty();
     board.set(Square(9));
     assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
+}
+
+#[test]
+fn square_squares() {
+    for bitboard in sjadam_board::SQUARE_SQUARES.iter() {
+        assert_eq!(bitboard.popcount(), 4);
+    }
+
+    assert_eq!(sjadam_board::SQUARE_SQUARES.iter().fold(BitBoard::empty(), |b1, &b2| b1 | b2).popcount(), 64);
 }
 
 #[test]
