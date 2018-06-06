@@ -172,14 +172,14 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                     Black => (info.black_time, info.black_inc),
                 };
                 
-                if time_taken > inc / (B::branch_factor() as u32 / 5)
-                    + time / (B::branch_factor() as u32 * 5) {
+                if time_taken > inc / (B::BRANCH_FACTOR as u32 / 5)
+                    + time / (B::BRANCH_FACTOR as u32 * 5) {
                         break;
                     }
             }
             
             uci::TimeRestriction::MoveTime(time) =>
-                if time_taken > time / (B::branch_factor() as u32 / 10) {
+                if time_taken > time / (B::BRANCH_FACTOR as u32 / 10) {
                     break
                 },
             

@@ -1189,7 +1189,5 @@ impl EvalBoard for SjadamBoard {
          */    
     }
 
-    fn branch_factor() -> u64 {
-        30
-    }
+    const BRANCH_FACTOR : u64 = 30;
 }

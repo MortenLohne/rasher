@@ -61,15 +61,15 @@ impl ops::Not for GameResult {
 pub trait EvalBoard : PartialEq + Clone {
     type Move : Clone + fmt::Debug + PartialEq + Eq;
     type UndoMove : Clone + fmt::Debug;
-    // A representation of the board that can be hashed. Can be Self, or unit if no hasing is desired.
+    // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
     type HashBoard : hash::Hash + Eq;
 
     /// Returns whose turn it is
     fn to_move(&self) -> Color;
 
-    fn do_move(&mut self, Self::Move) -> Self::UndoMove;
+    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
     
-    fn undo_move(&mut self, Self::UndoMove);
+    fn undo_move(&mut self, mv: Self::UndoMove);
 
     fn start_board() -> Self;
 
@@ -98,7 +98,5 @@ pub trait EvalBoard : PartialEq + Clone {
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
     }
     
-    fn branch_factor() -> u64 {
-        20
-    }
+    const BRANCH_FACTOR: u64 = 20;
 }

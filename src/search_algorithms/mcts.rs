@@ -138,7 +138,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                 }
             },
             Depth(n) | Mate(n)
-                if mc_tree.searches >= (<B as EvalBoard>::branch_factor()).pow(n as u32)
+                if mc_tree.searches >= (<B as EvalBoard>::BRANCH_FACTOR).pow(n as u32)
                 => break,
             Nodes(n) => if mc_tree.searches >= n { break } else { },
             MoveTime(time) => {
