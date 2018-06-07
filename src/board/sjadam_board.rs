@@ -1169,7 +1169,7 @@ impl EvalBoard for SjadamBoard {
         })
             .collect::<Vec<_>>();
 
-        const SPREAD: f32 = 0.2;
+        const SPREAD: f32 = 0.3;
 
         let white_spread_bonus = SQUARE_SQUARES.iter()
             .filter(|&&bitboard| !(bitboard & self.white_pieces).is_empty())
