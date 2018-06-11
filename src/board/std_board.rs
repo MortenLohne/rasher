@@ -8,7 +8,6 @@ use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use ::uci::UciBoard;
 
-use std::ascii::AsciiExt;
 use std::ops;
 use std::fmt;
 use std::fmt::Write;
@@ -360,17 +359,17 @@ impl UciBoard for ChessBoard {
 
         let mut board = ChessBoard { board: [[Piece::empty(); 8]; 8], to_move: White,
                                      castling_en_passant: 15, half_move_clock: 0, move_num: 0 };
-        board.board = try!(parse_fen_board(fen_split[0]));
+        board.board = parse_fen_board(fen_split[0])?;
         
         if fen_split[1].len() != 1 {
             return Err("Invalid FEN string: Error in side to move-field".to_string());
         }
 
         // Check side to move
-        board.to_move = try!(parse_fen_to_move(fen_split[1]));
+        board.to_move = parse_fen_to_move(fen_split[1])?;
 
         // Check castling rights field
-        try!(parse_fen_castling_rights(fen_split[2], &mut board));
+        parse_fen_castling_rights(fen_split[2], &mut board)?;
 
         // Check en passant field
         if fen_split[3] != "-" {
@@ -382,8 +381,8 @@ impl UciBoard for ChessBoard {
 
         let (half_clock, move_num) : (u8, u16) =
             if fen_split.len() > 4 {
-                (try!(fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")),
-                 try!(fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")))
+                (fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")?,
+                 fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")?)
             }
         else {
             (0, 0)
@@ -391,6 +390,18 @@ impl UciBoard for ChessBoard {
 
         board.half_move_clock = half_clock;
         board.move_num = move_num;
+
+        if (board.can_castle_kingside(White) || board.can_castle_queenside(White))
+            && board[Square::E1] != Piece::new(King, White) {
+            return Err("FEN string has white castling rights, but white's king is not on e1"
+                       .to_string());
+            }
+
+        if (board.can_castle_kingside(Black) || board.can_castle_queenside(Black))
+            && board[Square::E8] != Piece::new(King, Black) {
+            return Err("FEN string has black castling rights, but black's king is not on e8"
+                       .to_string());
+        }
     
         Ok(board)
     }
@@ -521,7 +532,35 @@ impl EvalBoard for ChessBoard {
     }
 
     fn all_legal_moves(&self) -> Vec<Self::Move> {
-        move_gen::all_legal_moves(self)
+        let (mut active_moves, mut quiet_moves) = move_gen::all_legal_moves(self);
+        active_moves.append(&mut quiet_moves);
+        active_moves
+    }
+
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+
+        if self[mv.from].color() != Some(self.to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+        let king_pos = move_gen::king_pos(&self);
+        let is_in_check = move_gen::is_attacked(&self, king_pos);
+        move_gen::legal_moves_for_piece(&mut self.clone(), mv.from,
+                                        &mut moves1, &mut moves2, &mut moves3,
+                                        is_in_check, king_pos);
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            debug_assert!(self.all_legal_moves().contains(&mv),
+            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
+    }
+
+    fn active_moves(&self) -> Vec<Self::Move> {
+        let (active_moves, _) = move_gen::all_legal_moves(self);
+        active_moves
     }
 
     fn hash_board(&self) -> Self {
@@ -529,7 +568,7 @@ impl EvalBoard for ChessBoard {
     }
     
     fn game_result(&self) -> Option<board::GameResult> {
-        if self.half_move_clock > 50 {
+        if self.half_move_clock > 100 {
             return Some(board::GameResult::Draw);
         }
         // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
@@ -626,6 +665,7 @@ impl EvalBoard for ChessBoard {
         
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).piece_type()) {
+            (Pawn, _) => self.half_move_clock = 0,
             (_, Empty) => self.half_move_clock += 1,
             (_, _) => self.half_move_clock = 0,
         }

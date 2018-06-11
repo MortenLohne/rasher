@@ -17,6 +17,8 @@ extern crate ordered_float;
 extern crate rayon;
 #[cfg(feature = "logging")]
 extern crate log4rs;
+#[cfg(feature = "profile")]
+extern crate cpuprofiler;
 
 use std::sync::{Arc, Mutex};
 use std::io;
@@ -43,6 +45,9 @@ use log4rs::config::{Appender, Config, Root};
 #[cfg(feature = "logging")]
 use std::io::Write;
 
+#[cfg(feature = "profile")]
+use cpuprofiler::PROFILER;
+
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
     let appender = log4rs::append::file::FileAppender::builder().append(true).build("rasher.log")?;
@@ -59,6 +64,10 @@ fn main() {
     init_log().unwrap_or_else(|err| {
         let _ = writeln!(&mut io::stderr(), "Failed to open log file: {}", err);
     });
+
+    #[cfg(feature = "profile")]
+    PROFILER.lock().unwrap().start("./my-prof.profile").unwrap();
+
     let mut stdin = io::BufReader::new(io::stdin());
     info!("Opened log");
     loop {
@@ -211,7 +220,7 @@ fn play_game<B> (mut board : B)
                 Arc::new(Mutex::new(uci::EngineComm::new())), None);
             
             let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-            println!("Found move {} with score {}.", move_str, score);
+            println!("Found move {} with score {}.", move_str, score.uci_string(board.to_move()));
             let mv = board.from_alg(&move_str).unwrap();
             board.do_move(mv);
             play_game(board);
@@ -265,7 +274,8 @@ fn play_human<B>(mut board : B)
                 
                 let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
                 let best_move = board.from_alg(&move_str);
-                println!("Computer played {:?} with score {}", best_move, score);
+                println!("Computer played {:?} with score {}",
+                         best_move, score.uci_string(board.to_move()));
                 board.do_move(best_move.unwrap());
                 play_human(board);
             }

@@ -26,7 +26,6 @@ fn available_moves_at_start() {
 #[test]
 fn starting_position_perf_test() {
     let mut board = CrazyhouseBoard::start_board().clone();
-    println!("{:?}", board);
     assert_eq!(legal_moves_after_plies(&mut board, 1), 20);
     assert_eq!(legal_moves_after_plies(&mut board, 2), 400);
     assert_eq!(legal_moves_after_plies(&mut board, 3), 8_902);

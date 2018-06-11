@@ -22,22 +22,24 @@ use rand::SeedableRng;
 const WHITE_SQUARES : BitBoard = BitBoard {
     board: 0b10101010_01010101_10101010_01010101_10101010_01010101_10101010_01010101
 };
+
 const BLACK_SQUARES : BitBoard = BitBoard {
     board: 0b01010101_10101010_01010101_10101010_01010101_10101010_01010101_10101010
 };
-const EVEN_RANKS : BitBoard = BitBoard {
-    board: 0b11111111_00000000_11111111_00000000_11111111_00000000_11111111_00000000
-};
-const ODD_RANKS : BitBoard = BitBoard {
-    board: 0b00000000_11111111_00000000_11111111_00000000_11111111_00000000_11111111
-};
-const EVEN_FILES : BitBoard = BitBoard {
-    board: 0b10101010_10101010_10101010_10101010_10101010_10101010_10101010_10101010
-};
-const ODD_FILES : BitBoard = BitBoard {
-    board: 0b01010101_01010101_01010101_01010101_01010101_01010101_01010101_01010101
-};
 
+pub const SJADAM_SQUARE_TYPES : [BitBoard; 4] =
+    [   BitBoard {
+        board: 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101
+    },
+        BitBoard {
+            board: 0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010
+        },
+        BitBoard {
+            board: 0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000
+        },
+    BitBoard {
+        board: 0b10101010_00000000_10101010_00000000_10101010_00000000_10101010_00000000
+    }];
 
 lazy_static! {
     static ref DIAGONAL_NEIGHBOURS : [BitBoard; 64] = {
@@ -92,8 +94,45 @@ lazy_static! {
         table
     };
 
-    static ref ZOBRIST_KEYS : [u64; 793] = {
-        let mut table = [0; 793];
+
+    static ref ORTHOGONAL_NEIGHBOURS : [BitBoard; 64] = {
+        let mut table : [BitBoard; 64] = [BitBoard::empty(); 64];
+
+        for i in 0..64 {
+            table[i] = RANK_NEIGHBOURS[i] | FILE_NEIGHBOURS[i];
+        }
+        table
+    };
+
+    /// For each square and color, store squares from which the player's pawns can attack the square
+    /// Always has 1 or 2 bits set
+    static ref PAWN_ATTACK_SQUARES : [[BitBoard; 2]; 64] = {
+        let mut table : [[BitBoard; 2]; 64] = [[BitBoard::empty(); 2]; 64];
+
+        for i in 0..64 {
+            let square = Square(i as u8);
+            let dia_neighbours = BitBoard::diagonal_neighbours(square);
+            table[i][0] = dia_neighbours.into_iter().filter(|sq| sq.rank() > square.rank()).collect();
+            table[i][1] = dia_neighbours.into_iter().filter(|sq| sq.rank() < square.rank()).collect();
+        }
+        table
+    };
+
+    pub static ref SQUARE_SQUARES : [BitBoard; 16] = {
+        let mut table = [BitBoard::empty(); 16];
+        for i in 0..16 {
+            let square : u8 = (i % 4) * 2 + (i / 4) * 16;
+            for j in [0, 1, 8, 9].iter() {
+                table[i as usize].set(Square(square + j));
+            }
+        }
+        table
+    };
+
+    // 768 keys for each piece on square, 8 for en passant squares,
+    // 1 for side to move, 16 for castling rights, 5 for repetitions
+    static ref ZOBRIST_KEYS : [u64; 798] = {
+        let mut table = [0; 798];
         let mut rng = rand::StdRng::from_seed(&[42]);
         for entry in table.iter_mut() {
             *entry = rng.next_u64();
@@ -265,12 +304,12 @@ impl BitBoard {
         DIAGONAL_NEIGHBOURS[square.0 as usize]
     }
 
-    pub fn rank_neighbours(square: Square) -> BitBoard {
-        RANK_NEIGHBOURS[square.0 as usize]
+    pub fn orthogonal_neighbours(square: Square) -> BitBoard {
+        ORTHOGONAL_NEIGHBOURS[square.0 as usize]
     }
 
-    pub fn file_neighbours(square: Square) -> BitBoard {
-        FILE_NEIGHBOURS[square.0 as usize]
+    pub fn pawn_attack_squares(square: Square, color: Color) -> BitBoard {
+        PAWN_ATTACK_SQUARES[square.0 as usize][color.disc()]
     }
 
     pub fn first_piece(&self) -> Option<Square> {
@@ -302,6 +341,16 @@ impl IntoIterator for BitBoard {
     }
 }
 
+impl FromIterator<Square> for BitBoard {
+    fn from_iter<T: IntoIterator<Item=Square>>(iter: T) -> Self {
+        let mut board = Self::empty();
+        for square in iter {
+            board.set(square);
+        }
+        board
+    }
+}
+
 pub struct BitBoardIterator {
     board: BitBoard,
 }
@@ -322,7 +371,6 @@ impl Iterator for BitBoardIterator {
         else {
             None
         }
-        
     }
 }
 
@@ -333,9 +381,12 @@ pub struct SjadamBoard {
     hash: u64,
     bitboards: [BitBoard; 12],
     to_move: Color,
+    last_move: Option<SjadamMove>,
     castling_en_passant: u8,
     half_move_clock: u8,
     move_num: u16,
+    move_history: Vec<u64>,
+    repetitions: u8, // starts at 1 ("number of occurrences")
 }
 
 impl PartialEq for SjadamBoard {
@@ -343,14 +394,15 @@ impl PartialEq for SjadamBoard {
         self.bitboards == other.bitboards
             && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
+            && self.repetitions == other.repetitions
     }
 }
 
 impl Eq for SjadamBoard {}
 
-
 use std::hash::Hasher;
 use std::hash::Hash;
+use std::iter::FromIterator;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -374,6 +426,8 @@ impl SjadamBoard {
             hash ^= ZOBRIST_KEYS[769 + en_passant_square.file() as usize];
         }
         hash ^= ZOBRIST_KEYS[777 + (self.castling_en_passant & 0b1111) as usize];
+        debug_assert!(self.repetitions > 0 && self.repetitions <= 5);
+        hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
         hash
     }
     
@@ -382,15 +436,20 @@ impl SjadamBoard {
                                white_pieces: BitBoard::empty(), black_pieces: BitBoard::empty(),
                                hash: 0,
                                to_move: other.to_move(),
+                               last_move: None,
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
-                               move_num: other.move_num };
+                               move_num: other.move_num,
+                               move_history: Vec::with_capacity(10),
+                               repetitions: 1};
+
         for square in BoardIter::new() {
             if !other[square].is_empty() {
                 board.set_piece_at_square(other[square], square);
             }
         }
         board.hash = board.hash_from_scratch();
+        debug_assert!(board.half_move_clock <= 100);
         board
     }
 
@@ -443,6 +502,8 @@ impl SjadamBoard {
     pub fn black_pieces(&self) -> BitBoard {
         self.black_pieces
     }
+
+    pub fn last_move(&self) -> Option<SjadamMove> { self.last_move.clone() }
 
     pub fn all_pieces(&self) -> BitBoard {
         BitBoard::from_u64(self.white_pieces().board | self.black_pieces().board)
@@ -552,7 +613,9 @@ impl SjadamBoard {
 
 impl fmt::Debug for SjadamBoard {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt::Debug::fmt(&self.to_chess_board(), fmt)
+        fmt::Debug::fmt(&self.to_chess_board(), fmt)?;
+        write!(fmt, "Hash: {}, repetitions: {}\n", self.hash, self.repetitions)?;
+        write!(fmt, "Move history: {:?}", self.move_history)
     }
 }
 
@@ -599,7 +662,8 @@ impl UciBoard for SjadamBoard {
         }
         let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
         let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
-        debug_assert!(!self.get_square(from).is_empty());
+        debug_assert!(!self.get_square(from).is_empty(), "Cannot parse move {} on \n{:?}",
+                      input, self);
         match input.len() {
             4 => Ok(SjadamMove::new(from, to, false,
                                     self.get_square(from).piece_type())),
@@ -714,8 +778,18 @@ impl EvalBoard for SjadamBoard {
             (true, false) => Some(GameResult::WhiteWin),
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
-            (true, true) if self.half_move_clock > 50 => Some(GameResult::Draw),
-            (true, true) => None,
+            (true, true) => {
+                if self.half_move_clock > 100 {
+                    Some(GameResult::Draw)
+                }
+                else if self.repetitions >= 3 {
+                    Some(GameResult::Draw)
+                }
+                else {
+                    None
+                }
+
+            },
         }
     }
 
@@ -725,18 +799,27 @@ impl EvalBoard for SjadamBoard {
         debug_assert!(!self.is_empty(mv.from()),
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
 
+
+
         let en_passant = mv.en_passant_bitboard(self);
         let undo_move = SjadamUndoMove {
             from: mv.from(), to: mv.to(),
             castling: mv.castling(), en_passant: en_passant,
             capture: self.get_square(mv.to()).piece_type(),
+            old_last_move: Some(mv.clone()),
             piece_moved: mv.piece_moved(),
             old_castling_en_passant: self.castling_en_passant,
             old_half_move_clock: self.half_move_clock,
+            old_repetitions: self.repetitions,
             old_hash: self.hash
         };
         debug_assert!(mv.piece_moved() != PieceType::Empty,
                       "Empty piece_moved when doing {} on \n{:?}", mv, self);
+
+        self.move_history.push(self.hash);
+        debug_assert!(self.half_move_clock <= 100, "half_move_clock was {}", self.half_move_clock);
+        self.half_move_clock += 1; // Gets zeroed later on on captures or promotions
+        debug_assert!(self.half_move_clock <= 100, "half_move_clock was {}", self.half_move_clock);
 
         self.hash ^= self.castling_en_passant_key();
         
@@ -790,8 +873,9 @@ impl EvalBoard for SjadamBoard {
         
         if undo_move.capture != Empty {
             self.clear_piece_at_square(Piece::new(undo_move.capture, !start_color), mv.to());
+            self.half_move_clock = 0;
         }
-        
+
         if mv.castling() {
             // Move the rook too
             let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
@@ -810,14 +894,48 @@ impl EvalBoard for SjadamBoard {
         {
             // Promote to queen
             debug_assert!(!self.is_empty(mv.to()));
+
             if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
                 self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
                 self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
             }
+            self.half_move_clock = 0;
         }
         
         self.to_move = !self.to_move();
         self.hash ^= ZOBRIST_KEYS[768];
+
+        // Last step: Detect repetitions
+        // The hash is now fully updated, *except* for any possible repetition
+        // Remove repetition from hash entirely
+        self.hash ^= ZOBRIST_KEYS[792 + self.repetitions as usize];
+
+        if self.half_move_clock >= 4 {
+            for repetition in 1..=5 {
+                let key = ZOBRIST_KEYS[792 + repetition];
+                self.hash ^= key;
+
+                if repetition == 5 {
+                    self.repetitions = 5;
+                }
+                else if self.move_history.iter().rev()
+                    .take(self.half_move_clock as usize)
+                    .skip(3)
+                    .any(|&hash| hash == self.hash)
+                    {
+                        self.hash ^= key;
+                    }
+                else {
+                    self.repetitions = repetition as u8;
+                    break;
+                }
+            }
+        }
+        else {
+            self.repetitions = 1;
+            self.hash ^= ZOBRIST_KEYS[793];
+        }
+
         debug_assert_ne!(start_color, self.to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
@@ -827,6 +945,10 @@ impl EvalBoard for SjadamBoard {
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
         let start_color = !self.to_move();
+
+        let old_hash = self.move_history.pop();
+        debug_assert!(old_hash.is_some());
+
         if mv.piece_moved != Queen
             && self.piece_at_square(Piece::new(Queen, start_color), mv.to()) {
                 self.clear_piece_at_square(Piece::new(Queen, start_color), mv.to());
@@ -857,10 +979,15 @@ impl EvalBoard for SjadamBoard {
         self.half_move_clock = mv.old_half_move_clock;
         self.castling_en_passant = mv.old_castling_en_passant;
         self.hash = mv.old_hash;
+        self.repetitions = mv.old_repetitions;
+        self.last_move = mv.old_last_move.clone();
 
         self.to_move = !self.to_move();
         debug_assert_ne!(!start_color, self.to_move());
         debug_assert!(!self.is_empty(mv.from()));
+        debug_assert_eq!(self.hash, self.hash_from_scratch(),
+                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
+        debug_assert_eq!(old_hash, Some(self.hash));
     }
 
     #[inline(never)]
@@ -868,6 +995,28 @@ impl EvalBoard for SjadamBoard {
         let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(self);
         active_moves.append(&mut moves);
         active_moves
+    }
+
+    #[inline(never)]
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        let piece_moved = self.get_square(mv.from());
+
+        if piece_moved.color() != Some(self.to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+
+        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
+                                                &mut moves1, &mut moves2, &mut moves3);
+
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            debug_assert!(self.all_legal_moves().contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
 
     #[inline(never)]
@@ -907,12 +1056,16 @@ impl EvalBoard for SjadamBoard {
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
 
-        let tempo_bonus = (white_val + black_val.abs()) / 200.0;
+        let tempo_bonus = match self.to_move() {
+            White => (white_val + black_val.abs()) / 200.0,
+            Black => -(white_val + black_val.abs()) / 200.0,
+        };
 
         const QUEEN_VAL : f32 = 0.5;
         const ROOK_VAL : f32 = 0.5;
         const BISHOP_VAL : f32 = 0.5;
-        const PAWN_VAL : f32 = 0.05;
+        const KNIGHT_VAL : f32 = 0.5;
+        const PAWN_VAL : f32 = 0.2;
 
         let king_safety_penalties = [White, Black].iter().map(|&color| {
 
@@ -926,7 +1079,8 @@ impl EvalBoard for SjadamBoard {
             else {
                 self.black_pieces()
             };
-            
+
+            // Penalty for king being on same colored diagonal as enemy queens/bishops
             {
                 let mut dia_penalty = 0.0;
                 
@@ -948,74 +1102,85 @@ impl EvalBoard for SjadamBoard {
                 dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
 
-                let pawns = self.bitboards[(!color).disc()];
-                dia_penalty -= PAWN_VAL * (pawns & colored_squares).popcount() as f32;
-                dia_penalty -= PAWN_VAL * (pawns & !colored_squares).popcount() as f32 * 0.2;
-
                 dia_penalty *= open_dia_neighbours as f32;
                 penalty += dia_penalty
             }
 
             {
-                let mut file_penalty = 0.0;
-                let files = if (kings & EVEN_FILES).is_empty() {
-                    ODD_FILES
-                }
-                else {
-                    EVEN_FILES
-                };
+                let mut orthogonal_penalty: f32 = 0.0;
 
-                let friendly_file_neighbours = BitBoard::file_neighbours(king_pos)
-                    & friendly_pieces;
-                let open_file_neighbours = BitBoard::file_neighbours(king_pos).popcount() - friendly_file_neighbours.popcount();
+                let neighbour_squares = BitBoard::orthogonal_neighbours(kings.first_piece().unwrap());
+                let open_neighbours_squares = neighbour_squares & (!friendly_pieces);
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
 
                 let rooks = self.bitboards[6 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
 
-                file_penalty -= ROOK_VAL * (rooks & files).popcount() as f32;
-                file_penalty -= ROOK_VAL * (rooks & !files).popcount() as f32 * 0.3;
-                file_penalty -= QUEEN_VAL * (queens & files).popcount() as f32;
-                file_penalty -= QUEEN_VAL * (queens & !files).popcount() as f32 * 0.4;
+                for square in open_neighbours_squares {
+                    orthogonal_penalty -= ROOK_VAL * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= ROOK_VAL * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                    orthogonal_penalty -= QUEEN_VAL * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= QUEEN_VAL * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.4;
+                }
 
-                file_penalty *= open_file_neighbours as f32;
-                penalty += file_penalty;
+                penalty += orthogonal_penalty;
+
             }
 
+            // Penalty when king has open knight-jump squares around it,
+            // which a knight may be able to sjadam-jump to
             {
-                let mut rank_penalty = 0.0;
-                let ranks = if (kings & EVEN_RANKS).is_empty() {
-                    ODD_RANKS
+                let mut knight_penalty = 0.0;
+
+                let open_neighbours_squares = sjadam_move_gen::knight_moves(kings, friendly_pieces);
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
+
+                let knights = self.bitboards[2 + (!color).disc()];
+
+                for square in open_neighbours_squares {
+                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    knight_penalty -= KNIGHT_VAL * (knights & sjadam_squares).popcount() as f32;
+                    knight_penalty -= KNIGHT_VAL * (knights & !sjadam_squares).popcount() as f32 * 0.3;
                 }
-                else {
-                    EVEN_RANKS
-                };
 
-                let friendly_rank_neighbours = BitBoard::rank_neighbours(king_pos)
-                    & friendly_pieces;
-                let open_rank_neighbours = BitBoard::rank_neighbours(king_pos).popcount() - friendly_rank_neighbours.popcount();
-
-                let rooks = self.bitboards[6 + (!color).disc()];
-                let queens = self.bitboards[8 + (!color).disc()];
-
-                rank_penalty -= ROOK_VAL * (rooks & ranks).popcount() as f32;
-                rank_penalty -= ROOK_VAL * (rooks & !ranks).popcount() as f32 * 0.3;
-                rank_penalty -= QUEEN_VAL * (queens & ranks).popcount() as f32;
-                rank_penalty -= QUEEN_VAL * (queens & !ranks).popcount() as f32 * 0.4;
-
-                rank_penalty *= open_rank_neighbours as f32;
-                penalty += rank_penalty;
+                penalty += knight_penalty;
             }
-            
+
+            // Penalty when king can has open pawn-capture squares,
+            // which a pawn may be able to sjadam-jump to
+            {
+                let mut pawn_penalty = 0.0;
+
+                let open_neighbours_squares = BitBoard::pawn_attack_squares(kings.first_piece().unwrap(), !color) & !friendly_pieces;
+
+                debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
+
+                let pawns = self.bitboards[(!color).disc()];
+
+                for square in open_neighbours_squares {
+                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    pawn_penalty -= PAWN_VAL * (pawns & sjadam_squares).popcount() as f32;
+                    pawn_penalty -= PAWN_VAL * (pawns & !sjadam_squares).popcount() as f32 * 0.2;
+                }
+
+                penalty += pawn_penalty;
+            }
             penalty
         })
             .collect::<Vec<_>>();
 
-        match self.to_move {
-            White => white_val - black_val + tempo_bonus
-                + king_safety_penalties[0] - king_safety_penalties[1],
-            Black => white_val - black_val - tempo_bonus
-                + king_safety_penalties[0] - king_safety_penalties[1],
-        } 
+        const SPREAD: f32 = 0.3;
+
+        let white_spread_bonus = SQUARE_SQUARES.iter()
+            .filter(|&&bitboard| !(bitboard & self.white_pieces).is_empty())
+            .count() as f32 * SPREAD;
+
+        let black_spread_bonus = SQUARE_SQUARES.iter()
+            .filter(|&&bitboard| !(bitboard & self.black_pieces).is_empty())
+            .count() as f32 * SPREAD;
+
+        white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
+            + king_safety_penalties[0] - king_safety_penalties[1]
         /*
         TODO: Put pawn advancement eval back
         let pawn_val = match self.board[rank][file].piece_type() {
@@ -1024,7 +1189,5 @@ impl EvalBoard for SjadamBoard {
          */    
     }
 
-    fn branch_factor() -> u64 {
-        30
-    }
+    const BRANCH_FACTOR : u64 = 30;
 }

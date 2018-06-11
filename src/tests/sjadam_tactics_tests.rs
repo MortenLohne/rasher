@@ -4,8 +4,11 @@ use search_algorithms::alpha_beta;
 use board::sjadam_move::SjadamMove;
 use search_algorithms::board::EvalBoard;
 use search_algorithms::board::Color;
+use search_algorithms::board::Color::*;
 use uci;
 use std::sync;
+use search_algorithms::alpha_beta::Score;
+use search_algorithms::board::GameResult;
 
 /// Promotes a pawn through a sjadam move, which mates
 #[test]
@@ -27,7 +30,7 @@ fn basic_tactics_prop(board : &SjadamBoard, best_move : SjadamMove) {
     let game_move = board.from_alg(&move_str).unwrap();
     
     assert_eq!(game_move, best_move,
-               "Best move was {:?} with score {}, expected {:?}, board:\n{:?}",
+               "Best move was {:?} with score {:?}, expected {:?}, board:\n{:?}",
                game_move, score,
                best_move, board);
 }
@@ -144,6 +147,56 @@ fn sjadammate18() {
     is_mate_in_one(&board, correct_move);
 }
 
+#[test]
+fn repetitions_score_0() {
+    let board = SjadamBoard::from_fen("q3pr1k/R7/K5R1/8/7P/8/8/7q w - -").unwrap();
+    let engine_comm = sync::Arc::new(sync::Mutex::new(uci::EngineComm::new()));
+
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Infinite,
+        uci::EngineOptions::new(),
+        engine_comm.clone(), None);
+
+    loop {
+        let info = channel.recv().unwrap();
+        if let Score::Draw(_) = info.pvs[0].0 {
+            engine_comm.lock().unwrap().engine_should_stop = true;
+            handle.join().unwrap();
+            return;
+        }
+        else if info.nodes > 1_000_000 {
+            panic!("Expected draw score, got: {}", info.to_info_string());
+        }
+    }
+}
+
+/// The engine should be able to return and make a move, even in drawn position
+#[test]
+fn can_move_in_draw_position() {
+    let mut board = SjadamBoard::start_board();
+
+    for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8", "c1c3", "c8c6", "c3c1", "c6c8"].iter() {
+        assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
+        let mv = board.from_alg(mv_str).unwrap();
+        board.do_move(mv);
+    }
+
+    assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
+
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), uci::TimeRestriction::Mate(3),
+        uci::EngineOptions::new(),
+        sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
+
+    let (_, move_str) = uci::get_uci_move(handle, channel).unwrap();
+
+    let mv = board.from_alg(&move_str).unwrap();
+
+    board.do_move(mv);
+
+    assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
+}
+
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
     let mut engine_options = uci::EngineOptions::new();
     engine_options.null_move_pruning = false;
@@ -157,11 +210,11 @@ fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
     let game_move = board.from_alg(&move_str).unwrap();
     
     assert_eq!(game_move, best_move,
-               "Best move was {:?} with score {}, expected {:?}, board:\n{:?}",
+               "Best move was {:?} with score {:?}, expected {:?}, board:\n{:?}",
                game_move, score,
                best_move, board);
     match board.to_move() {
-        Color::White => assert_eq!(score.to_string(), "mate 2"),
-        Color::Black => assert_eq!(score.to_string(), "mate -2"),
+        Color::White => assert_eq!(score.uci_string(White), "mate 2"),
+        Color::Black => assert_eq!(score.uci_string(Black), "mate -2"),
     }
 }

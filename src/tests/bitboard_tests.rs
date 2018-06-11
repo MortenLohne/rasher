@@ -1,3 +1,4 @@
+use board::sjadam_board;
 use board::sjadam_board::BitBoard;
 use board::sjadam_board::SjadamBoard;
 use board::std_board::ChessBoard;
@@ -40,16 +41,21 @@ impl Arbitrary for BitBoard {
     }
 }
 
+impl Arbitrary for Square {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        Square((g.next_u64() % 64) as u8)
+    }
+}
+
 quickcheck! {
     fn rotation_45_preserves_pieces(bitboard: BitBoard) -> bool {
         bitboard.rotate_45().board.count_ones() == bitboard.board.count_ones()
     }
+
     fn diagonals_preserve_pieces(bitboard: BitBoard) -> bool {
-        println!("Bitcounts: {}, {}",
-                 (0..15).map(|n| bitboard.diagonal(n)).map(u8::count_ones).sum::<u32>(),
-                 bitboard.popcount());
         (0..15).map(|n| bitboard.diagonal(n)).map(u8::count_ones).sum::<u32>() == bitboard.popcount()
     }
+
     fn rotation_315_preserves_pieces(bitboard: BitBoard) -> bool {
         bitboard.rotate_315().board.count_ones() == bitboard.board.count_ones()
     }
@@ -59,21 +65,41 @@ quickcheck! {
             .map(u8::count_ones)
             .sum::<u32>() == bitboard.popcount()
     }
+
     fn rotate_315_back(bitboard: BitBoard) -> bool {
         (0..8).fold(bitboard, |board, _| board.rotate_315()) == bitboard
     }
+
     fn rotate_45_back(bitboard: BitBoard) -> bool {
         (0..8).fold(bitboard, |board, _| board.rotate_45()) == bitboard
+    }
+
+    fn iterator_iterates_all(bitboard: BitBoard) -> bool {
+        bitboard.into_iter().count() == bitboard.popcount() as usize
+    }
+
+    fn iterator(bitboard: BitBoard) -> bool {
+        let mut board = BitBoard::empty();
+        for square in bitboard {
+            board.set(square);
+        }
+        board == bitboard
+    }
+
+    fn from_to_iterator(bitboard: BitBoard) -> bool {
+        bitboard.into_iter().collect::<BitBoard>() == bitboard
+    }
+
+    fn pawn_attacks_both_ways(square: Square) -> bool {
+        let attacks = BitBoard::pawn_attack_squares(square, White) | BitBoard::pawn_attack_squares(square, Black);
+        assert!(!attacks.is_empty());
+        attacks == BitBoard::diagonal_neighbours(square)
     }
 }
 
 #[test]
 fn rank() {
     let start_board = BitBoard::all_from_board(&ChessBoard::start_board());
-    println!("{:?}", start_board);
-    for rank in 0..8 {
-        println!("{}", start_board.rank(rank));
-    }
     assert_eq!(start_board.rank(0), 255);
     assert_eq!(start_board.rank(1), 255);
     assert_eq!(start_board.rank(2), 0);
@@ -140,6 +166,15 @@ fn diagonal_neighbours() {
     let mut board = BitBoard::empty();
     board.set(Square(9));
     assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
+}
+
+#[test]
+fn square_squares() {
+    for bitboard in sjadam_board::SQUARE_SQUARES.iter() {
+        assert_eq!(bitboard.popcount(), 4);
+    }
+
+    assert_eq!(sjadam_board::SQUARE_SQUARES.iter().fold(BitBoard::empty(), |b1, &b2| b1 | b2).popcount(), 64);
 }
 
 #[test]

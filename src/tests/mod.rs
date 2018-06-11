@@ -28,3 +28,6 @@ mod board_tests;
 
 #[cfg(test)]
 mod bitboard_tests;
+
+#[cfg(test)]
+mod sjadam_board_tests;

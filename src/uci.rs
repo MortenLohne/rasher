@@ -14,7 +14,8 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::str::FromStr;
 use std::time;
-
+use std::hash::Hash;
+ 
 pub trait UciBoard: board::EvalBoard {
     fn from_fen(&str) -> Result<Self, String>;
     fn to_fen(&self) -> String;
@@ -75,6 +76,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 };
             }
+            /*
             "quiet_eval" => {
                 let mut node_counter = ::NodeCount::new();
                 match engine_options.variant {
@@ -98,6 +100,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 };
             }
+             */
             "fen" => {
                 match engine_options.variant {
                     ChessVariant::Standard => {
@@ -246,6 +249,22 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 });
                 search_thread = Some(handle);
             }
+            "eval_game" => {
+                match engine_options.variant {
+                    ChessVariant::Standard => {
+                        let board = parse_position::<ChessBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                    ChessVariant::Sjadam => {
+                        let board = parse_position::<SjadamBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                    ChessVariant::Crazyhouse => {
+                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                        eval_game(board, &tokens[1..]);
+                    }
+                };
+            }
             "sjadam" => engine_options.variant = ChessVariant::Sjadam,
             "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
             "hash1G" => engine_options.hash_memory = 1024,
@@ -291,8 +310,7 @@ pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>
 }
 
 #[allow(dead_code)]
-pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>,
-                                multipv: u32)
+pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
                              -> Result<Vec<(Score, String)>, (Option<Vec<(Score, String)>>, String)> {
     let mut last_info = None;
     loop { // The channel will return error when closed
@@ -311,11 +329,6 @@ pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciIn
                             (score, pv_string)
                         })
                         .collect::<Vec<_>>();
-                    if results.len() as u32 != multipv {
-                        return Err((Some(results.clone()),
-                                    format!("Engine returned {} moves, expected {}",
-                                            results.len() as u32, multipv)))
-                    }
                     if let Err(err) = handle.join() {
                         return Err((Some(results), format!("{:?}", err)))
                     }
@@ -530,6 +543,63 @@ pub fn parse_go (input : &str)
     Ok((TimeRestriction::GameTime(time_info), None))
 }
 
+pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
+    where Board: 'static + UciBoard + fmt::Debug + Send + Hash + Eq,
+<Board as board::EvalBoard>::Move: Send + Sync
+{
+
+    let (handle, channel) = alpha_beta::start_uci_search(
+        board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+        EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
+        None);
+
+
+    let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
+    let mut last_eval = eval;
+    let mut last_correct_move = pv_str.split_whitespace()
+        .next()
+        .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
+    
+    for mv_str in moves {
+        let mv = board.from_alg(mv_str).unwrap();
+        assert!(board.all_legal_moves().contains(&mv));
+
+        board.do_move(mv.clone());
+        
+        let (handle, channel) = alpha_beta::start_uci_search(
+            board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+            EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
+            None);
+
+        let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
+                
+        let best_move = pv_str.split_whitespace()
+            .next()
+            .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
+        let delta_score = eval.to_cp(board.to_move()) - last_eval.to_cp(board.to_move());
+        
+        if best_move != mv && delta_score > 0 {
+            let verdict = match delta_score {
+                0 ... 100 => "Inaccuracy",
+                100 ... 300 => "Mistake",
+                _ => "Blunder",
+            };
+            println!("{} ({}): {}, {} was better. ({} vs {}, delta={})",
+                     mv_str, !board.to_move(), verdict,
+                     board.to_alg(&last_correct_move),
+                     eval.uci_string(board.to_move()), last_eval.uci_string(board.to_move()),
+                     delta_score);
+        }
+        
+        else {
+            println!("{} ({}): {}", mv_str, board.to_move(), eval.uci_string(board.to_move()));
+        }
+        
+        last_eval = eval;
+        last_correct_move = best_move;
+    }
+}
+
 /// Prints the input to stdout (Where it can be read by the GUI), and also writes it
 /// to the log file, if it is present
 pub fn uci_send (message : &str) {
@@ -609,6 +679,7 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 /// Trait representing an algorithm returning uci-compatible output
 #[derive(Debug, PartialEq, Clone)]
 pub struct UciInfo {
+    pub color: board::Color,
     pub depth: u16,
     pub seldepth: u16,
     pub time: i64,
@@ -623,15 +694,15 @@ impl UciInfo {
         let mut string = String::new();
         if self.pvs.len() == 1 {
             write!(string, "info depth {} seldepth {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                   self.depth, self.seldepth, self.pvs[0].0, self.nodes,
-                   (self.hashfull * 1000.0) as i64,
+                   self.depth, self.seldepth, self.pvs[0].0.uci_string(self.color),
+                   self.nodes, (self.hashfull * 1000.0) as i64,
                    self.time, (1000 * self.nodes) as i64 / (self.time + 1), self.pvs[0].1).unwrap();
         } // Add one to self.time to avoid division by zero
         else {
             for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
                 write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                       self.depth, self.seldepth, n + 1, score, self.nodes,
-                       (self.hashfull * 1000.0) as i64,
+                       self.depth, self.seldepth, n + 1, score.uci_string(self.color),
+                       self.nodes, (self.hashfull * 1000.0) as i64,
                        self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
             }
         }

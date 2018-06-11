@@ -2,6 +2,20 @@ use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
 use search_algorithms::board::{GameResult, EvalBoard};
 use tests::move_gen_tests;
+use board::sjadam_board::BitBoard;
+use board::std_board::Square;
+use board::sjadam_move_gen;
+
+#[test]
+fn possible_sjadam_squares() {
+    let mut squares = BitBoard::empty();
+    for square in [Square(0), Square(1), Square(8), Square(9)].iter().cloned() {
+        let board = sjadam_move_gen::possible_sjadam_squares(square);
+        assert_eq!(board.popcount(), 16);
+        squares = squares | board;
+    }
+    assert_eq!(squares.popcount(), 64);
+}
 
 #[test]
 fn correct_move_gen_start_pos() {

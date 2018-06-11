@@ -7,6 +7,7 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::EvalBoard;
 
+use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
 use board::sjadam_board::BitBoard;
 
@@ -52,6 +53,7 @@ lazy_static! {
         }
         table
     };
+
     static ref KNIGHT_TABLE : [u64; 256] = {
         let mut table = [0; 256];
         let c = 1 << 18;
@@ -83,6 +85,7 @@ lazy_static! {
         }
         table
     };
+
     static ref KING_TABLE : [u64; 256] = {
         let mut table = [0; 256];
         let attacks = 0b11100000_11100000_111;
@@ -111,6 +114,7 @@ lazy_static! {
     };
 }
 
+#[inline(never)]
 pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>) {
     let mut moves = Vec::with_capacity(250);
     let mut active_moves = Vec::with_capacity(50);
@@ -155,7 +159,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
 }
 
 #[inline(never)]
-fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
+pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: PieceType,
                           quiet_moves: &mut Vec<SjadamMove>,
                           active_moves: &mut Vec<SjadamMove>,
                           winning_moves: &mut Vec<SjadamMove>) {
@@ -218,10 +222,14 @@ fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: Piece
                 else if target.value().abs() == piece_type.value().abs() {
                     active_moves.push(mv);
                 }
+                else if Some(target_square) == board.last_move().map(|m|m.to()) {
+                    active_moves.push(mv);
+                }
                 else {
                     quiet_moves.push(mv);
                 }
             }
+                // TODO: Make pawn captures active if they recapture a pawn?
             else {
                 quiet_moves.push(mv);
             }
@@ -298,6 +306,16 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
         }
     }
 }
+// possible sjadam squares. Always 16 squares marked
+pub fn possible_sjadam_squares(square: Square) -> BitBoard{
+    let (file, rank) = square.file_rank();
+    match (file % 2 == 0, rank % 2 == 0) {
+        (false, false) => sjadam_board::SJADAM_SQUARE_TYPES[3],
+        (true, false) => sjadam_board::SJADAM_SQUARE_TYPES[2],
+        (false, true) => sjadam_board::SJADAM_SQUARE_TYPES[1],
+        (true, true) => sjadam_board::SJADAM_SQUARE_TYPES[0],
+    }
+}
 
 #[inline(never)]
 fn king_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
@@ -314,7 +332,7 @@ fn king_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
 }
 
 #[inline(never)]
-fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
+pub fn knight_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard) -> BitBoard {
     let mut moves = 0;
     for rank in 0..2 {
         let index = ((sjadam_squares.board >> (rank * 8)) & 255) as usize;

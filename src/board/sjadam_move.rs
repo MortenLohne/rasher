@@ -13,9 +13,11 @@ pub struct SjadamUndoMove {
     pub en_passant: bool,
     pub castling: bool,
     pub piece_moved: PieceType,
+    pub old_last_move: Option<SjadamMove>,
     pub capture: PieceType,
     pub old_castling_en_passant: u8,
     pub old_half_move_clock: u8,
+    pub old_repetitions: u8,
     pub old_hash: u64,
 }
 
@@ -61,10 +63,10 @@ impl SjadamMove {
         self.castling
     }
     pub fn from(&self) -> Square {
-        self.from_to_squares().0
+        self.from
     }
     pub fn to(&self) -> Square {
-        self.from_to_squares().1
+        self.to
     }
     pub fn piece_moved(&self) -> PieceType {
         self.piece_moved
