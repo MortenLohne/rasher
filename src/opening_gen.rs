@@ -14,9 +14,12 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use std::time;
 
+const SEARCH_TIME_MS : u64 = 1000;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OpeningTree<B: EvalBoard> {
     pub mv: Option<B::Move>,
-    pub eval: Score,
+    pub eval: Score, // From the perspective of the side to move
     pub children: Option<Vec<OpeningTree<B>>>,
 }
 
@@ -36,11 +39,12 @@ impl<B: EvalBoard> OpeningTree<B>
     pub fn sort_tree(&mut self, board: &mut B) {
         if let Some(ref mut children) = self.children {
             children.sort_by(|child1, child2| {
-                match board.to_move() {
-                    White => child1.eval.partial_cmp(&child2.eval).unwrap().reverse(),
-                    Black => child1.eval.partial_cmp(&child2.eval).unwrap(),
-                }
+                child1.eval.partial_cmp(&child2.eval).unwrap()
             });
+
+            assert_eq!(Some(!self.eval), children.get(0).map(|ch| ch.eval),
+                       "self-eval was {:?} after {:?}, child-evals were {:?}", self.eval, self.mv, children);
+
             for child in children {
                 if let Some(mv) = child.mv.clone() {
                     let undo_move = board.do_move(mv);
@@ -63,7 +67,7 @@ impl<B: EvalBoard> OpeningTree<B>
 
                 board.undo_move(undo_move);
 
-                result && child.eval.to_cp().abs() < 100
+                result && child.eval.to_cp(board.to_move()).abs() < 100
                 
             });
             for child in children {
@@ -88,7 +92,7 @@ impl<B: EvalBoard> OpeningTree<B>
         let fen = board.to_fen().split_whitespace().take(4).collect::<Vec<&str>>().join(" ");
         
         println!("{} ce {}; id \"{}\"",
-                 fen, self.eval.to_cp(), pv.join(" "));
+                 fen, self.eval.to_cp(board.to_move()), pv.join(" "));
         for child in self.children.as_ref()
             .unwrap_or(&vec![]) {
             child.print_opening(board, pv);
@@ -105,8 +109,11 @@ impl<B: EvalBoard> OpeningTree<B>
         if depth == 0 {
             return None
         }
+
         let multipv = if depth > 1 { 16 } else { 1 };
-        
+
+        let duration = time::Duration::from_millis(SEARCH_TIME_MS * (multipv as f64).sqrt() as u64);
+
         let mut options = EngineOptions::new();
         options.multipv = multipv;
         options.hash_memory = 128;
@@ -114,34 +121,21 @@ impl<B: EvalBoard> OpeningTree<B>
         let (handle, move_channel) =
             alpha_beta::start_uci_search(
                 board.clone(),
-                TimeRestriction::MoveTime(time::Duration::from_millis(600 * (multipv as f64).sqrt() as u64)),
+                TimeRestriction::MoveTime(duration),
                 options,
                 Arc::new(Mutex::new(EngineComm::new())),
                 None);
         
-        if let Ok(mut results) = uci::get_uci_multipv(handle, move_channel, multipv) {
-            
-            match board.to_move() {
-                White => {
-                    results = results.iter()
-                        .cloned()
-                        .filter(|&(score, _)|
-                                score.to_cp() > i16::min(-200, -100 * depth as i16))
-                        .collect();
-                    results.sort_by(|&(score1, _), &(score2, _)|
-                                    score1.partial_cmp(&score2).unwrap());
+        if let Ok(mut results) = uci::get_uci_multipv(handle, move_channel) {
 
-                },
-                Black => {
-                    results = results.iter()
-                    .cloned()
-                        .filter(|&(score, _)|
-                                score.to_cp() < i16::max(200, 100 * depth as i16))
-                    .collect();
-                    results.sort_by(|&(score1, _), &(score2, _)|
-                                    score1.partial_cmp(&score2).unwrap().reverse());
-                }
-            }
+            results = results.iter()
+                .cloned()
+                .filter(|&(score, _)|
+                    score > Score::Val(-2.0))
+                .collect();
+            results.sort_by(|&(score1, _), &(score2, _)|
+                score1.partial_cmp(&score2).unwrap());
+            results.reverse(); // Best score first
 
             if results.is_empty() {
                 return None
@@ -149,8 +143,8 @@ impl<B: EvalBoard> OpeningTree<B>
             debug_assert!(self.children.is_none());
             self.children = Some(vec![]);
 
-            let mut smallest = Score::WhiteWin(0);
-            let mut biggest = Score::BlackWin(0);
+            //let mut smallest = Score::Win(0);
+            let mut biggest = Score::Loss(0);
             
             for &(ref score, ref mv_str) in results.iter() {
 
@@ -158,38 +152,33 @@ impl<B: EvalBoard> OpeningTree<B>
                 let mv = board.from_alg(&mv_str).unwrap();
 
                 let child = OpeningTree { mv: Some(mv.clone()),
-                                          eval: score.clone(), children: None };
+                                          eval: !*score,
+                                          children: None };
                 children.push(child);
                 
                 let undo_move = board.do_move(mv);
-                
-                //println!("{}; ce {}",
-                //         board.to_fen(), score.to_cp());
+
                 let result =
                     if depth > 1 {
                         children.last_mut().unwrap().eval(depth - 1, board.clone())
                     }
                 else {
-                    Some(score.clone())
+                    Some(*score)
                 };
                 board.undo_move(undo_move);
                 if let Some(val) = result {
                     if val > biggest { biggest = val }
-                    if val < smallest { smallest = val }
                 }
             }
-            
-            match board.to_move() {
-                White => { self.eval = biggest; Some(biggest) },
-                Black => { self.eval = smallest; Some(smallest) },
-            }
+
+            self.eval = biggest;
+            Some(!biggest)
         }
         
         else {
             None
         }
     }
-    
 }
 
 pub fn gen_from_startpos<B>(depth: u8)
@@ -214,22 +203,22 @@ pub fn gen_openings<B>(mut board: B, depth: u8, pv: &str, transpositions: &mut H
     let (handle, move_channel) =
         alpha_beta::start_uci_search(board.clone(),
                                      TimeRestriction::MoveTime(
-                                         time::Duration::from_millis(500 * multipv as u64)),
+                                         time::Duration::from_millis(SEARCH_TIME_MS * multipv as u64)),
                                      options,
                                      Arc::new(Mutex::new(EngineComm::new())),
                                      None);
     
-    match uci::get_uci_multipv(handle, move_channel, multipv) {
+    match uci::get_uci_multipv(handle, move_channel) {
         Ok(mut results) => {
             
             match board.to_move() {
                 White => results = results.iter()
                     .cloned()
-                    .filter(|&(score, _)| score.to_cp() > i16::min(-100, -50 * depth as i16))
+                    .filter(|&(score, _)| score.to_cp(White) > i16::min(-100, -50 * depth as i16))
                     .collect(),
                 Black => results = results.iter()
                     .cloned()
-                    .filter(|&(score, _)| score.to_cp() < i16::max(100, 50 * depth as i16))
+                    .filter(|&(score, _)| score.to_cp(Black) < i16::max(100, 50 * depth as i16))
                     .collect(),
             }
             
@@ -243,7 +232,7 @@ pub fn gen_openings<B>(mut board: B, depth: u8, pv: &str, transpositions: &mut H
                 if !transpositions.contains(&board) {
                     transpositions.insert(board.clone());
                     println!("{}; ce {}; {}",
-                             board.to_fen(), score.to_cp(), new_pv);
+                             board.to_fen(), score.to_cp(board.to_move()), new_pv);
                     gen_openings(board.clone(), depth - 1, &new_pv, transpositions);
                 }
                 board.undo_move(undo_move);

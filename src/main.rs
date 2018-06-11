@@ -159,41 +159,62 @@ fn main() {
                 "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
 
                 "opening_gen" => {
-                    if tokens.len() == 1 || tokens[1] == "standard" {
-                        opening_gen::gen_from_startpos::<ChessBoard>(4);
-                    }
-                    else {
-                        match tokens[1] {
-                            "crazyhouse" => opening_gen::gen_from_startpos::<CrazyhouseBoard>(4),
-                            
-                            "sjadam" => {
-                                let mut tree = OpeningTree::new_root();
-                                let mut board = SjadamBoard::start_board();
-                                let root_eval = tree.eval(3, board.clone());
-                                tree.sort_tree(&mut board);
-                                
-                                for child in tree.children.as_ref().unwrap_or(&vec![]) {
+                    match tokens.get(1) {
+                        Some(&"standard") | None => {
+                            let mut tree = OpeningTree::new_root();
+                            let mut board = ChessBoard::start_board();
+                            let root_eval = tree.eval(3, board.clone());
+                            tree.sort_tree(&mut board);
 
-                                    println!("Child eval for {:?}: {}",
-                                             child.mv, child.eval);
+                            for child in tree.children.as_ref().unwrap_or(&vec![]) {
 
-                                    for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
-                                        println!("Grandchild eval for {:?}: {}",
-                                                 grandchild.mv, grandchild.eval);
-                                    }
+                                println!("Child eval for {:?}: {:?}",
+                                         child.mv, child.eval);
+
+                                for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
+                                    println!("Grandchild eval for {:?}: {:?}",
+                                             grandchild.mv, grandchild.eval);
                                 }
-                                println!("Size before pruning: {}", tree.size());
-                                tree.prune(&mut board, &mut HashSet::new());
-                                println!("Size after pruning: {}", tree.size());
-                                println!("Eval: {:?}", root_eval);
-                                tree.print_opening(&mut board, &mut vec![]);
+                            }
+                            println!("Size before pruning: {}", tree.size());
+                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.prune(&mut board, &mut HashSet::new());
 
-                            },
-                            
-                            s => println!("Unrecognized variant {}.", s),
-                        }
+                            println!("Size after pruning: {}", tree.size());
+                            println!("Eval: {:?}", root_eval);
+                            tree.print_opening(&mut board, &mut vec![]);
+
+                        },
+                        Some(&"crazyhouse") => opening_gen::gen_from_startpos::<CrazyhouseBoard>(4),
+
+                        Some(&"sjadam") => {
+                            let mut tree = OpeningTree::new_root();
+                            let mut board = SjadamBoard::start_board();
+                            let root_eval = tree.eval(3, board.clone());
+                            tree.sort_tree(&mut board);
+
+                            for child in tree.children.as_ref().unwrap_or(&vec![]) {
+
+                                println!("Child eval for {:?}: {:?}",
+                                         child.mv, child.eval);
+
+                                for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
+                                    println!("Grandchild eval for {:?}: {:?}",
+                                             grandchild.mv, grandchild.eval);
+                                }
+                            }
+                            println!("Size before pruning: {}", tree.size());
+                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.prune(&mut board, &mut HashSet::new());
+
+                            println!("Size after pruning: {}", tree.size());
+                            println!("Eval: {:?}", root_eval);
+                            tree.print_opening(&mut board, &mut vec![]);
+
+                        },
+
+                        s => println!("Unrecognized variant {:?}.", s),
                     }
-                    break;
                 },
                 
                 s => warn!("Unrecognized command \"{}\".", s),
