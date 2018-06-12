@@ -159,38 +159,41 @@ fn main() {
                 "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
 
                 "opening_gen" => {
+                    const DEPTH : u8 = 3;
                     match tokens.get(1) {
                         Some(&"standard") | None => {
                             let mut tree = OpeningTree::new_root();
                             let mut board = ChessBoard::start_board();
-                            let root_eval = tree.eval(3, board.clone());
+                            let root_eval = tree.eval(DEPTH, board.clone());
                             tree.sort_tree(&mut board);
 
-                            for child in tree.children.as_ref().unwrap_or(&vec![]) {
-
-                                println!("Child eval for {:?}: {:?}",
-                                         child.mv, child.eval);
-
-                                for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
-                                    println!("Grandchild eval for {:?}: {:?}",
-                                             grandchild.mv, grandchild.eval);
-                                }
-                            }
                             println!("Size before pruning: {}", tree.size());
                             tree.print_opening(&mut board, &mut vec![]);
                             tree.prune(&mut board, &mut HashSet::new());
-
                             println!("Size after pruning: {}", tree.size());
                             println!("Eval: {:?}", root_eval);
                             tree.print_opening(&mut board, &mut vec![]);
 
                         },
-                        Some(&"crazyhouse") => opening_gen::gen_from_startpos::<CrazyhouseBoard>(4),
+                        Some(&"crazyhouse") => {
+                            let mut tree = OpeningTree::new_root();
+                            let mut board = CrazyhouseBoard::start_board();
+                            let root_eval = tree.eval(DEPTH, board.clone());
+                            tree.sort_tree(&mut board);
+
+                            println!("Size before pruning: {}", tree.size());
+                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.prune(&mut board, &mut HashSet::new());
+                            println!("Size after pruning: {}", tree.size());
+                            println!("Eval: {:?}", root_eval);
+                            tree.print_opening(&mut board, &mut vec![]);
+
+                        },
 
                         Some(&"sjadam") => {
                             let mut tree = OpeningTree::new_root();
                             let mut board = SjadamBoard::start_board();
-                            let root_eval = tree.eval(3, board.clone());
+                            let root_eval = tree.eval(DEPTH, board.clone());
                             tree.sort_tree(&mut board);
 
                             for child in tree.children.as_ref().unwrap_or(&vec![]) {
