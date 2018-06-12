@@ -20,9 +20,9 @@ use board::sjadam_board::SjadamBoard;
 
 use rayon::prelude::*;
 use std::io;
-use search_algorithms::board::Color::White;
 use board::sjadam_move::SjadamMove;
 use std::process;
+use std::fs;
 
 type Depth = u32;
 
@@ -102,8 +102,8 @@ impl<B: EvalBoard> OpeningTree<B>
         }
     }
 
-    pub fn print_opening<T: io::Write>(&self, board: &mut B, pv: &mut Vec<String>,
-                                       depth: Depth, sink: &mut T) {
+    pub fn print_epd<T: io::Write>(&self, board: &mut B, pv: &mut Vec<String>,
+                                   depth: Depth, sink: &mut T) {
         let undo_move =
             if let Some(mv) = self.mv.as_ref() {
                 pv.push(board.to_alg(mv));
@@ -121,12 +121,25 @@ impl<B: EvalBoard> OpeningTree<B>
 
         for child in self.children.as_ref()
             .unwrap_or(&vec![]) {
-            child.print_opening(board, pv, depth + 1, sink);
+            child.print_epd(board, pv, depth + 1, sink);
         }
 
         if let Some(undo_move) = undo_move {
             pv.pop();
             board.undo_move(undo_move);
+        }
+    }
+
+    pub fn print_opening<T: io::Write>(&self, board: &B, sink: &mut T) {
+        for child in self.children.as_ref().unwrap_or(&vec![]) {
+            write!(sink, "Child eval for {:?}: {}\n",
+                     child.mv, child.eval.to_cp(!board.to_move())).unwrap();
+
+            for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
+                write!(sink, "\tGrandchild eval for {:?}: {}, best reply {:?}\n",
+                         grandchild.mv, grandchild.eval.to_cp(board.to_move()),
+                         grandchild.children.as_ref().and_then(|chs| chs.get(0).and_then(|ch| ch.mv.clone() ))).unwrap();
+            }
         }
     }
 
@@ -281,7 +294,7 @@ impl<B: EvalBoard> OpeningTree<B>
 
 pub fn gen_sjadam_openings() {
 
-    const DEPTH : Depth = 2;
+    const DEPTH : Depth = 3;
 
     let moves = ["c1a7","c1c3","f1f3","h2h3","a2a3","b1b3","f1h7",
         "g1f3","c1a3","b1d3","h2h4","g1e3","g1g3","c1e3","f1d3","b1c3","h1h7",
@@ -314,26 +327,6 @@ pub fn gen_sjadam_openings() {
                            "root-eval was {:?}, child-evals were {:?}",
                            root_eval, tree.children.as_ref().unwrap().iter().map(|ch| (ch.mv.clone(), ch.eval)).collect::<Vec<_>>());
 
-
-                /*
-                for child in tree.children.as_ref().unwrap_or(&vec![]) {
-                    println!("Child eval for {:?}: {:?}",
-                             child.mv, child.eval.to_cp(!board.to_move()));
-
-                    for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
-                        println!("\tGrandchild eval for {:?}: {:?}",
-                                 grandchild.mv, grandchild.eval.to_cp(board.to_move()));
-                    }
-                }
-                */
-                println!("Size before pruning: {}", tree.size());
-                //tree.print_opening(&mut board, &mut vec![], &mut io::stdout());
-                //tree.prune(&mut board, &mut HashSet::new());
-
-                println!("Size after pruning: {}", tree.size());
-                println!("Eval: {:?}", root_eval);
-                //tree.print_opening(&mut board, &mut vec![], &mut io::stdout());
-
                 tree
     })
         .collect::<Vec<_>>();
@@ -348,18 +341,17 @@ pub fn gen_sjadam_openings() {
 
     final_tree.sort_tree(&mut board);
 
-    for child in final_tree.children.as_ref().unwrap_or(&vec![]) {
-        println!("Child eval for {:?}: {:?}",
-                 child.mv, child.eval.to_cp(!board.to_move()));
+    let mut tree_file = fs::File::create(format!("opening_d{}_{}ms.txt", DEPTH, SEARCH_TIME_MS)).unwrap();
+    final_tree.print_opening(&board, &mut tree_file);
 
-        for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
-            println!("\tGrandchild eval for {:?}: {:?}",
-                     grandchild.mv, grandchild.eval.to_cp(board.to_move()));
-        }
-    }
+    let mut epd_file = fs::File::create(format!("opening_d{}_{}ms.epd", DEPTH, SEARCH_TIME_MS)).unwrap();
+    let mut pruned_epd_file = fs::File::create(format!("opening_pruned_d{}_{}ms.epd", DEPTH, SEARCH_TIME_MS)).unwrap();
 
     println!("Final eval: {:?}", final_tree.eval);
-    final_tree.print_opening(&mut board, &mut vec![],  0,&mut io::stdout());
+    final_tree.print_epd(&mut board, &mut vec![], 0, &mut epd_file);
+
+    final_tree.prune(&mut board, &mut HashSet::new());
+    final_tree.print_epd(&mut board, &mut vec![], 0, &mut pruned_epd_file);
 
     process::exit(0);
 

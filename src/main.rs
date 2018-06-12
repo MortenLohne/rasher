@@ -170,11 +170,11 @@ fn main() {
                             tree.sort_tree(&mut board);
 
                             println!("Size before pruning: {}", tree.size());
-                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
+                            tree.print_epd(&mut board, &mut vec![], 0, &mut io::stdout());
                             tree.prune(&mut board, &mut HashSet::new());
                             println!("Size after pruning: {}", tree.size());
                             println!("Eval: {:?}", root_eval);
-                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
+                            tree.print_epd(&mut board, &mut vec![], 0, &mut io::stdout());
 
                         },
                         Some(&"crazyhouse") => {
@@ -185,11 +185,11 @@ fn main() {
                             tree.sort_tree(&mut board);
 
                             println!("Size before pruning: {}", tree.size());
-                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
+                            tree.print_epd(&mut board, &mut vec![], 0, &mut io::stdout());
                             tree.prune(&mut board, &mut HashSet::new());
                             println!("Size after pruning: {}", tree.size());
                             println!("Eval: {:?}", root_eval);
-                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
+                            tree.print_epd(&mut board, &mut vec![], 0, &mut io::stdout());
 
                         },
 
