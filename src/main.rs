@@ -47,6 +47,7 @@ use std::io::Write;
 
 #[cfg(feature = "profile")]
 use cpuprofiler::PROFILER;
+use std::collections::HashMap;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -69,7 +70,7 @@ fn main() {
     PROFILER.lock().unwrap().start("./my-prof.profile").unwrap();
 
     let mut stdin = io::BufReader::new(io::stdin());
-    info!("Opened log");
+    debug!("Opened log");
     loop {
         if let Ok(input) = uci::get_engine_input(&mut stdin) {
             
@@ -159,61 +160,41 @@ fn main() {
                 "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
 
                 "opening_gen" => {
-                    const DEPTH : u8 = 3;
+                    const DEPTH : u32 = 3;
                     match tokens.get(1) {
                         Some(&"standard") | None => {
+                            let mut table = Arc::new(Mutex::new(HashMap::new()));
                             let mut tree = OpeningTree::new_root();
                             let mut board = ChessBoard::start_board();
-                            let root_eval = tree.eval(DEPTH, board.clone());
+                            let root_eval = tree.eval(DEPTH, board.clone(), &mut table);
                             tree.sort_tree(&mut board);
 
                             println!("Size before pruning: {}", tree.size());
-                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
                             tree.prune(&mut board, &mut HashSet::new());
                             println!("Size after pruning: {}", tree.size());
                             println!("Eval: {:?}", root_eval);
-                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
 
                         },
                         Some(&"crazyhouse") => {
+                            let mut table = Arc::new(Mutex::new(HashMap::new()));
                             let mut tree = OpeningTree::new_root();
                             let mut board = CrazyhouseBoard::start_board();
-                            let root_eval = tree.eval(DEPTH, board.clone());
+                            let root_eval = tree.eval(DEPTH, board.clone(), &mut table);
                             tree.sort_tree(&mut board);
 
                             println!("Size before pruning: {}", tree.size());
-                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
                             tree.prune(&mut board, &mut HashSet::new());
                             println!("Size after pruning: {}", tree.size());
                             println!("Eval: {:?}", root_eval);
-                            tree.print_opening(&mut board, &mut vec![]);
+                            tree.print_opening(&mut board, &mut vec![], 0, &mut io::stdout());
 
                         },
 
                         Some(&"sjadam") => {
-                            let mut tree = OpeningTree::new_root();
-                            let mut board = SjadamBoard::start_board();
-                            let root_eval = tree.eval(DEPTH, board.clone());
-                            tree.sort_tree(&mut board);
-
-                            for child in tree.children.as_ref().unwrap_or(&vec![]) {
-
-                                println!("Child eval for {:?}: {:?}",
-                                         child.mv, child.eval);
-
-                                for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
-                                    println!("Grandchild eval for {:?}: {:?}",
-                                             grandchild.mv, grandchild.eval);
-                                }
-                            }
-                            println!("Size before pruning: {}", tree.size());
-                            tree.print_opening(&mut board, &mut vec![]);
-                            tree.prune(&mut board, &mut HashSet::new());
-
-                            println!("Size after pruning: {}", tree.size());
-                            println!("Eval: {:?}", root_eval);
-                            tree.print_opening(&mut board, &mut vec![]);
-
+                            opening_gen::gen_sjadam_openings();
                         },
 
                         s => println!("Unrecognized variant {:?}.", s),
