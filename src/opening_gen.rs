@@ -34,7 +34,7 @@ pub enum Transposition {
 
 type Table<B> = Arc<Mutex<HashMap<<B as EvalBoard>::HashBoard, Transposition>>>;
 
-const SEARCH_TIME_MS : u64 = 750;
+const SEARCH_TIME_MS : u64 = 2250;
 
 const MIN_SCORE : Score = Score::Val(-2.5);
 
@@ -187,13 +187,13 @@ impl<B: EvalBoard> OpeningTree<B>
         }
 
 
-        let multipv = if depth > 1 { 16 } else { 1 };
+        let multipv = if depth > 1 { 20 } else { 1 };
 
-        let duration = time::Duration::from_millis(SEARCH_TIME_MS * (depth * depth) as u64);
+        let duration = time::Duration::from_millis(SEARCH_TIME_MS * 3_u32.pow(depth - 1) as u64);
 
         let mut options = EngineOptions::new();
         options.multipv = multipv;
-        options.hash_memory = 32;
+        options.hash_memory = 64;
         
         let (handle, move_channel) =
             alpha_beta::start_uci_search(
