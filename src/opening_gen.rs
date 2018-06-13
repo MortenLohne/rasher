@@ -34,9 +34,9 @@ pub enum Transposition {
 
 type Table<B> = Arc<Mutex<HashMap<<B as EvalBoard>::HashBoard, Transposition>>>;
 
-const SEARCH_TIME_MS : u64 = 1000;
+const SEARCH_TIME_MS : u64 = 750;
 
-const MIN_SCORE : Score = Score::Val(-2.0);
+const MIN_SCORE : Score = Score::Val(-2.5);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OpeningTree<B: EvalBoard> {
@@ -189,7 +189,7 @@ impl<B: EvalBoard> OpeningTree<B>
 
         let multipv = if depth > 1 { 16 } else { 1 };
 
-        let duration = time::Duration::from_millis(SEARCH_TIME_MS * (multipv as f64).sqrt() as u64);
+        let duration = time::Duration::from_millis(SEARCH_TIME_MS * (depth * depth) as u64);
 
         let mut options = EngineOptions::new();
         options.multipv = multipv;
@@ -301,7 +301,7 @@ pub fn gen_sjadam_openings() {
         "f1h3","g1h3","c1a5","g1h5","b1a3","a2a4","b1a5","a1a7","f2f3","g1g4",
         "c1b4","c2c3","a1f3","f1h5","f1g4","b1b4","h1f3","a1c3","e2e3","h1c3",
         "a1a3","a1b3","h1b3","a1g3","h1g3","a1a5","h1h3","e2e4","c2c4","a1h3",
-        "h1h5","h1a3","f1c4"];
+        "h1h5","h1a3","f1c4", "d2d3", "d2d4", "f2f4"];
 
     let table = Arc::new(Mutex::new(HashMap::new()));
     let mut board = SjadamBoard::start_board();
