@@ -133,11 +133,11 @@ impl<B: EvalBoard> OpeningTree<B>
     pub fn print_opening<T: io::Write>(&self, board: &B, sink: &mut T) {
         for child in self.children.as_ref().unwrap_or(&vec![]) {
             write!(sink, "Child eval for {:?}: {}\n",
-                     child.mv, child.eval.to_cp(!board.to_move())).unwrap();
+                     child.mv.as_ref().unwrap(), child.eval.to_cp(!board.to_move())).unwrap();
 
             for grandchild in child.children.as_ref().unwrap_or(&vec![]) {
                 write!(sink, "\tGrandchild eval for {:?}: {}, best reply {:?}\n",
-                         grandchild.mv, grandchild.eval.to_cp(board.to_move()),
+                         grandchild.mv.as_ref().unwrap(), grandchild.eval.to_cp(board.to_move()),
                          grandchild.children.as_ref().and_then(|chs| chs.get(0).and_then(|ch| ch.mv.clone() ))).unwrap();
             }
         }
@@ -322,6 +322,17 @@ pub fn gen_sjadam_openings() {
                 tree.sort_tree(&mut board);
                 println!("Finished root eval for {:?}: {}",
                          board.to_alg(&mv), root_eval.unwrap().to_cp(!board.to_move()));
+
+                let mut tree_file = fs::File::create(format!("{:?}_d{}_{}ms.txt", mv, DEPTH, SEARCH_TIME_MS)).unwrap();
+                tree.print_opening(&board,&mut tree_file);
+
+                let mut epd_file = fs::File::create(format!("{:?}_d{}_{}ms.epd", mv, DEPTH, SEARCH_TIME_MS)).unwrap();
+                tree.print_epd(&mut board, &mut vec![], 0, &mut epd_file);
+
+                let mut pruned_epd_file = fs::File::create(format!("{:?}_pruned_d{}_{}ms.epd", mv, DEPTH, SEARCH_TIME_MS)).unwrap();
+                let mut pruned_tree = tree.clone();
+                pruned_tree.prune(&mut board, &mut HashSet::new());
+                pruned_tree.print_epd(&mut board, &mut vec![], 0, &mut pruned_epd_file);
 
                 assert_eq!(root_eval.unwrap(), tree.children.as_ref().unwrap()[0].eval,
                            "root-eval was {:?}, child-evals were {:?}",
