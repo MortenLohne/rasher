@@ -158,7 +158,7 @@ impl<B: EvalBoard> OpeningTree<B>
                         Entry::Occupied(mut entry) => match *entry.get() {
                             Transposition::Searched(score, entry_depth) => {
                                 if entry_depth >= depth {
-                                    debug!("Found entry at depth {} while searching at depth {} after {:?}, skipping search",
+                                    trace!("Found entry at depth {} while searching at depth {} after {:?}, skipping search",
                                            entry_depth, depth, self.mv);
                                     self.eval = score;
                                     return Some(!score)
@@ -193,7 +193,7 @@ impl<B: EvalBoard> OpeningTree<B>
 
         let mut options = EngineOptions::new();
         options.multipv = multipv;
-        options.hash_memory = 64;
+        options.hash_memory = 64 * depth;
         
         let (handle, move_channel) =
             alpha_beta::start_uci_search(
