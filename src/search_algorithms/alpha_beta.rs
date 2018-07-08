@@ -22,6 +22,7 @@ use std::thread;
 use std::mem;
 use std::time;
 use std::sync::{Arc, Mutex};
+use uci::TimeRestriction::{Nodes, Mate, GameTime};
 
 /// Start a standard uci search, sending the results through a channel
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
@@ -212,8 +213,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         where B: UciBoard + fmt::Debug + Hash + Eq
     {
         debug_assert!(alpha <= beta, "alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
-                      alpha, beta, depth, board); 
-        use uci::TimeRestriction::*;
+                      alpha, beta, depth, board);
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
             = table.get(&board.hash_board()) {
@@ -240,37 +240,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         };
         // Check if the thread should stop
         if node_counter.total() % 2048 == 0 {
-            {
-                let engine_comm = engine_comm.lock().unwrap();
-                if engine_comm.engine_should_stop {
-                    return None // "Engine was told to stop"
-                }
-            }
-            let time_taken = time::Instant::now() - start_time;
-
-            // If we've spent more than half of our time, abort immediately
-            match time_restriction {
-                Nodes(n) if node_counter.total() > n
-                    => return None,
-                GameTime(info) => {
-                
-
-                    let time_left = match board.to_move() {
-                    White => info.white_time,
-                        Black => info.black_time,
-                    };
-                    
-                    if time_taken > time_left / 2 {
-                        return None;
-                    }
-                }
-                // If on movetime restriction, abort if we are getting close to our time limit
-                uci::TimeRestriction::MoveTime(time) =>
-                    if time_taken > time - time::Duration::from_millis(10) {
-                        return None;
-                    },
-                _ => (),
-            }
+            abort_search_check(engine_comm, start_time, time_restriction,
+                               node_counter, board.to_move())?;
         }
 
         if let Some(result) = board.game_result() {
@@ -485,6 +456,43 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     }
     else {
         None
+    }
+}
+
+fn abort_search_check(engine_comm: &Mutex<uci::EngineComm>, start_time: time::Instant,
+                      time_restriction: uci::TimeRestriction, node_counter: &NodeCount,
+                      to_move: Color) -> Option<()> {
+    {
+        let engine_comm = engine_comm.lock().unwrap();
+        if engine_comm.engine_should_stop {
+            return None // "Engine was told to stop"
+        }
+    }
+    let time_taken = time::Instant::now() - start_time;
+
+    // If we've spent more than half of our time, abort immediately
+    match time_restriction {
+        Nodes(n) if node_counter.total() > n
+        => return None,
+        GameTime(info) => {
+            let time_left = match to_move {
+                White => info.white_time,
+                Black => info.black_time,
+            };
+
+            if time_taken > time_left / 2 {
+                None
+            }
+            else {
+                Some(())
+            }
+        }
+        // If on movetime restriction, abort if we are getting close to our time limit
+        uci::TimeRestriction::MoveTime(time)
+        if time_taken > time - time::Duration::from_millis(10) => {
+            None
+        },
+        _ => Some(()),
     }
 }
 
