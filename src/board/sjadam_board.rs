@@ -1189,5 +1189,5 @@ impl EvalBoard for SjadamBoard {
          */    
     }
 
-    const BRANCH_FACTOR : u64 = 30;
+    const BRANCH_FACTOR : u64 = 40;
 }
