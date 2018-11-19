@@ -64,15 +64,15 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 match engine_options.variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
-                        println!("Eval: {}", board.eval_board());
+                        uci_send(&format!("Eval: {}", board.eval_board()));
                     }
                     ChessVariant::Sjadam => {
                         let board = parse_position::<SjadamBoard>(&board_string)?;
-                        println!("Eval: {}", board.eval_board());
+                        uci_send(&format!("Eval: {}", board.eval_board()));
                     }
                     ChessVariant::Crazyhouse => {
                         let board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        println!("Eval: {}", board.eval_board());
+                        uci_send(&format!("Eval: {}", board.eval_board()));
                     }
                 };
             }
@@ -105,15 +105,15 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 match engine_options.variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
-                        println!("Fen: {}", board.to_fen());
+                        uci_send(&format!("Fen: {}", board.to_fen()));
                     }
                     ChessVariant::Sjadam => {
                         let board = parse_position::<SjadamBoard>(&board_string)?;
-                        println!("Fen: {}", board.to_fen());
+                        uci_send(&format!("Fen: {}", board.to_fen()));
                     }
                     ChessVariant::Crazyhouse => {
                         let board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        println!("Fen: {}", board.to_fen());
+                        uci_send(&format!("Fen: {}", board.to_fen()));
                     }
                 };
             }
@@ -584,15 +584,17 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
                 100 ... 300 => "Mistake",
                 _ => "Blunder",
             };
-            println!("{} ({}): {}, {} was better. ({} vs {}, delta={})",
-                     mv_str, !board.to_move(), verdict,
-                     board.to_alg(&last_correct_move),
-                     eval.uci_string(board.to_move()), last_eval.uci_string(board.to_move()),
-                     delta_score);
+            uci_send(&format!(
+                "{} ({}): {}, {} was better. ({} vs {}, delta={})",
+                mv_str, !board.to_move(), verdict,
+                board.to_alg(&last_correct_move),
+                eval.uci_string(board.to_move()), last_eval.uci_string(board.to_move()),
+                delta_score));
         }
         
         else {
-            println!("{} ({}): {}", mv_str, board.to_move(), eval.uci_string(board.to_move()));
+            uci_send(&format!("{} ({}): {}",
+                              mv_str, board.to_move(), eval.uci_string(board.to_move())));
         }
         
         last_eval = eval;
