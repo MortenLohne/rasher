@@ -351,7 +351,6 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         let mut move_searched = false; // ensure not all moves are pruned as null moves
 
         let mut node_type = if alpha == Loss(0) && beta == Win(0) {
-            //println!("PV node, alpha={:?}, beta={:?}, board\n{:?}", alpha, beta, board);
             Ordering::Equal // It is currently a pv node
         }
         else {

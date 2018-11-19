@@ -76,31 +76,6 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                     }
                 };
             }
-            /*
-            "quiet_eval" => {
-                let mut node_counter = ::NodeCount::new();
-                match engine_options.variant {
-                    ChessVariant::Standard => {
-                        let mut board = parse_position::<ChessBoard>(&board_string)?;
-                        println!("Eval: {}",
-                                 alpha_beta::quiescence_search(&mut board, &mut node_counter,
-                                                               Score::Val(-1000.0), Score::Val(1000.0)));
-                    }
-                    ChessVariant::Sjadam => {
-                        let mut board = parse_position::<SjadamBoard>(&board_string)?;
-                        println!("Eval: {}",
-                                 alpha_beta::quiescence_search(&mut board, &mut node_counter,
-                                                               Score::Val(-1000.0), Score::Val(1000.0)));
-                    }
-                    ChessVariant::Crazyhouse => {
-                        let mut board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        println!("Eval: {}",
-                                 alpha_beta::quiescence_search(&mut board, &mut node_counter,
-                                                               Score::Val(-1000.0), Score::Val(1000.0)));
-                    }
-                };
-            }
-             */
             "fen" => {
                 match engine_options.variant {
                     ChessVariant::Standard => {
