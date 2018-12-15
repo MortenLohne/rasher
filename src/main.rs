@@ -176,7 +176,7 @@ fn play_game<B> (mut board : B)
                 Arc::new(Mutex::new(uci::EngineComm::new())), None);
             
             let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-            println!("Found move {} with score {}.", move_str, score.uci_string(board.to_move()));
+            println!("Found move {} with score {}.", move_str, score.uci_string(board.side_to_move()));
             let mv = board.from_alg(&move_str).unwrap();
             board.do_move(mv);
             play_game(board);
@@ -195,12 +195,12 @@ fn play_human<B>(mut board : B)
             use search_algorithms::board::Color::*;
             println!("Board:\n{:?}", board);
             // If black, play as human
-            if board.to_move() == White {
+            if board.side_to_move() == White {
                 println!("Type your move as long algebraic notation (e2e4):");
 
                 let reader = io::stdin();
                 let mut input_str = "".to_string();
-                let legal_moves = board.all_legal_moves();
+                let legal_moves = board.generate_moves();
                 // Loop until user enters a valid move
                 loop {
                     input_str.clear();
@@ -231,7 +231,7 @@ fn play_human<B>(mut board : B)
                 let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
                 let best_move = board.from_alg(&move_str);
                 println!("Computer played {:?} with score {}",
-                         best_move, score.uci_string(board.to_move()));
+                         best_move, score.uci_string(board.side_to_move()));
                 board.do_move(best_move.unwrap());
                 play_human(board);
             }

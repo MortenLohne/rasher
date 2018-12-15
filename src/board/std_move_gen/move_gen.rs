@@ -412,7 +412,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
     let file = square.file() as i8;
     let rank = square.rank() as i8;
     
-    if file > 0 && ((board.to_move() == White && rank > 1) || (board.to_move() == Black && rank < 6))
+    if file > 0 && ((board.side_to_move() == White && rank > 1) || (board.side_to_move() == Black && rank < 6))
     {
         let pawn_square = Square::from_ints(file as u8 - 1, (rank as i8 + pawn_direction) as u8);
 
@@ -423,7 +423,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
         }
     }
     
-    if file < 7 && ((board.to_move() == White && rank > 1) || (board.to_move() == Black && rank < 6))
+    if file < 7 && ((board.side_to_move() == White && rank > 1) || (board.side_to_move() == Black && rank < 6))
     {
         
         let pawn_square = Square::from_ints(file as u8 + 1, (rank as i8 + pawn_direction) as u8);
@@ -561,5 +561,5 @@ fn add_moves_in_direction (i: i8, j: i8, board: &ChessBoard, square: Square,
 }
 
 pub fn king_pos (board : &ChessBoard) -> Square {
-    board.king_pos(board.to_move())
+    board.king_pos(board.side_to_move())
 }

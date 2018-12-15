@@ -14,7 +14,7 @@ fn hash_stays_equal() {
     board.hash(&mut hasher);
     let start_hash = hasher.finish();
 
-    for mv in board.all_legal_moves() {
+    for mv in board.generate_moves() {
         let undo_move = board.do_move(mv.clone());
         board.undo_move(undo_move);
 

@@ -58,8 +58,8 @@ impl EvalBoard for CrazyhouseBoard {
     type UndoMove = CrazyhouseUndoMove;
     type HashBoard = Self;
     
-    fn to_move(&self) -> Color {
-        self.base_board.to_move()
+    fn side_to_move(&self) -> Color {
+        self.base_board.side_to_move()
     }
     
     fn start_board() -> Self {
@@ -77,16 +77,16 @@ impl EvalBoard for CrazyhouseBoard {
         self.base_board.game_result()
     }
 
-    fn eval_board(&self) -> f32 {
+    fn static_eval(&self) -> f32 {
         // TODO: Make this take into account available pieces
-        let score = self.base_board.eval_board();
+        let score = self.base_board.static_eval();
         0.0 + score -
             self.black_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>() +
             self.white_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>()
     }
 
-    fn all_legal_moves(&self) -> Vec<Self::Move> {
-        let mut moves : Vec<CrazyhouseMove> = self.base_board.all_legal_moves().iter()
+    fn generate_moves(&self) -> Vec<Self::Move> {
+        let mut moves : Vec<CrazyhouseMove> = self.base_board.generate_moves().iter()
             .map(|&mv| CrazyhouseMove::NormalMove(mv)).collect();
         let board_iter = std_board::BoardIter::new();
         let king_pos = move_gen::king_pos(&self.base_board);
@@ -95,14 +95,14 @@ impl EvalBoard for CrazyhouseBoard {
         let leaves_king_in_check = |mv| {
             let mut cloned = self.clone();
             cloned.do_move(mv);
-            cloned.base_board.to_move = !cloned.to_move();
+            cloned.base_board.to_move = !cloned.side_to_move();
 
             debug_assert_eq!(king_pos, move_gen::king_pos(&self.base_board));
             move_gen::is_attacked(&cloned.base_board, king_pos)
         };
         
         for square in board_iter.filter(|&sq| self.base_board[sq].is_empty()) {
-            let to_move = self.to_move();
+            let to_move = self.side_to_move();
             if to_move == White {
                 for piece_type in &self.white_available_pieces {
                     // Make sure you don't put pawns on the back ranks
@@ -138,7 +138,7 @@ impl EvalBoard for CrazyhouseBoard {
             CrazyhouseMove::NormalMove(normal_move) => {
                 let capture = self.base_board[normal_move.to].piece_type();
                 if capture != PieceType::Empty {
-                    if self.to_move() == Black {
+                    if self.side_to_move() == Black {
                         self.black_available_pieces.push(capture);
                     }
                     else {
@@ -150,7 +150,7 @@ impl EvalBoard for CrazyhouseBoard {
             },
             CrazyhouseMove::CrazyMove(piecetype, square, n) => {
                 let (file, rank) = square.file_rank();
-                if self.to_move() == White {
+                if self.side_to_move() == White {
                     match self.white_available_pieces.iter()
                         .rposition(|&p| p == piecetype) {
                             Some(index) =>
@@ -184,7 +184,7 @@ impl EvalBoard for CrazyhouseBoard {
             // If the normal move was a capture, remove 
             CrazyhouseUndoMove::NormalMove(normal_move) => {
                 self.base_board.undo_move(normal_move);
-                match (self.to_move(), normal_move.capture) {
+                match (self.side_to_move(), normal_move.capture) {
                     (_, PieceType::Empty) => PieceType::Empty, // This is not used for anything
                     (White, piecetype) =>
                         match self.white_available_pieces.iter().rposition(|&p| p == piecetype) {
@@ -202,7 +202,7 @@ impl EvalBoard for CrazyhouseBoard {
             },
             CrazyhouseUndoMove::CrazyMove(piecetype, square, castling_en_passant) => {
                 let (file, rank) = square.file_rank();
-                if self.to_move() == Black {
+                if self.side_to_move() == Black {
                     self.white_available_pieces.push(piecetype);
                     self.base_board.board[rank as usize][file as usize] = Piece::empty();
                 }

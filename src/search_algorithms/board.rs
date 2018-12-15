@@ -65,7 +65,7 @@ pub trait EvalBoard : PartialEq + Clone {
     type HashBoard : hash::Hash + Eq;
 
     /// Returns whose turn it is
-    fn to_move(&self) -> Color;
+    fn side_to_move(&self) -> Color;
 
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
     
@@ -73,10 +73,10 @@ pub trait EvalBoard : PartialEq + Clone {
 
     fn start_board() -> Self;
 
-    fn all_legal_moves(&self) -> Vec<Self::Move>;
+    fn generate_moves(&self) -> Vec<Self::Move>;
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
-        self.all_legal_moves().contains(&mv)
+        self.generate_moves().contains(&mv)
     }
 
     fn active_moves(&self) -> Vec<Self::Move> {
@@ -89,12 +89,12 @@ pub trait EvalBoard : PartialEq + Clone {
     /// otherwise the function may return anything
     fn game_result(&self) -> Option<GameResult>;
     
-    fn eval_board(&self) -> f32;
+    fn static_eval(&self) -> f32;
 
     fn hash_board(&self) -> Self::HashBoard;
     
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
-        let moves = self.all_legal_moves();
+        let moves = self.generate_moves();
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
     }
     

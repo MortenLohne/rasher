@@ -429,7 +429,7 @@ impl UciBoard for ChessBoard {
         }
         string.pop();
 
-        match self.to_move() {
+        match self.side_to_move() {
             White => string.push_str(" w"),
             Black => string.push_str(" b"),
         }
@@ -527,11 +527,11 @@ impl EvalBoard for ChessBoard {
     type UndoMove = std_move::ChessUndoMove;
     type HashBoard = Self;
     
-    fn to_move(&self) -> Color {
+    fn side_to_move(&self) -> Color {
         self.to_move
     }
 
-    fn all_legal_moves(&self) -> Vec<Self::Move> {
+    fn generate_moves(&self) -> Vec<Self::Move> {
         let (mut active_moves, mut quiet_moves) = move_gen::all_legal_moves(self);
         active_moves.append(&mut quiet_moves);
         active_moves
@@ -539,7 +539,7 @@ impl EvalBoard for ChessBoard {
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
 
-        if self[mv.from].color() != Some(self.to_move()) {
+        if self[mv.from].color() != Some(self.side_to_move()) {
             return false;
         }
 
@@ -552,8 +552,8 @@ impl EvalBoard for ChessBoard {
                                         &mut moves1, &mut moves2, &mut moves3,
                                         is_in_check, king_pos);
         if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            debug_assert!(self.all_legal_moves().contains(&mv),
-            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+            debug_assert!(self.generate_moves().contains(&mv),
+            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.generate_moves(), moves1, moves2, moves3);
         }
         moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
@@ -571,9 +571,9 @@ impl EvalBoard for ChessBoard {
         if self.half_move_clock > 100 {
             return Some(board::GameResult::Draw);
         }
-        // TODO: This shouldn't call all_legal_moves(), but instead store whether its mate or not
-        if self.all_legal_moves().is_empty() {            
-            if move_gen::is_attacked(self, self.king_pos(self.to_move())) {
+        // TODO: This shouldn't call generate_moves(), but instead store whether its mate or not
+        if self.generate_moves().is_empty() {
+            if move_gen::is_attacked(self, self.king_pos(self.side_to_move())) {
                 if self.to_move == White {
                     Some(board::GameResult::BlackWin)
                 }
@@ -612,7 +612,7 @@ impl EvalBoard for ChessBoard {
     }
     
     #[inline(never)]
-    fn eval_board (&self) -> f32 {
+    fn static_eval (&self) -> f32 {
         const POS_VALS : [[u8; 8]; 8] = 
             [[0, 0, 0, 0, 0, 0, 0, 0],
              [0, 1, 1, 1, 1, 1, 1, 0],
@@ -723,7 +723,7 @@ impl EvalBoard for ChessBoard {
             // Does the move, depending on whether the move promotes or not
             match c_move.prom {
                 Some(piece_type) => self.board[rank_to as usize][file_to as usize]
-                    = Piece::new(piece_type, self.to_move()),
+                    = Piece::new(piece_type, self.side_to_move()),
                 None => self.board[rank_to as usize][file_to as usize]
                     = self.board[rank_from as usize][file_from as usize],
                 

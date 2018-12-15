@@ -66,7 +66,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     // If no move is found, return null move
     match board.game_result() {
         Some(GameResult::Draw) => {
-            for mv in board.all_legal_moves() {
+            for mv in board.generate_moves() {
                 let undo_move = board.do_move(mv.clone());
 
                 if board.game_result() == Some(GameResult::Draw) {
@@ -74,7 +74,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                     let uci_info = uci::UciInfo {
                         depth: 1, seldepth: 1, time: 0, nodes: 1,
                         hashfull: 0.0,
-                        pvs: vec![(Score::Draw(0), board.to_alg(&mv))], color: board.to_move() };
+                        pvs: vec![(Score::Draw(0), board.to_alg(&mv))], color: board.side_to_move() };
                     channel.send(uci_info).unwrap();
                     return;
                 }
@@ -85,7 +85,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             let uci_info = uci::UciInfo {
                 depth: 1, seldepth: 1, time: 0, nodes: 1,
                 hashfull: 0.0,
-                pvs: vec![(Score::Draw(0), "null".to_string())], color: board.to_move() };
+                pvs: vec![(Score::Draw(0), "null".to_string())], color: board.side_to_move() };
             channel.send(uci_info).unwrap();
 
             return;
@@ -108,7 +108,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 move_list.clone().unwrap()
             }
             else {
-                board.all_legal_moves()
+                board.generate_moves()
             };
 
             moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
@@ -119,7 +119,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             if let Some((score, moves, node_count)) =
                 // If all moves are to be searched, send None to the function
                 // This way, the root position will still be hashed correctly
-                if moves_to_search.len() == board.all_legal_moves().len() {
+                if moves_to_search.len() == board.generate_moves().len() {
                     find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                       options, start_time, None, &mut table)
                 }
@@ -139,7 +139,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 for mv in &moves {
                     pv_str.push_str(&pv_board.to_alg(mv));
                     pv_str.push(' ');
-                    debug_assert!(pv_board.all_legal_moves().contains(mv),
+                    debug_assert!(pv_board.generate_moves().contains(mv),
                                   "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
                                   mv, moves, pv_board, board);
                     pv_board.do_move(mv.clone());
@@ -159,7 +159,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
         let uci_info = uci::UciInfo {
             depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total(),
             hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
-            pvs: pvs, color: board.to_move() };
+            pvs: pvs, color: board.side_to_move() };
         channel.send(uci_info).unwrap();
 
         // If we're playing a time control, don't start searching deeper
@@ -168,7 +168,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             uci::TimeRestriction::GameTime(info) => {
 
                 let time_taken = time::Instant::now() - start_time;
-                let (time, inc) = match board.to_move() {
+                let (time, inc) = match board.side_to_move() {
                     White => (info.white_time, info.white_inc),
                     Black => (info.black_time, info.black_inc),
                 };
@@ -241,29 +241,29 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         // Check if the thread should stop
         if node_counter.total() % 2048 == 0 {
             abort_search_check(engine_comm, start_time, time_restriction,
-                               node_counter, board.to_move())?;
+                               node_counter, board.side_to_move())?;
         }
 
         if let Some(result) = board.game_result() {
-            return Some((Score::from_game_result(result, board.to_move()),
+            return Some((Score::from_game_result(result, board.side_to_move()),
                          None, Vec::new()))
         }
 
         // Helpful alias
-        let color = board.to_move();
+        let color = board.side_to_move();
         let mut best_line = vec![];
 
         if depth == 0 { // Quiescence search
 
             // If searching for mate, don't do quiescence search
             if let Mate(_) = time_restriction {
-                return Some((Val(board.eval_board() * color.multiplier() as f32),
+                return Some((Val(board.static_eval() * color.multiplier() as f32),
                              None, vec![]));
             }
 
             node_counter.intern += 1;
 
-            let stand_pat = Val(board.eval_board() * color.multiplier() as f32);
+            let stand_pat = Val(board.static_eval() * color.multiplier() as f32);
 
             if stand_pat >= beta {
                 return Some((beta, None, vec![]));
@@ -328,7 +328,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             move_list.take().unwrap()
         }
         else {
-            board.all_legal_moves()
+            board.generate_moves()
         };
         
         // If there is mate or stalemate on the board, we should already have returned
@@ -347,7 +347,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                      .filter(|mv| board.move_is_legal(mv.clone())));
         moves.append(&mut legal_moves);
 
-        let old_eval = board.eval_board() * color.multiplier() as f32;
+        let old_eval = board.static_eval() * color.multiplier() as f32;
         let mut move_searched = false; // ensure not all moves are pruned as null moves
 
         let mut node_type = if alpha == Loss(0) && beta == Win(0) {
@@ -373,7 +373,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 _ if depth < 3 && options.null_move_pruning
                     && move_searched && !board.game_result().is_some() =>
                 {
-                    let eval = board.eval_board() * color.multiplier() as f32;
+                    let eval = board.static_eval() * color.multiplier() as f32;
                     if eval < old_eval {
                         board.undo_move(undo_move);
                         continue;

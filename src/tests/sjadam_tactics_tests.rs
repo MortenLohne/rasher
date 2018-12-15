@@ -213,7 +213,7 @@ fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
                "Best move was {:?} with score {:?}, expected {:?}, board:\n{:?}",
                game_move, score,
                best_move, board);
-    match board.to_move() {
+    match board.side_to_move() {
         Color::White => assert_eq!(score.uci_string(White), "mate 2"),
         Color::Black => assert_eq!(score.uci_string(Black), "mate -2"),
     }

@@ -64,15 +64,15 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 match engine_options.variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
-                        uci_send(&format!("Eval: {}", board.eval_board()));
+                        uci_send(&format!("Eval: {}", board.static_eval()));
                     }
                     ChessVariant::Sjadam => {
                         let board = parse_position::<SjadamBoard>(&board_string)?;
-                        uci_send(&format!("Eval: {}", board.eval_board()));
+                        uci_send(&format!("Eval: {}", board.static_eval()));
                     }
                     ChessVariant::Crazyhouse => {
                         let board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        uci_send(&format!("Eval: {}", board.eval_board()));
+                        uci_send(&format!("Eval: {}", board.static_eval()));
                     }
                 };
             }
@@ -537,7 +537,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
     
     for mv_str in moves {
         let mv = board.from_alg(mv_str).unwrap();
-        assert!(board.all_legal_moves().contains(&mv));
+        assert!(board.generate_moves().contains(&mv));
 
         board.do_move(mv.clone());
         
@@ -551,7 +551,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
         let best_move = pv_str.split_whitespace()
             .next()
             .map(|mv_str| board.from_alg(mv_str).unwrap()).unwrap();
-        let delta_score = eval.to_cp(board.to_move()) - last_eval.to_cp(board.to_move());
+        let delta_score = eval.to_cp(board.side_to_move()) - last_eval.to_cp(board.side_to_move());
         
         if best_move != mv && delta_score > 0 {
             let verdict = match delta_score {
@@ -561,15 +561,15 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             };
             uci_send(&format!(
                 "{} ({}): {}, {} was better. ({} vs {}, delta={})",
-                mv_str, !board.to_move(), verdict,
+                mv_str, !board.side_to_move(), verdict,
                 board.to_alg(&last_correct_move),
-                eval.uci_string(board.to_move()), last_eval.uci_string(board.to_move()),
+                eval.uci_string(board.side_to_move()), last_eval.uci_string(board.side_to_move()),
                 delta_score));
         }
         
         else {
             uci_send(&format!("{} ({}): {}",
-                              mv_str, board.to_move(), eval.uci_string(board.to_move())));
+                              mv_str, board.side_to_move(), eval.uci_string(board.side_to_move())));
         }
         
         last_eval = eval;

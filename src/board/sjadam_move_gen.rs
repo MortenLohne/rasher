@@ -120,7 +120,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
     let mut active_moves = Vec::with_capacity(50);
     let mut winning_moves = Vec::with_capacity(300);
 
-    let color = board.to_move();
+    let color = board.side_to_move();
     let all_pieces = board.all_pieces();
 
     for (piece, mut bitboard) in [Knight, Bishop, Rook, Queen, Pawn, King].iter()
@@ -166,7 +166,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
     
     let mut sjadam_squares = BitBoard::empty();
     sjadam_squares.set(square);
-    let color = board.to_move();
+    let color = board.side_to_move();
     
     let (friendly_pieces, opponent_pieces) = match color {
         White => (board.white_pieces(), board.black_pieces()),
@@ -194,7 +194,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
             if let Some(ep_square) = board.en_passant_square() {
                 all_pieces_pawns.set(ep_square);
             }
-            if board.to_move() == White {
+            if board.side_to_move() == White {
                 pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces_pawns)
             }
             else {

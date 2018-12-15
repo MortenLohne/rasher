@@ -64,7 +64,7 @@ fn capture_to_promote() {
 /// Checks that the expected move is indeed played in the position
 fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Move) {
     let mut board = board.clone();
-    let all_legal_moves = board.all_legal_moves();
+    let all_legal_moves = board.generate_moves();
 
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let mut searches = mc_tree.searches;

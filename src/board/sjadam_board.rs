@@ -435,7 +435,7 @@ impl SjadamBoard {
         let mut board = Self { bitboards: [BitBoard::empty(); 12],
                                white_pieces: BitBoard::empty(), black_pieces: BitBoard::empty(),
                                hash: 0,
-                               to_move: other.to_move(),
+                               to_move: other.side_to_move(),
                                last_move: None,
                                castling_en_passant: other.castling_en_passant,
                                half_move_clock: other.half_move_clock,
@@ -459,7 +459,7 @@ impl SjadamBoard {
             board[square] = self.get_square(square);
         }
         board.castling_en_passant = self.castling_en_passant;
-        board.to_move = self.to_move();
+        board.to_move = self.side_to_move();
         board.half_move_clock = self.half_move_clock;
         board.move_num = self.move_num;
         board
@@ -698,7 +698,7 @@ impl UciBoard for SjadamBoard {
 
             let pawn_neighbours = |square: i8| [square + 7, square + 9]
                 .iter().cloned()
-                .map(|sq| if self.to_move() == Black { sq - 16 } else { sq } )
+                .map(|sq| if self.side_to_move() == Black { sq - 16 } else { sq } )
                 .filter(|&sq| sq >= 0 && sq < 64)
                 .map(|sq| Square(sq as u8))
                 .filter(|&sq| self.is_empty(sq) || sq == mv.from())
@@ -757,7 +757,7 @@ impl EvalBoard for SjadamBoard {
     type UndoMove = SjadamUndoMove;
     type HashBoard = u64;
     
-    fn to_move(&self) -> Color {
+    fn side_to_move(&self) -> Color {
         self.to_move
     }
     
@@ -793,7 +793,7 @@ impl EvalBoard for SjadamBoard {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
-        let start_color = self.to_move();
+        let start_color = self.side_to_move();
         debug_assert_ne!(mv.from(), mv.to());
         debug_assert!(!self.is_empty(mv.from()),
                       "Tried to do move {} from empty square at \n{:?}", mv, self);
@@ -826,7 +826,7 @@ impl EvalBoard for SjadamBoard {
         
         // Remove castling priviledges on king moves
         if mv.piece_moved() == PieceType::King {
-            let color = self.to_move();
+            let color = self.side_to_move();
             self.disable_castling(color);
         }
         
@@ -901,7 +901,7 @@ impl EvalBoard for SjadamBoard {
             self.half_move_clock = 0;
         }
         
-        self.to_move = !self.to_move();
+        self.to_move = !self.side_to_move();
         self.hash ^= ZOBRIST_KEYS[768];
 
         // Last step: Detect repetitions
@@ -935,7 +935,7 @@ impl EvalBoard for SjadamBoard {
             self.hash ^= ZOBRIST_KEYS[793];
         }
 
-        debug_assert_ne!(start_color, self.to_move());
+        debug_assert_ne!(start_color, self.side_to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
                          "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
@@ -943,7 +943,7 @@ impl EvalBoard for SjadamBoard {
     }
 
     fn undo_move(&mut self, mv: Self::UndoMove) {
-        let start_color = !self.to_move();
+        let start_color = !self.side_to_move();
 
         let old_hash = self.move_history.pop();
         debug_assert!(old_hash.is_some());
@@ -981,8 +981,8 @@ impl EvalBoard for SjadamBoard {
         self.repetitions = mv.old_repetitions;
         self.last_move = mv.old_last_move.clone();
 
-        self.to_move = !self.to_move();
-        debug_assert_ne!(!start_color, self.to_move());
+        self.to_move = !self.side_to_move();
+        debug_assert_ne!(!start_color, self.side_to_move());
         debug_assert!(!self.is_empty(mv.from()));
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
                          "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
@@ -990,7 +990,7 @@ impl EvalBoard for SjadamBoard {
     }
 
     #[inline(never)]
-    fn all_legal_moves(&self) -> Vec<Self::Move> {
+    fn generate_moves(&self) -> Vec<Self::Move> {
         let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(self);
         active_moves.append(&mut moves);
         active_moves
@@ -1000,7 +1000,7 @@ impl EvalBoard for SjadamBoard {
     fn move_is_legal(&self, mv: Self::Move) -> bool {
         let piece_moved = self.get_square(mv.from());
 
-        if piece_moved.color() != Some(self.to_move()) {
+        if piece_moved.color() != Some(self.side_to_move()) {
             return false;
         }
 
@@ -1012,8 +1012,8 @@ impl EvalBoard for SjadamBoard {
                                                 &mut moves1, &mut moves2, &mut moves3);
 
         if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            debug_assert!(self.all_legal_moves().contains(&mv),
-                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.all_legal_moves(), moves1, moves2, moves3);
+            debug_assert!(self.generate_moves().contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.generate_moves(), moves1, moves2, moves3);
         }
         moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
@@ -1025,7 +1025,7 @@ impl EvalBoard for SjadamBoard {
     }
     
     #[inline(never)]
-    fn eval_board (&self) -> f32 {
+    fn static_eval (&self) -> f32 {
         debug_assert!(self.game_result() == None);
         let centre1 = 0b00000000_00000000_00000000_00011000_00011000_00000000_00000000_00000000;
         let centre2 = 0b00000000_00000000_00111100_00111100_00111100_00111100_00000000_00000000;
@@ -1055,7 +1055,7 @@ impl EvalBoard for SjadamBoard {
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
 
-        let tempo_bonus = match self.to_move() {
+        let tempo_bonus = match self.side_to_move() {
             White => (white_val + black_val.abs()) / 200.0,
             Black => -(white_val + black_val.abs()) / 200.0,
         };
