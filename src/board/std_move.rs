@@ -1,6 +1,6 @@
 use board::std_board::*;
-use search_algorithms::board::EvalBoard;
 use uci::UciBoard;
+use search_algorithms::board::Board;
 
 use std::fmt;
 

@@ -1,5 +1,5 @@
 use board::sjadam_board::SjadamBoard;
-use search_algorithms::board::{GameResult, EvalBoard};
+use search_algorithms::board::{GameResult, Board};
 use uci::UciBoard;
 
 use std::collections::hash_map::DefaultHasher;

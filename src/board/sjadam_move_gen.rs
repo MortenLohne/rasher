@@ -5,11 +5,11 @@ use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 
 use search_algorithms::board::Color::*;
-use search_algorithms::board::EvalBoard;
 
 use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
 use board::sjadam_board::BitBoard;
+use search_algorithms::board::Board;
 
 lazy_static! {
     static ref ROOK_TABLE : [[u8; 256]; 32] = {

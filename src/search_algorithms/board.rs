@@ -58,22 +58,29 @@ impl ops::Not for GameResult {
     }
 }
 
-pub trait EvalBoard : PartialEq + Clone {
-    type Move : Clone + fmt::Debug + PartialEq + Eq;
-    type UndoMove : Clone + fmt::Debug;
-    // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
-    type HashBoard : hash::Hash + Eq;
-
-    /// Returns whose turn it is
-    fn side_to_move(&self) -> Color;
-
-    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
-    
-    fn undo_move(&mut self, mv: Self::UndoMove);
+pub trait Board {
+    type Move: Eq + Clone + fmt::Debug;
+    type UndoMove;
 
     fn start_board() -> Self;
 
+    fn side_to_move(&self) -> Color;
+
     fn generate_moves(&self, moves: &mut Vec<Self::Move>);
+
+    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
+
+    fn undo_move(&mut self, mv: Self::UndoMove);
+
+    /// Returns the result if the game is decided, otherwise returns None.
+    /// If the game is over, it must be the losing player's turn,
+    /// otherwise the function may return anything
+    fn game_result(&self) -> Option<GameResult>;
+}
+
+pub trait EvalBoard : Board + PartialEq + Clone {
+    // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
+    type HashBoard : hash::Hash + Eq;
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
         let mut moves = vec![];
@@ -84,12 +91,6 @@ pub trait EvalBoard : PartialEq + Clone {
     fn active_moves(&self) -> Vec<Self::Move> {
         vec![]
     }
-
-    /// Returns the result if the game is decided, otherwise returns None.
-    /// This function should return quickly if the game is not decided yet.
-    /// If the game is over, it must be the losing player's turn,
-    /// otherwise the function may return anything
-    fn game_result(&self) -> Option<GameResult>;
     
     fn static_eval(&self) -> f32;
 

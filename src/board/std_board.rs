@@ -13,6 +13,7 @@ use std::fmt;
 use std::fmt::Write;
 use std::mem;
 use std::hash::{Hash, Hasher};
+use search_algorithms::board::Board;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
@@ -521,14 +522,211 @@ impl UciBoard for ChessBoard {
     }
 }
 
-impl EvalBoard for ChessBoard {
-
+impl Board for ChessBoard {
     type Move = std_move::ChessMove;
     type UndoMove = std_move::ChessUndoMove;
-    type HashBoard = Self;
-    
+
     fn side_to_move(&self) -> Color {
         self.to_move
+    }
+
+    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
+        // Helper variables
+        let (file_from, rank_from) = c_move.from.file_rank();
+        let (file_to, rank_to) = c_move.to.file_rank();
+        let color = self.to_move;
+        let piece_moved = self.piece_at(c_move.from).piece_type();
+        let captured_piece : PieceType = self[c_move.to].piece_type();
+        let undo_move = std_move::ChessUndoMove::from_move(c_move, self);
+
+        // Increment or reset the half-move clock
+        match (piece_moved, self.piece_at(c_move.to).piece_type()) {
+            (Pawn, _) => self.half_move_clock = 0,
+            (_, Empty) => self.half_move_clock += 1,
+            (_, _) => self.half_move_clock = 0,
+        }
+
+        self.move_num += 1;
+
+        // Perform castling
+        // It will castle regardless of whether it is legal to do so
+        if piece_moved == King &&
+            (file_from as i8 - file_to as i8).abs() == 2 {
+            debug_assert_eq!(file_from, 4, "Tried to castle from the {}th file", file_from);
+
+            // Simple helper closure that moves a piece, emptying the square it came from
+            // Checks nothing, not even if the square has a piece. Use carefully.
+            let do_simple_move = |board : &mut Self, f_from, r_from, f_to, r_to| {
+                board.board[r_to as usize][f_to as usize]
+                    = board.board[r_from as usize][f_from as usize];
+                board.board[r_from as usize][f_from as usize] = Piece::empty();
+            };
+            // Assume castling is legal, and move the king and rook to where they should go
+            match (color, file_to) {
+                (White, 2) => {
+                    do_simple_move(self, 4, 7, 2, 7);
+                    do_simple_move(self, 0, 7, 3, 7);
+                },
+                (White, 6) => {
+                    do_simple_move(self, 4, 7, 6, 7);
+                    do_simple_move(self, 7, 7, 5, 7);
+                },
+                (Black, 2) => {
+                    do_simple_move(self, 4, 0, 2, 0);
+                    do_simple_move(self, 0, 0, 3, 0);
+                },
+                (Black, 6) => {
+                    do_simple_move(self, 4, 0, 6, 0);
+                    do_simple_move(self, 7, 0, 5, 0);
+                },
+                (_, _) => panic!(format!(
+                    "Error: Tried to castle to the {}th file. ", file_to)),
+            }
+        }
+            // If a pawn takes towards an empty square, assume it is doing a legal en passant capture
+            else if piece_moved == Pawn && file_from != file_to &&
+                captured_piece == Empty {
+                self.board[rank_to as usize][file_to as usize]
+                    = self.board[rank_from as usize][file_from as usize];
+
+                self.board[rank_from as usize][file_to as usize] = Piece::empty();
+                self.board[rank_from as usize][file_from as usize] = Piece::empty();
+
+
+            }
+                // If it is not a special move
+                else {
+                    // Does the move, depending on whether the move promotes or not
+                    match c_move.prom {
+                        Some(piece_type) => self.board[rank_to as usize][file_to as usize]
+                            = Piece::new(piece_type, self.side_to_move()),
+                        None => self.board[rank_to as usize][file_to as usize]
+                            = self.board[rank_from as usize][file_from as usize],
+
+                    }
+                    self.board[rank_from as usize][file_from as usize] = Piece::empty();
+                }
+
+        // Remove any en passant square. If it was available to this player,
+        // it has already been used. Any new en passant square is added below.
+
+        self.set_en_passant_square(None);
+
+        // If the pawn went two squares forward, add the square behind it as en passant square
+        if piece_moved == Pawn &&
+            (rank_from as i8 - rank_to as i8).abs() == 2
+            {
+                self.set_en_passant_square(
+                    Some(Square::from_ints(file_from, (rank_from + rank_to) / 2)));
+                debug_assert!(self.en_passant_square().is_some(), "Failed to set en passant square");
+            }
+
+        // Remove castling rights if necessary
+        if self.castling_en_passant & 0b0000_1111 > 0 {
+            // Remove castling rights on king/rook moves
+            // Does not check when rooks are captured, it is assumed that the
+            // function looking for moves checks that rooks are present
+            if piece_moved == King {
+                self.disable_castling(color);
+            }
+            // If a rook was moved, check if it came from a corner
+            if piece_moved == Rook {
+                match c_move.from {
+                    Square(0) => self.disable_castling_queenside(Black),
+                    Square(7) => self.disable_castling_kingside(Black),
+                    Square(56) => self.disable_castling_queenside(White),
+                    Square(63) => self.disable_castling_kingside(White),
+                    _ => (),
+                }
+            }
+            // For any piece, check if it goes into the corner
+            match c_move.to {
+                Square(0) => self.disable_castling_queenside(Black),
+                Square(7) => self.disable_castling_kingside(Black),
+                Square(56) => self.disable_castling_queenside(White),
+                Square(63) => self.disable_castling_kingside(White),
+                _ => (),
+            }
+        }
+
+        self.to_move = !self.to_move;
+        undo_move
+    }
+    fn undo_move(&mut self, c_move : Self::UndoMove) {
+
+        let (file_from, rank_from) = c_move.from.file_rank();
+        let (file_to, rank_to) = c_move.to.file_rank();
+        let piece_moved = self.piece_at(c_move.to).piece_type();
+        let color = !self.to_move;
+
+        if piece_moved == King &&
+            (file_from as i8 - file_to as i8).abs() == 2
+            {
+                // Simple helper closure that moves a piece, emptying the square it came from
+                // Checks nothing, not even if the square has a piece. Use carefully.
+                let mut do_simple_move = |f_from, r_from, f_to, r_to| {
+                    self.board[r_to as usize][f_to as usize]
+                        = self.board[r_from as usize][f_from as usize];
+                    self.board[r_from as usize][f_from as usize] = Piece::empty();
+                };
+                // Assume castling is legal, and move the king and rook to where they should go
+                match (color, file_to) {
+                    (White, 2) => { do_simple_move(2, 7, 4, 7);
+                        do_simple_move(3, 7, 0, 7);
+                    },
+                    (White, 6) => { do_simple_move(6, 7, 4, 7);
+                        do_simple_move(5, 7, 7, 7);
+                    },
+                    (Black, 2) => { do_simple_move(2, 0, 4, 0);
+                        do_simple_move(3, 0, 0, 0);
+                    },
+                    (Black, 6) => { do_simple_move(6, 0, 4, 0);
+                        do_simple_move(5, 0, 7, 0);
+                    },
+                    (_, _) => panic!(format!(
+                        "Error: Tried to castle to the {}th file. ", file_to)),
+                }
+
+            }
+            // Undo en passant capture
+            else if piece_moved == Pawn && file_from != file_to && c_move.capture == Empty {
+                self.board[rank_from as usize][file_from as usize] =
+                    self.board[rank_to as usize][file_to as usize];
+                self.board[rank_to as usize][file_to as usize] = Piece::empty();
+
+                match color {
+                    Black => self.board[rank_to as usize - 1][file_to as usize] = Piece::new(Pawn, White),
+                    White => self.board[rank_to as usize + 1][file_to as usize] = Piece::new(Pawn, Black),
+                }
+            }
+                else {
+                    if c_move.prom {
+                        self.board[rank_from as usize][file_from as usize] =
+                            Piece::new(Pawn, color);
+                    }
+                        else {
+                            self.board[rank_from as usize][file_from as usize] =
+                                self.board[rank_to as usize][file_to as usize];
+                        }
+
+                    if c_move.capture != Empty
+                        {
+                            self.board[rank_to as usize][file_to as usize] =
+                                Piece::new(c_move.capture, self.to_move);
+                        }
+                        else {
+                            self.board[rank_to as usize][file_to as usize] = Piece::empty();
+                        }
+                }
+        self.castling_en_passant = c_move.old_castling_en_passant;
+        self.half_move_clock = c_move.old_half_move_clock;
+        self.move_num -= 1;
+
+        self.to_move = !self.to_move;
+    }
+
+    fn start_board() -> Self {
+        Self::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
@@ -537,6 +735,56 @@ impl EvalBoard for ChessBoard {
         active_moves.append(&mut quiet_moves);
         moves.extend_from_slice(&active_moves[..]);
     }
+
+    fn game_result(&self) -> Option<board::GameResult> {
+        if self.half_move_clock > 100 {
+            return Some(board::GameResult::Draw);
+        }
+        // TODO: This shouldn't call generate_moves(), but instead store whether its mate or not
+        let mut moves = vec![];
+        self.generate_moves(&mut moves);
+        if moves.is_empty() {
+            if move_gen::is_attacked(self, self.king_pos(self.side_to_move())) {
+                if self.to_move == White {
+                    Some(board::GameResult::BlackWin)
+                }
+                    else {
+                        Some(board::GameResult::WhiteWin)
+                    }
+            }
+                else {
+                    Some(board::GameResult::Draw)
+                }
+        }
+            else {
+                // Force a draw for unwinnable bishop/knight endgames
+                let mut black_material = 0.0;
+                let mut white_material = 0.0;
+                for square in BoardIter::new() {
+                    // Games with queens, rooks or pawns are always undecided
+                    match self[square].piece_type() {
+                        Queen | Rook | Pawn => return None,
+                        Knight | Bishop | King | Empty => (),
+                    };
+                    match (self[square].piece_type(), self[square].color()) {
+                        (piece_type, Some(Black)) => black_material += piece_type.value(),
+                        (piece_type, Some(White)) => white_material += piece_type.value(),
+                        (Empty, None) => (),
+                        (_, _) => unreachable!(),
+                    };
+                }
+                if black_material <= 3.5 && white_material <= 3.5 {
+                    Some(board::GameResult::Draw)
+                }
+                    else {
+                        None
+                    }
+            }
+    }
+}
+
+impl EvalBoard for ChessBoard {
+    type HashBoard = Self;
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
 
@@ -568,52 +816,6 @@ impl EvalBoard for ChessBoard {
 
     fn hash_board(&self) -> Self {
         self.clone()
-    }
-    
-    fn game_result(&self) -> Option<board::GameResult> {
-        if self.half_move_clock > 100 {
-            return Some(board::GameResult::Draw);
-        }
-        // TODO: This shouldn't call generate_moves(), but instead store whether its mate or not
-        let mut moves = vec![];
-        self.generate_moves(&mut moves);
-        if moves.is_empty() {
-            if move_gen::is_attacked(self, self.king_pos(self.side_to_move())) {
-                if self.to_move == White {
-                    Some(board::GameResult::BlackWin)
-                }
-                else {
-                    Some(board::GameResult::WhiteWin)
-                }
-            }
-            else {
-                Some(board::GameResult::Draw)
-            }
-        }
-        else {
-            // Force a draw for unwinnable bishop/knight endgames
-            let mut black_material = 0.0;
-            let mut white_material = 0.0;
-            for square in BoardIter::new() {
-                // Games with queens, rooks or pawns are always undecided
-                match self[square].piece_type() {
-                    Queen | Rook | Pawn => return None,
-                    Knight | Bishop | King | Empty => (),
-                };
-                match (self[square].piece_type(), self[square].color()) {
-                    (piece_type, Some(Black)) => black_material += piece_type.value(),
-                    (piece_type, Some(White)) => white_material += piece_type.value(),
-                    (Empty, None) => (),
-                    (_, _) => unreachable!(),
-                };
-            }
-            if black_material <= 3.5 && white_material <= 3.5 {
-                Some(board::GameResult::Draw)
-            }
-            else {
-                None
-            }
-        }
     }
     
     #[inline(never)]
@@ -657,205 +859,6 @@ impl EvalBoard for ChessBoard {
             }
         }
         value
-    }
-
-    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
-        // Helper variables
-        let (file_from, rank_from) = c_move.from.file_rank();
-        let (file_to, rank_to) = c_move.to.file_rank();
-        let color = self.to_move;
-        let piece_moved = self.piece_at(c_move.from).piece_type();
-        let captured_piece : PieceType = self[c_move.to].piece_type();
-        let undo_move = std_move::ChessUndoMove::from_move(c_move, self);
-        
-        // Increment or reset the half-move clock
-        match (piece_moved, self.piece_at(c_move.to).piece_type()) {
-            (Pawn, _) => self.half_move_clock = 0,
-            (_, Empty) => self.half_move_clock += 1,
-            (_, _) => self.half_move_clock = 0,
-        }
-
-        self.move_num += 1;
-        
-        // Perform castling
-        // It will castle regardless of whether it is legal to do so
-        if piece_moved == King &&
-            (file_from as i8 - file_to as i8).abs() == 2 {
-                debug_assert_eq!(file_from, 4, "Tried to castle from the {}th file", file_from);
-                
-                // Simple helper closure that moves a piece, emptying the square it came from
-                // Checks nothing, not even if the square has a piece. Use carefully.
-                let do_simple_move = |board : &mut Self, f_from, r_from, f_to, r_to| {
-                    board.board[r_to as usize][f_to as usize]
-                        = board.board[r_from as usize][f_from as usize];
-                    board.board[r_from as usize][f_from as usize] = Piece::empty();
-                };
-                // Assume castling is legal, and move the king and rook to where they should go
-                match (color, file_to) {
-                    (White, 2) => {
-                        do_simple_move(self, 4, 7, 2, 7);
-                        do_simple_move(self, 0, 7, 3, 7);
-                    },
-                    (White, 6) => {
-                        do_simple_move(self, 4, 7, 6, 7);
-                        do_simple_move(self, 7, 7, 5, 7);
-                    },
-                    (Black, 2) => {
-                        do_simple_move(self, 4, 0, 2, 0);
-                        do_simple_move(self, 0, 0, 3, 0);
-                    },
-                    (Black, 6) => {
-                        do_simple_move(self, 4, 0, 6, 0);
-                        do_simple_move(self, 7, 0, 5, 0);
-                    },
-                    (_, _) => panic!(format!(
-                        "Error: Tried to castle to the {}th file. ", file_to)),
-                }
-            }
-        // If a pawn takes towards an empty square, assume it is doing a legal en passant capture
-        else if piece_moved == Pawn && file_from != file_to &&
-            captured_piece == Empty {
-                self.board[rank_to as usize][file_to as usize]
-                    = self.board[rank_from as usize][file_from as usize];
-
-                self.board[rank_from as usize][file_to as usize] = Piece::empty();
-                self.board[rank_from as usize][file_from as usize] = Piece::empty();
-                
-                
-            }
-        // If it is not a special move
-        else {
-            // Does the move, depending on whether the move promotes or not
-            match c_move.prom {
-                Some(piece_type) => self.board[rank_to as usize][file_to as usize]
-                    = Piece::new(piece_type, self.side_to_move()),
-                None => self.board[rank_to as usize][file_to as usize]
-                    = self.board[rank_from as usize][file_from as usize],
-                
-            }
-            self.board[rank_from as usize][file_from as usize] = Piece::empty();
-        }
-            
-        // Remove any en passant square. If it was available to this player,
-        // it has already been used. Any new en passant square is added below.
-
-       self.set_en_passant_square(None);
-
-        // If the pawn went two squares forward, add the square behind it as en passant square
-        if piece_moved == Pawn &&
-            (rank_from as i8 - rank_to as i8).abs() == 2
-        {
-            self.set_en_passant_square(
-                Some(Square::from_ints(file_from, (rank_from + rank_to) / 2)));
-            debug_assert!(self.en_passant_square().is_some(), "Failed to set en passant square");
-        }
-
-        // Remove castling rights if necessary
-        if self.castling_en_passant & 0b0000_1111 > 0 {
-            // Remove castling rights on king/rook moves
-            // Does not check when rooks are captured, it is assumed that the
-            // function looking for moves checks that rooks are present
-            if piece_moved == King {
-                self.disable_castling(color);
-            }
-            // If a rook was moved, check if it came from a corner
-            if piece_moved == Rook {
-                match c_move.from {
-                    Square(0) => self.disable_castling_queenside(Black),
-                    Square(7) => self.disable_castling_kingside(Black),
-                    Square(56) => self.disable_castling_queenside(White),
-                    Square(63) => self.disable_castling_kingside(White),
-                    _ => (),
-                }
-            }
-            // For any piece, check if it goes into the corner
-            match c_move.to {
-                Square(0) => self.disable_castling_queenside(Black),
-                Square(7) => self.disable_castling_kingside(Black),
-                Square(56) => self.disable_castling_queenside(White),
-                Square(63) => self.disable_castling_kingside(White),
-                _ => (),
-            }
-        }
-        
-        self.to_move = !self.to_move;
-        undo_move
-    }
-    fn undo_move(&mut self, c_move : Self::UndoMove) {
-        
-        let (file_from, rank_from) = c_move.from.file_rank();
-        let (file_to, rank_to) = c_move.to.file_rank();
-        let piece_moved = self.piece_at(c_move.to).piece_type();
-        let color = !self.to_move;
-
-        if piece_moved == King &&
-            (file_from as i8 - file_to as i8).abs() == 2
-        {
-            // Simple helper closure that moves a piece, emptying the square it came from
-            // Checks nothing, not even if the square has a piece. Use carefully.
-            let mut do_simple_move = |f_from, r_from, f_to, r_to| {
-                self.board[r_to as usize][f_to as usize]
-                    = self.board[r_from as usize][f_from as usize];
-                self.board[r_from as usize][f_from as usize] = Piece::empty();
-            };
-            // Assume castling is legal, and move the king and rook to where they should go
-            match (color, file_to) {
-                (White, 2) => { do_simple_move(2, 7, 4, 7);
-                                do_simple_move(3, 7, 0, 7);
-                },
-                (White, 6) => { do_simple_move(6, 7, 4, 7);
-                                do_simple_move(5, 7, 7, 7);
-                },
-                (Black, 2) => { do_simple_move(2, 0, 4, 0);
-                                do_simple_move(3, 0, 0, 0);
-                },
-                (Black, 6) => { do_simple_move(6, 0, 4, 0);
-                                do_simple_move(5, 0, 7, 0);
-                },
-                (_, _) => panic!(format!(
-                    "Error: Tried to castle to the {}th file. ", file_to)),
-            }
-            
-        }
-        // Undo en passant capture
-        else if piece_moved == Pawn && file_from != file_to && c_move.capture == Empty {
-            self.board[rank_from as usize][file_from as usize] =
-                self.board[rank_to as usize][file_to as usize];
-            self.board[rank_to as usize][file_to as usize] = Piece::empty();
-            
-            match color {
-                Black => self.board[rank_to as usize - 1][file_to as usize] = Piece::new(Pawn, White),
-                White => self.board[rank_to as usize + 1][file_to as usize] = Piece::new(Pawn, Black),
-            }
-        }
-        else {
-            if c_move.prom {
-                self.board[rank_from as usize][file_from as usize] = 
-                    Piece::new(Pawn, color);
-            }
-            else {
-                self.board[rank_from as usize][file_from as usize] =
-                    self.board[rank_to as usize][file_to as usize];
-            }
-            
-            if c_move.capture != Empty
-            {
-                self.board[rank_to as usize][file_to as usize] =
-                    Piece::new(c_move.capture, self.to_move);
-            }
-            else {
-                self.board[rank_to as usize][file_to as usize] = Piece::empty();
-            }
-        }
-        self.castling_en_passant = c_move.old_castling_en_passant;
-        self.half_move_clock = c_move.old_half_move_clock;
-        self.move_num -= 1;
-
-        self.to_move = !self.to_move;
-    }
-    
-    fn start_board() -> Self {
-        Self::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap()
     }
 }
 

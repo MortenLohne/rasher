@@ -403,6 +403,7 @@ impl Eq for SjadamBoard {}
 use std::hash::Hasher;
 use std::hash::Hash;
 use std::iter::FromIterator;
+use search_algorithms::board::Board;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -752,23 +753,19 @@ impl UciBoard for SjadamBoard {
     }
 }
 
-impl EvalBoard for SjadamBoard {
+
+impl Board for SjadamBoard {
     type Move = SjadamMove;
     type UndoMove = SjadamUndoMove;
-    type HashBoard = u64;
-    
+
     fn side_to_move(&self) -> Color {
         self.to_move
     }
-    
+
     fn start_board() -> Self {
         Self::from_chess_board(&ChessBoard::start_board())
     }
 
-    fn hash_board(&self) -> Self::HashBoard {
-        self.hash
-    }
-    
     fn game_result(&self) -> Option<GameResult> {
         // In sjadam, king may be actually captured.
         // Check if the king is gone
@@ -781,12 +778,12 @@ impl EvalBoard for SjadamBoard {
                 if self.half_move_clock > 100 {
                     Some(GameResult::Draw)
                 }
-                else if self.repetitions >= 3 {
-                    Some(GameResult::Draw)
-                }
-                else {
-                    None
-                }
+                    else if self.repetitions >= 3 {
+                        Some(GameResult::Draw)
+                    }
+                        else {
+                            None
+                        }
 
             },
         }
@@ -821,15 +818,15 @@ impl EvalBoard for SjadamBoard {
         debug_assert!(self.half_move_clock <= 100, "half_move_clock was {}", self.half_move_clock);
 
         self.hash ^= self.castling_en_passant_key();
-        
+
         self.set_en_passant_square(None);
-        
+
         // Remove castling priviledges on king moves
         if mv.piece_moved() == PieceType::King {
             let color = self.side_to_move();
             self.disable_castling(color);
         }
-        
+
         // Remove castling priviledges if anything moves from or to a corner
         match mv.from() {
             square if square == Square::A1 =>
@@ -867,9 +864,9 @@ impl EvalBoard for SjadamBoard {
             }
 
         self.hash ^= self.castling_en_passant_key();
-        
+
         self.move_piece(Piece::new(mv.piece_moved(), start_color), mv.from(), mv.to());
-        
+
         if undo_move.capture != Empty {
             self.clear_piece_at_square(Piece::new(undo_move.capture, !start_color), mv.to());
             self.half_move_clock = 0;
@@ -882,25 +879,25 @@ impl EvalBoard for SjadamBoard {
                             Square::from_ints(rook_from, mv.from().rank()),
                             Square::from_ints(rook_to, mv.from().rank()));
         }
-        else if en_passant {
-            // Remove the captured pawn
-            let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
-            self.clear_piece_at_square(Piece::new(Pawn, !start_color),
-                                       Square::from_ints(mv.to().file(), ep_square_rank));
-        }
-        else if (start_color == White && mv.to().rank() == 0)
-            || (start_color == Black && mv.to().rank() == 7)
-        {
-            // Promote to queen
-            debug_assert!(!self.is_empty(mv.to()));
-
-            if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
-                self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
-                self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
+            else if en_passant {
+                // Remove the captured pawn
+                let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
+                self.clear_piece_at_square(Piece::new(Pawn, !start_color),
+                                           Square::from_ints(mv.to().file(), ep_square_rank));
             }
-            self.half_move_clock = 0;
-        }
-        
+                else if (start_color == White && mv.to().rank() == 0)
+                    || (start_color == Black && mv.to().rank() == 7)
+                    {
+                        // Promote to queen
+                        debug_assert!(!self.is_empty(mv.to()));
+
+                        if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
+                            self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
+                            self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
+                        }
+                        self.half_move_clock = 0;
+                    }
+
         self.to_move = !self.side_to_move();
         self.hash ^= ZOBRIST_KEYS[768];
 
@@ -917,23 +914,23 @@ impl EvalBoard for SjadamBoard {
                 if repetition == 5 {
                     self.repetitions = 5;
                 }
-                else if self.move_history.iter().rev()
-                    .take(self.half_move_clock as usize)
-                    .skip(3)
-                    .any(|&hash| hash == self.hash)
-                    {
-                        self.hash ^= key;
-                    }
-                else {
-                    self.repetitions = repetition as u8;
-                    break;
-                }
+                    else if self.move_history.iter().rev()
+                        .take(self.half_move_clock as usize)
+                        .skip(3)
+                        .any(|&hash| hash == self.hash)
+                        {
+                            self.hash ^= key;
+                        }
+                        else {
+                            self.repetitions = repetition as u8;
+                            break;
+                        }
             }
         }
-        else {
-            self.repetitions = 1;
-            self.hash ^= ZOBRIST_KEYS[793];
-        }
+            else {
+                self.repetitions = 1;
+                self.hash ^= ZOBRIST_KEYS[793];
+            }
 
         debug_assert_ne!(start_color, self.side_to_move());
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
@@ -950,13 +947,13 @@ impl EvalBoard for SjadamBoard {
 
         if mv.piece_moved != Queen
             && self.piece_at_square(Piece::new(Queen, start_color), mv.to()) {
-                self.clear_piece_at_square(Piece::new(Queen, start_color), mv.to());
-                self.set_piece_at_square(Piece::new(mv.piece_moved, start_color), mv.from());
+            self.clear_piece_at_square(Piece::new(Queen, start_color), mv.to());
+            self.set_piece_at_square(Piece::new(mv.piece_moved, start_color), mv.from());
         }
-        else { // If move was not promotion
-            self.move_piece(Piece::new(mv.piece_moved, start_color), mv.to(), mv.from());
-        }
-        
+            else { // If move was not promotion
+                self.move_piece(Piece::new(mv.piece_moved, start_color), mv.to(), mv.from());
+            }
+
         if mv.capture != Empty {
             self.set_piece_at_square(Piece::new(mv.capture, !start_color), mv.to());
         }
@@ -968,13 +965,13 @@ impl EvalBoard for SjadamBoard {
                             Square::from_ints(rook_to, mv.from().rank()),
                             Square::from_ints(rook_from, mv.from().rank()));
         }
-        else if mv.en_passant() {
-            // Replace the captured pawn
-            let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
-            self.set_piece_at_square(Piece::new(Pawn, !start_color),
-                                     Square::from_ints(mv.to().file(), ep_square_rank));
-        }
-        
+            else if mv.en_passant() {
+                // Replace the captured pawn
+                let ep_square_rank = if start_color == Black { mv.to().rank() - 1 } else { mv.to().rank() + 1 };
+                self.set_piece_at_square(Piece::new(Pawn, !start_color),
+                                         Square::from_ints(mv.to().file(), ep_square_rank));
+            }
+
         self.half_move_clock = mv.old_half_move_clock;
         self.castling_en_passant = mv.old_castling_en_passant;
         self.hash = mv.old_hash;
@@ -996,6 +993,19 @@ impl EvalBoard for SjadamBoard {
         moves.append(&mut active_moves);
         moves.append(&mut inactive_moves);
     }
+}
+
+impl EvalBoard for SjadamBoard {
+
+    type HashBoard = u64;
+    
+
+
+    fn hash_board(&self) -> Self::HashBoard {
+        self.hash
+    }
+    
+
 
     #[inline(never)]
     fn move_is_legal(&self, mv: Self::Move) -> bool {

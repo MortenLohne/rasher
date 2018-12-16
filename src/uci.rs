@@ -354,7 +354,7 @@ fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
                         -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
     where B: 'static + UciBoard + fmt::Debug + Send,
-<B as board::EvalBoard>::Move: Sync
+<B as board::Board>::Move: Sync
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
 }
@@ -520,7 +520,7 @@ pub fn parse_go (input : &str)
 
 pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
     where Board: 'static + UciBoard + fmt::Debug + Send + Hash + Eq,
-<Board as board::EvalBoard>::Move: Send + Sync
+<Board as board::Board>::Move: Send + Sync
 {
 
     let (handle, channel) = alpha_beta::start_uci_search(

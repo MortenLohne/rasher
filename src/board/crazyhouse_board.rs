@@ -52,37 +52,22 @@ impl PartialEq for CrazyhouseBoard {
     }
 }
 
-impl EvalBoard for CrazyhouseBoard {
-
+impl Board for CrazyhouseBoard {
     type Move = CrazyhouseMove;
     type UndoMove = CrazyhouseUndoMove;
-    type HashBoard = Self;
-    
+
     fn side_to_move(&self) -> Color {
         self.base_board.side_to_move()
     }
-    
+
     fn start_board() -> Self {
         CrazyhouseBoard {base_board: ChessBoard::start_board().clone(),
-                         white_available_pieces: vec![],
-                         black_available_pieces: vec![],
-                         crazyhouse_moves: vec![]}
+            white_available_pieces: vec![],
+            black_available_pieces: vec![],
+            crazyhouse_moves: vec![]}
     }
-
-    fn hash_board(&self) -> Self {
-        self.clone()
-    }
-
     fn game_result(&self) -> Option<board::GameResult> {
         self.base_board.game_result()
-    }
-
-    fn static_eval(&self) -> f32 {
-        // TODO: Make this take into account available pieces
-        let score = self.base_board.static_eval();
-        0.0 + score -
-            self.black_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>() +
-            self.white_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>()
     }
 
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
@@ -102,38 +87,38 @@ impl EvalBoard for CrazyhouseBoard {
             debug_assert_eq!(king_pos, move_gen::king_pos(&self.base_board));
             move_gen::is_attacked(&cloned.base_board, king_pos)
         };
-        
+
         for square in board_iter.filter(|&sq| self.base_board[sq].is_empty()) {
             let to_move = self.side_to_move();
             if to_move == White {
                 for piece_type in &self.white_available_pieces {
                     // Make sure you don't put pawns on the back ranks
-                    let (_, rank) = square.file_rank(); 
-                    if piece_type != &PieceType::Pawn || (rank > 0 && rank < 7) {
-                        let mv = CrazyhouseMove::CrazyMove(
-                            *piece_type, square, self.base_board.castling_en_passant);
-                        if !is_in_check || !leaves_king_in_check(mv) {
-                            moves.push(mv);
-                        }
-                    }
-                }
-            }
-            else {
-                for piece_type in &self.black_available_pieces {
                     let (_, rank) = square.file_rank();
                     if piece_type != &PieceType::Pawn || (rank > 0 && rank < 7) {
                         let mv = CrazyhouseMove::CrazyMove(
                             *piece_type, square, self.base_board.castling_en_passant);
                         if !is_in_check || !leaves_king_in_check(mv) {
                             moves.push(mv);
-  
                         }
                     }
                 }
             }
+                else {
+                    for piece_type in &self.black_available_pieces {
+                        let (_, rank) = square.file_rank();
+                        if piece_type != &PieceType::Pawn || (rank > 0 && rank < 7) {
+                            let mv = CrazyhouseMove::CrazyMove(
+                                *piece_type, square, self.base_board.castling_en_passant);
+                            if !is_in_check || !leaves_king_in_check(mv) {
+                                moves.push(mv);
+
+                            }
+                        }
+                    }
+                }
         }
     }
-    
+
     fn do_move(&mut self, mv : Self::Move) -> Self::UndoMove {
         match mv {
             CrazyhouseMove::NormalMove(normal_move) => {
@@ -142,34 +127,34 @@ impl EvalBoard for CrazyhouseBoard {
                     if self.side_to_move() == Black {
                         self.black_available_pieces.push(capture);
                     }
-                    else {
-                        self.white_available_pieces.push(capture);
-                    }
+                        else {
+                            self.white_available_pieces.push(capture);
+                        }
                 }
                 CrazyhouseUndoMove::NormalMove(self.base_board.do_move(normal_move))
-                
+
             },
             CrazyhouseMove::CrazyMove(piecetype, square, n) => {
                 let (file, rank) = square.file_rank();
                 if self.side_to_move() == White {
                     match self.white_available_pieces.iter()
                         .rposition(|&p| p == piecetype) {
-                            Some(index) =>
-                                self.base_board.board[rank as usize][file as usize] =
+                        Some(index) =>
+                            self.base_board.board[rank as usize][file as usize] =
                                 Piece::new(self.white_available_pieces.remove(index), White),
-                            None => panic!("{:?}\nWhite tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.white_available_pieces),
-                        }
+                        None => panic!("{:?}\nWhite tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.white_available_pieces),
+                    }
                 }
-                else {
-                    match self.black_available_pieces.iter()
-                        .rposition(|&p| p == piecetype) {
+                    else {
+                        match self.black_available_pieces.iter()
+                            .rposition(|&p| p == piecetype) {
                             Some (index) =>
                                 self.base_board.board[rank as usize][file as usize] =
-                                Piece::new(self.black_available_pieces.remove(index), Black),
+                                    Piece::new(self.black_available_pieces.remove(index), Black),
                             None => panic!("{:?}\nBlack tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.black_available_pieces),
-                            
+
                         }
-                }
+                    }
                 // Remove any en passant square. If it was available to this player,
                 self.base_board.set_en_passant_square(None);
                 self.base_board.to_move = !self.base_board.to_move;
@@ -182,7 +167,7 @@ impl EvalBoard for CrazyhouseBoard {
 
     fn undo_move(&mut self, mv : Self::UndoMove) {
         match mv {
-            // If the normal move was a capture, remove 
+            // If the normal move was a capture, remove
             CrazyhouseUndoMove::NormalMove(normal_move) => {
                 self.base_board.undo_move(normal_move);
                 match (self.side_to_move(), normal_move.capture) {
@@ -193,7 +178,7 @@ impl EvalBoard for CrazyhouseBoard {
                                 self.white_available_pieces.remove(index),
                             None => panic!("Tried to make illegal move {:?}", mv),
                         },
-                    (Black, piecetype) => 
+                    (Black, piecetype) =>
                         match self.black_available_pieces.iter().rposition(|&p| p == piecetype) {
                             Some(index) =>
                                 self.black_available_pieces.remove(index),
@@ -207,10 +192,10 @@ impl EvalBoard for CrazyhouseBoard {
                     self.white_available_pieces.push(piecetype);
                     self.base_board.board[rank as usize][file as usize] = Piece::empty();
                 }
-                else {
-                    self.black_available_pieces.push(piecetype);
-                    self.base_board.board[rank as usize][file as usize] = Piece::empty();
-                }
+                    else {
+                        self.black_available_pieces.push(piecetype);
+                        self.base_board.board[rank as usize][file as usize] = Piece::empty();
+                    }
                 self.base_board.to_move = !self.base_board.to_move;
                 match self.crazyhouse_moves.pop() {
                     None => panic!("Tried to undo crazyhouse move on a board with no crazyhouse moves played"),
@@ -227,7 +212,25 @@ impl EvalBoard for CrazyhouseBoard {
     }
 }
 
+impl EvalBoard for CrazyhouseBoard {
+    type HashBoard = Self;
+
+    fn hash_board(&self) -> Self {
+        self.clone()
+    }
+
+    fn static_eval(&self) -> f32 {
+        // TODO: Make this take into account available pieces
+        let score = self.base_board.static_eval();
+        0.0 + score -
+            self.black_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>() +
+            self.white_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>()
+    }
+}
+
 use std::fmt;
+use search_algorithms::board::Board;
+
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\nCrazyhouse moves: {:?}\nWhite pieces: {:?}\nBlack pieces: {:?}",

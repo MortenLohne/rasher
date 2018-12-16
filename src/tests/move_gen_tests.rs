@@ -1,6 +1,6 @@
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::board::EvalBoard;
+use search_algorithms::board::Board;
 
 use uci::UciBoard;
 
@@ -378,8 +378,8 @@ use std::fmt;
 
 /// Checks that the engine finds the total number of legal moves after n plies.
 /// This provides a very strong indication that the move generator is correct
-pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n : u8) -> u64
-    where <B as EvalBoard>::Move: fmt::Display
+pub fn legal_moves_after_plies<B: Board + Eq + fmt::Debug + Clone>(board : &mut B, n : u8) -> u64
+    where <B as Board>::Move: fmt::Display
 {
     if n == 0 || board.game_result() != None { 1 }
     else {
@@ -400,8 +400,8 @@ pub fn legal_moves_after_plies<B: EvalBoard + Eq + fmt::Debug>(board : &mut B, n
 }
 
 #[allow(dead_code)]
-pub fn perf_prop<B: EvalBoard + Eq + fmt::Debug>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
-    where <B as EvalBoard>::Move: fmt::Display
+pub fn perf_prop<B: Board + Eq + fmt::Debug + Clone>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
+    where <B as Board>::Move: fmt::Display
 {
     let mut results = vec![];
     let old_board = board.clone();

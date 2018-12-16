@@ -1,10 +1,9 @@
 use board::std_board::Square;
 use board::std_board::{Piece, PieceType};
-//use board::sjadam_board::SjadamBoard;
 use board::sjadam_board::SjadamBoard;
-use search_algorithms::board::EvalBoard;
 
 use std::fmt;
+use search_algorithms::board::Board;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SjadamUndoMove {

@@ -90,11 +90,12 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
 }
 
 use std::thread;
+use search_algorithms::board::Board;
 
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + Send + 'static, <B as EvalBoard>::Move: Sync
+    where B: UciBoard + fmt::Debug + Send + 'static, <B as Board>::Move: Sync
 {
     let (sender, receiver) = mpsc::channel();
     
@@ -107,7 +108,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
                      channel: mpsc::Sender<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+    where B: UciBoard + fmt::Debug + Send, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::Instant::now();
@@ -208,7 +209,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
 
 /// Scecial non-uci search that gives additional debug information
 pub fn search_position<B>(board: &mut B)
-    where B: EvalBoard + fmt::Debug + Send, <B as EvalBoard>::Move: Sync
+    where B: EvalBoard + fmt::Debug + Send, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(board);
     let start_time = time::Instant::now();
@@ -338,7 +339,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         }
     }
 
-    pub fn pv(&self, board: &mut B) -> Vec<<B as EvalBoard>::Move> {
+    pub fn pv(&self, board: &mut B) -> Vec<<B as Board>::Move> {
         debug_assert_eq!(*board, self.board);
         match self.best_child() {
             None => vec![],
@@ -559,7 +560,7 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
                                   total_searches: u64, search_data: &mut SearchData,
                                   depth: u16) -> Score
         where Ra: rand::Rng + rand::Rand + Send + Clone + Sync,
-    <B as EvalBoard>::Move: Sync
+    <B as Board>::Move: Sync
     {
         //println!("Selecting in parallel");
         

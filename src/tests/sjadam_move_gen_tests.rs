@@ -1,6 +1,6 @@
 use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
-use search_algorithms::board::{GameResult, EvalBoard};
+use search_algorithms::board::{GameResult, Board};
 use tests::move_gen_tests;
 use board::sjadam_board::BitBoard;
 use board::std_board::Square;

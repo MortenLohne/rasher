@@ -2,7 +2,7 @@ use board::sjadam_board::SjadamBoard;
 use uci::UciBoard;
 use search_algorithms::alpha_beta;
 use board::sjadam_move::SjadamMove;
-use search_algorithms::board::EvalBoard;
+use search_algorithms::board::Board;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use uci;

@@ -6,7 +6,7 @@ use board::std_board::Square;
 use board::std_board::Piece;
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
-use search_algorithms::board::EvalBoard;
+use search_algorithms::board::Board;
 use uci::UciBoard;
 
 #[test]

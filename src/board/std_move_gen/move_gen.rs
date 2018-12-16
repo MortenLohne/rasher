@@ -1,4 +1,3 @@
-use search_algorithms::board::EvalBoard;
 use board::std_board::ChessBoard;
 use board::std_board::Piece;
 use board::std_board::Square;
@@ -8,6 +7,7 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 
 use std::cmp::Ordering;
+use search_algorithms::board::Board;
 
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> (Vec<ChessMove>, Vec<ChessMove>) {

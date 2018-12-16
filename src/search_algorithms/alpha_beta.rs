@@ -23,6 +23,7 @@ use std::mem;
 use std::time;
 use std::sync::{Arc, Mutex};
 use uci::TimeRestriction::{Nodes, Mate, GameTime};
+use search_algorithms::board::Board;
 
 /// Start a standard uci search, sending the results through a channel
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
@@ -30,7 +31,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             move_list: Option<Vec<B::Move>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
     where B: UciBoard + fmt::Debug + Send + 'static + Hash + Eq,
-<B as EvalBoard>::Move: Sync + Send
+<B as Board>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
     let thread = thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
@@ -42,7 +43,7 @@ pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
     where B: UciBoard + fmt::Debug + Send + Hash + Eq,
-<B as EvalBoard>::Move: Sync
+<B as Board>::Move: Sync
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
 }
