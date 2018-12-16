@@ -775,7 +775,7 @@ impl Board for SjadamBoard {
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
             (true, true) => {
-                if self.half_move_clock > 100 {
+                if self.half_move_clock >= 100 {
                     Some(GameResult::Draw)
                 }
                     else if self.repetitions >= 3 {
