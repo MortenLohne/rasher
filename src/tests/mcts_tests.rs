@@ -68,7 +68,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
     board.generate_moves(&mut all_legal_moves);
 
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
-    let mut searches = mc_tree.searches;
+    let mut searches = mc_tree.searches();
     let start_time = time::Instant::now();
     let mut rng = rand::weak_rng();
     
@@ -79,7 +79,7 @@ fn basic_tactics_prop<B: EvalBoard + fmt::Debug> (board : &B, best_move : B::Mov
             searches += 1;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
-                .map(|n| n.searches)
+                .map(|n| n.searches())
                 .fold(0, u64::add);
             debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
                           format!("{} searches overall, but sum of searches of children is {}.",

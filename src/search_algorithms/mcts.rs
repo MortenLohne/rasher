@@ -56,7 +56,7 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
         let start_time = time::Instant::now();
         
         let mut mctree = MonteCarloTree::new_root(&mut board);
-        let mut searches = mctree.searches;
+        let mut searches = mctree.searches();
         let mut rng = rand::weak_rng();
         
         while start_time.elapsed() < time::Duration::from_secs(20) {
@@ -65,7 +65,7 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
             searches += 1;
             let searches_of_children = mctree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
-                .map(|n| n.searches)
+                .map(|n| n.searches())
                 .fold(0, u64::add);
             debug_assert!((searches as i64 - searches_of_children as i64).abs() <= 1,
                           format!("{} searches overall, but sum of searches of children is {} {}.",
@@ -81,7 +81,7 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
         let best_node = mctree.children[best_move_index].take().unwrap();
         println!("{:?}\nAI played {:?} after {}/{} searches, with {:.2}% winning chance",
                  board, best_move,
-                 best_node.searches,
+                 best_node.searches(),
                  searches,
                  100.0 * *best_node.score());
         board.do_move(best_move);
@@ -116,18 +116,18 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
     for n in 1.. {
         for _ in 0..100 * (n as f64).sqrt() as usize {
             use std::ops::Add;
-            let searches = mc_tree.searches;
+            let searches = mc_tree.searches();
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
             mc_tree.select_parallel(&mut rng, searches, &mut search_data, 1);
-            //mc_tree.select(&mut rng, searches, &mut search_data);
+            // mc_tree.select(&mut rng, searches, &mut search_data);
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
-                .map(|n| n.searches)
+                .map(|n| n.searches())
                 .fold(0, u64::add);
-            debug_assert!((mc_tree.searches as i64 - searches_of_children as i64).abs() <= 1,
-                          format!("{} searches overall, but sum of searches of children is {}.\n{:?}",
-                                  mc_tree.searches, searches_of_children, mc_tree));
+            debug_assert_eq!(mc_tree.searches(), searches_of_children,
+                          "{} searches overall, but sum of searches of children is {}.\n{:?}",
+                                  mc_tree.searches(), searches_of_children, mc_tree);
         }
         
         let time_taken = time::Instant::now() - start_time;
@@ -143,9 +143,9 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                 }
             },
             Depth(n) | Mate(n)
-                if mc_tree.searches >= (<B as EvalBoard>::BRANCH_FACTOR).pow(n as u32)
+                if mc_tree.searches() >= (<B as EvalBoard>::BRANCH_FACTOR).pow(n as u32)
                 => break,
-            Nodes(n) => if mc_tree.searches >= n { break } else { },
+            Nodes(n) => if mc_tree.searches() >= n { break } else { },
             MoveTime(time) => {
                 if time_taken > time {
                     break;
@@ -202,7 +202,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         board.undo_move(undo_move);
     }
     let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken as i64,
-                                  nodes: mc_tree.searches, hashfull: 0.0, pvs: pvs,
+                                  nodes: mc_tree.searches(), hashfull: 0.0, pvs: pvs,
                                   color: board.side_to_move() };
     channel.send(uci_info).unwrap();
 }
@@ -221,7 +221,7 @@ pub fn search_position<B>(board: &mut B)
     for n in 1.. {
         for _ in 0..((5*n) as f64).sqrt() as usize {
             use std::ops::Add;
-            let searches = mc_tree.searches;
+            let searches = mc_tree.searches();
             //searches_last_print = mc_tree.searches;
             let mut search_data = SearchData::default();
             mc_tree.select_parallel(&mut rng, searches, &mut search_data, 1);
@@ -229,24 +229,24 @@ pub fn search_position<B>(board: &mut B)
             total_depth += search_data.total_depth as u64;
             let searches_of_children = mc_tree.children.iter()
                 .map(Option::as_ref).map(Option::unwrap)
-                .map(|n| n.searches)
+                .map(|n| n.searches())
                 .fold(0, u64::add);
-            debug_assert!((mc_tree.searches as i64 - searches_of_children as i64).abs() <= 1,
+            debug_assert!((mc_tree.searches() as i64 - searches_of_children as i64).abs() <= 1,
                           format!("{} searches overall, but sum of searches of children is {}.\n{:?}",
-                                  mc_tree.searches, searches_of_children, mc_tree));
-            if mc_tree.searches - searches_last_print > 4096 {
-                searches_last_print = mc_tree.searches;
+                                  mc_tree.searches(), searches_of_children, mc_tree));
+            if mc_tree.searches() - searches_last_print > 4096 {
+                searches_last_print = mc_tree.searches();
                 
                 let elapsed_time = start_time.elapsed();
                 let elapsed_seconds = elapsed_time.as_secs() as f32
                     + elapsed_time.subsec_nanos() as f32 / 1000_0000_0000.0;
                     
                 println!("{} total searches at {}nps, t={}s, {:.2}% draws, average depth {}.",
-                         mc_tree.searches,
-                         (mc_tree.searches as f32 / elapsed_seconds) as u64,
+                         mc_tree.searches(),
+                         (mc_tree.searches() as f32 / elapsed_seconds) as u64,
                          elapsed_seconds,
-                         100.0 * mc_tree.score.draws as f64 / mc_tree.searches as f64,
-                         total_depth / mc_tree.searches);
+                         100.0 * mc_tree.score.draws as f64 / mc_tree.searches() as f64,
+                         total_depth / mc_tree.searches());
                 mc_tree.print_score(board, &mut String::new());
             }
         }
@@ -259,11 +259,19 @@ pub struct MonteCarloTree<B> {
     pub children: Vec<Option<Box<MonteCarloTree<B>>>>,
     board: B,
     pub score: Score,
-    pub value: f64,
-    pub searches: u64,
     game_result: Option<GameResult>,
     is_fully_expanded: bool,
     maximizing: bool,
+}
+
+impl<B> MonteCarloTree<B> {
+    pub fn value(&self) -> f64 {
+        return self.score.black_wins as f64 * 1.0 + self.score.draws as f64 * 0.5;
+    }
+
+    pub fn searches(&self) -> u64 {
+        return self.score.black_wins + self.score.white_wins + self.score.draws;
+    }
 }
 
 impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
@@ -273,7 +281,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         board.generate_moves(&mut moves);
         let mut root = MonteCarloTree { children: vec![None; moves.len()],
                                         board: board.clone(),
-                                        score: Score::new(), value: 0.0, searches: 0,
+                                        score: Score::new(),
                                         game_result: board.game_result(),
                                         is_fully_expanded: false,
                                         maximizing: board.side_to_move() == Color::Black
@@ -281,7 +289,7 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         let mut rng = rand::weak_rng();
         while !root.is_fully_expanded {
             root.expand(&mut rng, &mut SearchData::default());
-            if root.searches > 10_000 {
+            if root.searches() > 10_000 {
                 panic!("Failed to fully expand root node after 10000 searches")
             }
         }        
@@ -293,30 +301,26 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                                   game_result: board.game_result(),
                                   board: board,
                                   score: Score::new(),
-                                  value: 0.0, searches: 0,
                                   is_fully_expanded: false, 
                                   maximizing: !self.maximizing })
     }
 
     pub fn score(&self) -> NotNaN<f64> {
-        NotNaN::new(self.value / self.searches as f64).unwrap_or_else(|_|NotNaN::new(0.5).unwrap())
+        NotNaN::new(self.value() / self.searches() as f64).unwrap_or_else(|_|NotNaN::new(0.5).unwrap())
     }
 
     /// Increments the search counter for the node, and adds 1.0, 0.5 or 0.0 to the value,
     /// depending on the given result
     fn add_value(&mut self, result: GameResult) {
         // TODO: Maybe do not count a draw as a search
-        self.searches += 1;
         match result {
             BlackWin => {
-                self.value += 1.0;
                 self.score.black_wins += 1;
             },
             WhiteWin => {
                 self.score.white_wins += 1;
             },
             Draw => {
-                self.value += 0.5;
                 self.score.draws += 1;
             }
         }
@@ -353,12 +357,29 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                            "{:?} has {} moves but node has {} children: {:?}\n{:?}\nNode board: {:?}\nChild node board:{:?}",
                            board, moves.len(), self.children.len(), self.children,
                            moves, self.board, child_node.board);
+
                 if index >= moves.len() {
                     println!("{:?}\n{:?}\n{:?}", board, moves, self);
                 }
+
+                for (i, ref mv) in moves.iter().enumerate() {
+                    let old_board = board.clone();
+                    let undo_move = board.do_move((*mv).clone());
+                    if let Some(ref child) = self.children[i] {
+                        debug_assert_eq!(*board, child.board,
+                                         "\nAfter doing {:?}, boards were mismatched. Old board:{:?}\nParent node board:{:?}\n",
+                                         mv, old_board, self.board);
+                    }
+                    board.undo_move(undo_move);
+                }
+
                 let game_move = moves[index].clone();
                 let old_board = board.clone();
+                debug_assert!(board.move_is_legal(game_move.clone()));
                 let undo_move = board.do_move(game_move.clone());
+                debug_assert_eq!(*board, child_node.board,
+                                 "\nAfter doing {:?}, boards were mismatched. Old board:\n{:?}\n",
+                                 game_move, old_board);
                 let mut result = child_node.pv(board);
                 board.undo_move(undo_move);
                 debug_assert_eq!(*board, old_board);
@@ -397,11 +418,11 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                     println!("{}Move {:?} scores {:.2}% ({}/{}/{}), n={}, best reply {:?} with {:.2}% ({}/{}/{}), n={}", 
                              padding, go_move, 100.0 * *node.score(),
                              node.score.white_wins, node.score.draws, node.score.black_wins,
-                             node.searches, 
+                             node.searches(),
                              best_reply, 100.0 * *best_reply_node.score(),
                              best_reply_node.score.white_wins, best_reply_node.score.draws,
-                             best_reply_node.score.black_wins, best_reply_node.searches);
-                    if node.searches > 10_000 {
+                             best_reply_node.score.black_wins, best_reply_node.searches());
+                    if node.searches() > 10_000 {
                         println!("Children//:");
                         padding.push_str("  ");
                         node.print_score(&board_after_move, padding);
@@ -412,9 +433,9 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                     continue;
                 }
             }
-            if node.searches >= 10 {
+            if node.searches() >= 10 {
                 println!("{}Move {:?} scores {:.2}%, {} searches, best reply not found", 
-                         padding, go_move, 100.0 * *node.score(), node.searches );
+                         padding, go_move, 100.0 * *node.score(), node.searches() );
             }
         }
     }
@@ -423,14 +444,14 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
     /// Nodes with good scores but less searches are more attractive
     /// Higher is always better, even when minimzing
     pub fn move_selection_value(&self, total_searches: u64) -> NotNaN<f64> {
-        if self.searches == 0 {
+        if self.searches() == 0 {
             if self.maximizing { NotNaN::new(f64::MAX).unwrap() }
             else { NotNaN::new(f64::MIN).unwrap() }
         }
         else {
             let adjusted_score = if self.maximizing { 1.0 - *self.score() } else { *self.score() };
             NotNaN::new(adjusted_score + 
-                        (2.0f64).sqrt() * ((total_searches as f64).ln() / self.searches as f64).sqrt())
+                        (2.0f64).sqrt() * ((total_searches as f64).ln() / self.searches() as f64).sqrt())
                 .unwrap()
         }
     }
@@ -451,11 +472,11 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         use std::ops::Add;
         let searches_of_children = self.children.iter()
             .map(Option::as_ref).map(Option::unwrap)
-            .map(|n| n.searches)
+            .map(|n| n.searches())
             .fold(0, u64::add);
-        debug_assert!((self.searches as i64 - searches_of_children as i64).abs() <= 1,
+        debug_assert!((self.searches() as i64 - searches_of_children as i64).abs() <= 1,
                       format!("{} searches in total, but sum of searches of children is {}\n{:?}",
-                              self.searches, searches_of_children, self.children));
+                              self.searches(), searches_of_children, self.children));
         
         //let moves = board.generate_moves();
         // Find the index of the child node with highest selection value
@@ -571,21 +592,20 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
             search_data.total_depth += 1;
             return Score::from_game_result(&result)
         }
-        else {
-            // TODO: WHat do do with this data
-            // search_data.selection_depth += threads;
-            // search_data.total_depth += threads;
-        };
     
         if self.children.len() == 1 {
             let child = self.children[0].as_mut().unwrap();
-            if child.is_fully_expanded {
-                return (*child).select_parallel(rng, total_searches,
-                                                search_data, depth + 1)
-            }
-            else {
-                return Score::from_game_result(&child.expand(rng, search_data))
-            }
+
+            let value =
+                if child.is_fully_expanded {
+                    (*child).select_parallel(rng, total_searches,
+                                                    search_data, depth + 1)
+                }
+                    else {
+                        Score::from_game_result(&child.expand(rng, search_data))
+                    };
+            self.score.add_score(&value);
+            return value;
         }
         // Find the index of the child node with highest selection value
         let child_indices : Vec<usize>;
@@ -625,10 +645,8 @@ impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
                 }
             })
             .reduce(Score::new, |acc, score| { let mut a2 = acc.clone(); a2.add_score(&score); a2 });
-        
-        self.searches += value.sum_score();
+
         self.score.add_score(&value);
-        self.value += (value.black_wins as f64 * 1.0) + (value.draws as f64 * 0.5);
         value
             
     }    
@@ -663,14 +681,10 @@ impl Score {
         score
     }
     
-    fn add_score(&mut self, other: &Self) {
+    fn add_score(&mut self, other: &Score) {
         self.white_wins += other.white_wins;
         self.black_wins += other.black_wins;
         self.draws += other.draws;
-    }
-    
-    fn sum_score(&self) -> u64 {
-        self.white_wins + self.black_wins + self.draws
     }
 }
 
