@@ -35,7 +35,9 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
                 input.pop();
             }
             if let Ok(human_move) = board.from_alg(&input) {
-                if board.generate_moves().contains(&human_move) {
+                let mut moves = vec![];
+                board.generate_moves(&mut moves);
+                if moves.contains(&human_move) {
                     board.do_move(human_move);
                     break;
                 }
@@ -73,7 +75,9 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
         mctree.print_score(&board, &mut String::new());
         
         let best_move_index = mctree.best_child().unwrap();
-        let best_move = board.generate_moves()[best_move_index].clone();
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        let best_move = moves[best_move_index].clone();
         let best_node = mctree.children[best_move_index].take().unwrap();
         println!("{:?}\nAI played {:?} after {}/{} searches, with {:.2}% winning chance",
                  board, best_move,
@@ -172,7 +176,11 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         .map(Option::as_ref)
         .filter(Option::is_some)
         .map(Option::unwrap)
-        .zip(board.generate_moves())
+        .zip({
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
+            moves
+        })
         .sorted_by(|&(node1, _), &(node2, _)| {
             let cmp = node1.score().cmp(&node2.score());
             if mc_tree.maximizing { cmp.reverse() }
@@ -260,7 +268,9 @@ pub struct MonteCarloTree<B> {
 impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
 
     pub fn new_root(board : &mut B) -> Self {
-        let mut root = MonteCarloTree { children: vec![None; board.generate_moves().len()],
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        let mut root = MonteCarloTree { children: vec![None; moves.len()],
                                         board: board.clone(),
                                         score: Score::new(), value: 0.0, searches: 0,
                                         game_result: board.game_result(),
@@ -336,7 +346,8 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                 //println!("Found best child {:?}", self);
                 let child_node = self.children[index].as_ref()
                     .expect(&format!("No index {} in {:?}", index, self.children));
-                let moves = board.generate_moves();
+                let mut moves = vec![];
+                board.generate_moves(&mut moves);
                 assert_eq!(moves.len(), self.children.len(),
                            "{:?} has {} moves but node has {} children: {:?}\n{:?}\nNode board: {:?}\nChild node board:{:?}",
                            board, moves.len(), self.children.len(), self.children,
@@ -362,7 +373,11 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
             .map(Option::as_ref)
             .filter(Option::is_some)
             .map(Option::unwrap)
-            .zip(board.generate_moves())
+            .zip({
+                let mut moves = vec![];
+                board.generate_moves(&mut moves);
+                moves
+            })
             
             .sorted_by(|&(node1, _), &(node2, _)| {
                 let cmp = node1.score().cmp(&node2.score());
@@ -372,8 +387,10 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         {
             let mut board_after_move = board.clone();
             board_after_move.do_move(go_move.clone());
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
             if let Some(best_reply_index) = node.best_child() {
-                let best_reply = board_after_move.generate_moves()[best_reply_index].clone();
+                let best_reply = moves[best_reply_index].clone();
                 if let Some(ref best_reply_node) = node.children[best_reply_index] {
                     
                     println!("{}Move {:?} scores {:.2}% ({}/{}/{}), n={}, best reply {:?} with {:.2}% ({}/{}/{}), n={}", 
@@ -471,10 +488,12 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         //println!("Expanding");
         match self.game_result {
             None => {
+                let mut moves = vec![];
+                self.board.generate_moves(&mut moves);
                 debug_assert!(self.children.contains(&None));
-                debug_assert_eq!(self.board.generate_moves().len(), self.children.len(),
+                debug_assert_eq!(moves.len(), self.children.len(),
                                  "{} moves available, but tree has {} children\n{:?}",
-                                 self.board.generate_moves().len(),
+                                 moves.len(),
                                  self.children.len(), self.board);
                 
                 let mut random_index = rng.gen_range(0, self.children.len());
@@ -483,12 +502,15 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
                 loop {
                     if self.children[random_index] == None {
                         let mut board = self.board.clone();
-                        let moves = board.generate_moves();
+                        let mut moves = vec![];
+                        board.generate_moves(&mut moves);
                         board.do_move(moves[random_index].clone());
 
                         let value;
                         let num_child_moves = if board.game_result() == None {
-                            board.generate_moves().len()
+                            moves.clear();
+                            board.generate_moves(&mut moves);
+                            moves.len()
                         }
                         else { 0 };
                         self.children[random_index] = Some(

@@ -531,10 +531,11 @@ impl EvalBoard for ChessBoard {
         self.to_move
     }
 
-    fn generate_moves(&self) -> Vec<Self::Move> {
+    fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
+        debug_assert!(moves.is_empty());
         let (mut active_moves, mut quiet_moves) = move_gen::all_legal_moves(self);
         active_moves.append(&mut quiet_moves);
-        active_moves
+        moves.extend_from_slice(&active_moves[..]);
     }
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
@@ -552,8 +553,10 @@ impl EvalBoard for ChessBoard {
                                         &mut moves1, &mut moves2, &mut moves3,
                                         is_in_check, king_pos);
         if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            debug_assert!(self.generate_moves().contains(&mv),
-            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.generate_moves(), moves1, moves2, moves3);
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            debug_assert!(moves.contains(&mv),
+            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
         }
         moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
@@ -572,7 +575,9 @@ impl EvalBoard for ChessBoard {
             return Some(board::GameResult::Draw);
         }
         // TODO: This shouldn't call generate_moves(), but instead store whether its mate or not
-        if self.generate_moves().is_empty() {
+        let mut moves = vec![];
+        self.generate_moves(&mut moves);
+        if moves.is_empty() {
             if move_gen::is_attacked(self, self.king_pos(self.side_to_move())) {
                 if self.to_move == White {
                     Some(board::GameResult::BlackWin)

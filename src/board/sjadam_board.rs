@@ -990,10 +990,11 @@ impl EvalBoard for SjadamBoard {
     }
 
     #[inline(never)]
-    fn generate_moves(&self) -> Vec<Self::Move> {
-        let (mut active_moves, mut moves) = sjadam_move_gen::all_legal_moves(self);
-        active_moves.append(&mut moves);
-        active_moves
+    fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
+        debug_assert!(moves.is_empty());
+        let (mut active_moves, mut inactive_moves) = sjadam_move_gen::all_legal_moves(self);
+        moves.append(&mut active_moves);
+        moves.append(&mut inactive_moves);
     }
 
     #[inline(never)]
@@ -1012,8 +1013,10 @@ impl EvalBoard for SjadamBoard {
                                                 &mut moves1, &mut moves2, &mut moves3);
 
         if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            debug_assert!(self.generate_moves().contains(&mv),
-                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, self.generate_moves(), moves1, moves2, moves3);
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            debug_assert!(moves.contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
         }
         moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }

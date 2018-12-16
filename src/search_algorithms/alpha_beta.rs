@@ -66,7 +66,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     // If no move is found, return null move
     match board.game_result() {
         Some(GameResult::Draw) => {
-            for mv in board.generate_moves() {
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
+            for mv in moves {
                 let undo_move = board.do_move(mv.clone());
 
                 if board.game_result() == Some(GameResult::Draw) {
@@ -108,7 +110,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 move_list.clone().unwrap()
             }
             else {
-                board.generate_moves()
+                let mut moves = vec![];
+                board.generate_moves(&mut moves);
+                moves
             };
 
             moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
@@ -116,10 +120,14 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 continue;
             }
 
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
+
             if let Some((score, moves, node_count)) =
                 // If all moves are to be searched, send None to the function
                 // This way, the root position will still be hashed correctly
-                if moves_to_search.len() == board.generate_moves().len() {
+
+                if moves_to_search.len() == moves.len() {
                     find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
                                       options, start_time, None, &mut table)
                 }
@@ -139,7 +147,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 for mv in &moves {
                     pv_str.push_str(&pv_board.to_alg(mv));
                     pv_str.push(' ');
-                    debug_assert!(pv_board.generate_moves().contains(mv),
+                    let mut pv_board_moves = vec![];
+                    pv_board.generate_moves(&mut pv_board_moves);
+                    debug_assert!(pv_board_moves.contains(mv),
                                   "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
                                   mv, moves, pv_board, board);
                     pv_board.do_move(mv.clone());
@@ -328,7 +338,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             move_list.take().unwrap()
         }
         else {
-            board.generate_moves()
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
+            moves
         };
         
         // If there is mate or stalemate on the board, we should already have returned

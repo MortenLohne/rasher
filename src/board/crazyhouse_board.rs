@@ -85,9 +85,11 @@ impl EvalBoard for CrazyhouseBoard {
             self.white_available_pieces.iter().cloned().map(PieceType::value).sum::<f32>()
     }
 
-    fn generate_moves(&self) -> Vec<Self::Move> {
-        let mut moves : Vec<CrazyhouseMove> = self.base_board.generate_moves().iter()
-            .map(|&mv| CrazyhouseMove::NormalMove(mv)).collect();
+    fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
+        let mut normal_moves = vec![];
+        self.base_board.generate_moves(&mut normal_moves);
+        moves.extend(normal_moves.iter()
+            .map(|&mv| CrazyhouseMove::NormalMove(mv)));
         let board_iter = std_board::BoardIter::new();
         let king_pos = move_gen::king_pos(&self.base_board);
         let is_in_check = move_gen::is_attacked(&self.base_board, king_pos);
@@ -130,7 +132,6 @@ impl EvalBoard for CrazyhouseBoard {
                 }
             }
         }
-        moves
     }
     
     fn do_move(&mut self, mv : Self::Move) -> Self::UndoMove {

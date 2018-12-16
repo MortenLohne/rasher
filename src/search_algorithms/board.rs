@@ -73,10 +73,12 @@ pub trait EvalBoard : PartialEq + Clone {
 
     fn start_board() -> Self;
 
-    fn generate_moves(&self) -> Vec<Self::Move>;
+    fn generate_moves(&self, moves: &mut Vec<Self::Move>);
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
-        self.generate_moves().contains(&mv)
+        let mut moves = vec![];
+        self.generate_moves(&mut moves);
+        moves.contains(&mv)
     }
 
     fn active_moves(&self) -> Vec<Self::Move> {
@@ -94,7 +96,8 @@ pub trait EvalBoard : PartialEq + Clone {
     fn hash_board(&self) -> Self::HashBoard;
     
     fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
-        let moves = self.generate_moves();
+        let mut moves = vec![];
+        self.generate_moves(&mut moves);
         self.do_move(moves[rng.gen_range(0, moves.len())].clone());
     }
     

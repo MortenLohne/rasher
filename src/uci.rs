@@ -537,8 +537,11 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
     
     for mv_str in moves {
         let mv = board.from_alg(mv_str).unwrap();
-        assert!(board.generate_moves().contains(&mv));
-
+        {
+            let mut moves = vec![];
+            board.generate_moves(&mut moves);
+            assert!(moves.contains(&mv));
+        }
         board.do_move(mv.clone());
         
         let (handle, channel) = alpha_beta::start_uci_search(

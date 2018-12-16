@@ -200,7 +200,8 @@ fn play_human<B>(mut board : B)
 
                 let reader = io::stdin();
                 let mut input_str = "".to_string();
-                let legal_moves = board.generate_moves();
+                let mut legal_moves = vec![];
+                board.generate_moves(&mut legal_moves);
                 // Loop until user enters a valid move
                 loop {
                     input_str.clear();
