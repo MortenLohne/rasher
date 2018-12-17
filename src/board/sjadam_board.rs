@@ -395,6 +395,7 @@ impl PartialEq for SjadamBoard {
             && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
             && self.repetitions == other.repetitions
+            && self.last_move == other.last_move
     }
 }
 
@@ -616,7 +617,7 @@ impl fmt::Debug for SjadamBoard {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmt::Debug::fmt(&self.to_chess_board(), fmt)?;
         write!(fmt, "Hash: {}, repetitions: {}\n", self.hash, self.repetitions)?;
-        write!(fmt, "Move history: {:?}", self.move_history)
+        write!(fmt, "Move history: {:?}, last move: {:?}", self.move_history, self.last_move)
     }
 }
 
@@ -802,7 +803,7 @@ impl Board for SjadamBoard {
             from: mv.from(), to: mv.to(),
             castling: mv.castling(), en_passant: en_passant,
             capture: self.get_square(mv.to()).piece_type(),
-            old_last_move: Some(mv.clone()),
+            old_last_move: self.last_move.clone(),
             piece_moved: mv.piece_moved(),
             old_castling_en_passant: self.castling_en_passant,
             old_half_move_clock: self.half_move_clock,
@@ -936,6 +937,7 @@ impl Board for SjadamBoard {
         debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
                          "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
+        self.last_move = Some(mv);
         undo_move
     }
 
