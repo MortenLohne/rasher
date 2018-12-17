@@ -288,7 +288,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 Ordering::Less // All-node: True value is < score
             };
 
-            let active_moves = board.active_moves();
+            let mut active_moves = vec![];
+            board.active_moves(&mut active_moves);
 
             for mv in active_moves {
                 let reverse_move = board.do_move(mv.clone());

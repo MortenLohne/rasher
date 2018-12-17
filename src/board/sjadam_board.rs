@@ -1196,9 +1196,9 @@ impl ExtendedBoard for SjadamBoard {
     }
 
     #[inline(never)]
-    fn active_moves (&self) -> Vec<Self::Move> {
-        let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
-        active_moves
+    fn active_moves (&self, moves: &mut Vec<Self::Move>) {
+        let (mut active_moves, _) = sjadam_move_gen::all_legal_moves(self);
+        moves.append(&mut active_moves);
     }
 
     const BRANCH_FACTOR : u64 = 30;

@@ -229,6 +229,7 @@ impl ExtendedBoard for CrazyhouseBoard {
         self.clone()
     }
 
+    fn active_moves(&self, _: &mut Vec<<Self as Board>::Move>) {}
 }
 
 use std::fmt;

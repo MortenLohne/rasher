@@ -90,7 +90,7 @@ pub trait Board {
     /// Returns the side to move for the current board.
     fn side_to_move(&self) -> Color;
 
-    /// Generates all legal moves for the side to move, and appends them to a provided vector.
+    /// Generates all legal moves for the side to move, and appends them to the provided vector.
     fn generate_moves(&self, moves: &mut Vec<Self::Move>);
 
     /// Plays a move on the board. Also returns an ReverseMove do take the move back.
@@ -133,12 +133,10 @@ pub trait ExtendedBoard : EvalBoard {
         moves.contains(&mv)
     }
 
-    /// Returns only the "active" moves in a position. These are moves that radically change the static evaluation of a position, e.g. captures or promotions in chess.
-    /// Search algorithms may recursively search all active moves, so only a limited number of moves should be returned.
+    /// Generates only the "active" moves in a position, and appends them to the provided vector. These are moves that radically change the static evaluation of a position, e.g. captures or promotions in chess.
+    /// Search algorithms may recursively search all active moves, so eventually, no moves will be appended.
     /// Required for search algorithms to use quiescence search.
-    fn active_moves(&self) -> Vec<Self::Move> {
-        vec![]
-    }
+    fn active_moves(&self, moves: &mut Vec<Self::Move>);
 
     /// Returns an estimate for the average branch factor of the game.
     /// Helps search algorithms guide pruning and time management.

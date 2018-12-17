@@ -859,9 +859,9 @@ impl ExtendedBoard for ChessBoard {
         moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
     }
 
-    fn active_moves(&self) -> Vec<Self::Move> {
-        let (active_moves, _) = move_gen::all_legal_moves(self);
-        active_moves
+    fn active_moves(&self, moves: &mut Vec<Self::Move>) {
+        let (mut active_moves, _) = move_gen::all_legal_moves(self);
+        moves.append(&mut active_moves);
     }
 }
 
