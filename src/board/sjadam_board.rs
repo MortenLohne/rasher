@@ -1,6 +1,6 @@
 use board::std_board::{ChessBoard, Piece, PieceType, Square, BoardIter};
 use board::std_board::PieceType::*;
-use board::sjadam_move::{SjadamMove, SjadamUndoMove};
+use board::sjadam_move::{SjadamMove, SjadamReverseMove};
 use board::sjadam_move_gen;
 
 use search_algorithms::board::EvalBoard;
@@ -757,7 +757,7 @@ impl UciBoard for SjadamBoard {
 
 impl Board for SjadamBoard {
     type Move = SjadamMove;
-    type UndoMove = SjadamUndoMove;
+    type ReverseMove = SjadamReverseMove;
 
     fn side_to_move(&self) -> Color {
         self.to_move
@@ -790,7 +790,7 @@ impl Board for SjadamBoard {
         }
     }
 
-    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         let start_color = self.side_to_move();
         debug_assert_ne!(mv.from(), mv.to());
         debug_assert!(!self.is_empty(mv.from()),
@@ -799,7 +799,7 @@ impl Board for SjadamBoard {
 
 
         let en_passant = mv.en_passant_bitboard(self);
-        let undo_move = SjadamUndoMove {
+        let reverse_move = SjadamReverseMove {
             from: mv.from(), to: mv.to(),
             castling: mv.castling(), en_passant: en_passant,
             capture: self.get_square(mv.to()).piece_type(),
@@ -868,8 +868,8 @@ impl Board for SjadamBoard {
 
         self.move_piece(Piece::new(mv.piece_moved(), start_color), mv.from(), mv.to());
 
-        if undo_move.capture != Empty {
-            self.clear_piece_at_square(Piece::new(undo_move.capture, !start_color), mv.to());
+        if reverse_move.capture != Empty {
+            self.clear_piece_at_square(Piece::new(reverse_move.capture, !start_color), mv.to());
             self.half_move_clock = 0;
         }
 
@@ -934,14 +934,14 @@ impl Board for SjadamBoard {
             }
 
         debug_assert_ne!(start_color, self.side_to_move());
-        debug_assert!(self.castling_en_passant & 15 <= undo_move.old_castling_en_passant & 15);
+        debug_assert!(self.castling_en_passant & 15 <= reverse_move.old_castling_en_passant & 15);
         debug_assert_eq!(self.hash, self.hash_from_scratch(),
                          "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
         self.last_move = Some(mv);
-        undo_move
+        reverse_move
     }
 
-    fn undo_move(&mut self, mv: Self::UndoMove) {
+    fn reverse_move(&mut self, mv: Self::ReverseMove) {
         let start_color = !self.side_to_move();
 
         let old_hash = self.move_history.pop();

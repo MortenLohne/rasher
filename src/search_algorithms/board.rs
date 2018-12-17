@@ -3,11 +3,13 @@ use std::fmt;
 use self::Color::*;
 use std::hash;
 
+/// Represents a player's color
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
     White = 0,
     Black = 1,
 }
+
 impl ops::Not for Color {
     type Output = Color;
 
@@ -29,15 +31,28 @@ impl fmt::Display for Color {
 }
 
 impl Color {
+    /// Returns the color's discriminant. 0 for white, 1 for black
+    /// # Examples
+    /// ```
+    /// assert_eq!(Color::White.disc(), 0);
+    /// assert_eq!(Color::Black.disc(), 1);
+    /// ```
     pub fn disc(self) -> usize {
         self as u16 as usize
     }
 
+    /// Returns the color's multiplier. -1 for black, 1 for white.
+    /// # Examples
+    /// ```
+    /// assert_eq!(Color::White.multiplier(), 1);
+    /// assert_eq!(Color::Black.multiplier(), -1);
+    /// ```
     pub fn multiplier(self) -> isize {
         self as u16 as isize * -2 + 1
     }
 }
 
+/// The result of a game after it has finished.
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
 pub enum GameResult {
     WhiteWin,
@@ -60,7 +75,7 @@ pub trait Board {
     /// The type for moves in the game.
     type Move: Eq + Clone + fmt::Debug;
     /// The type for a reverse move in the game.
-    type UndoMove;
+    type ReverseMove;
 
     /// Returns the starting position for the game. This function always produces identical values.
     fn start_board() -> Self;
@@ -71,15 +86,15 @@ pub trait Board {
     /// Generates all legal moves for the side to move, and appends them to a provided vector.
     fn generate_moves(&self, moves: &mut Vec<Self::Move>);
 
-    /// Plays a move on the board. Also returns an UndoMove do take the move back.
+    /// Plays a move on the board. Also returns an ReverseMove do take the move back.
     ///
     /// Doing and then undoing a move always restores the board to exactly the same state.
-    fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
+    fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove;
 
     /// Reverse a move made by `do_move`.
     ///
     /// Doing and then undoing a move always restores the board to exactly the same state.
-    fn undo_move(&mut self, mv: Self::UndoMove);
+    fn reverse_move(&mut self, mv: Self::ReverseMove);
 
     /// Returns the result if the game is decided, otherwise returns None.
     /// If the winning player always plays the last move (as in chess), implementations are allowed

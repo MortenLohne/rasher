@@ -6,7 +6,7 @@ use std::fmt;
 use search_algorithms::board::Board;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct SjadamUndoMove {
+pub struct SjadamReverseMove {
     pub from: Square,
     pub to: Square,
     pub en_passant: bool,
@@ -20,7 +20,7 @@ pub struct SjadamUndoMove {
     pub old_hash: u64,
 }
 
-impl SjadamUndoMove {
+impl SjadamReverseMove {
     pub fn from(&self) -> Square {
         self.from
     }

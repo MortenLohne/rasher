@@ -524,20 +524,20 @@ impl UciBoard for ChessBoard {
 
 impl Board for ChessBoard {
     type Move = std_move::ChessMove;
-    type UndoMove = std_move::ChessUndoMove;
+    type ReverseMove = std_move::ChessReverseMove;
 
     fn side_to_move(&self) -> Color {
         self.to_move
     }
 
-    fn do_move(&mut self, c_move : Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, c_move : Self::Move) -> Self::ReverseMove {
         // Helper variables
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();
         let color = self.to_move;
         let piece_moved = self.piece_at(c_move.from).piece_type();
         let captured_piece : PieceType = self[c_move.to].piece_type();
-        let undo_move = std_move::ChessUndoMove::from_move(c_move, self);
+        let reverse_move = std_move::ChessReverseMove::from_move(c_move, self);
 
         // Increment or reset the half-move clock
         match (piece_moved, self.piece_at(c_move.to).piece_type()) {
@@ -650,9 +650,9 @@ impl Board for ChessBoard {
         }
 
         self.to_move = !self.to_move;
-        undo_move
+        reverse_move
     }
-    fn undo_move(&mut self, c_move : Self::UndoMove) {
+    fn reverse_move(&mut self, c_move : Self::ReverseMove) {
 
         let (file_from, rank_from) = c_move.from.file_rank();
         let (file_to, rank_to) = c_move.to.file_rank();

@@ -14,7 +14,7 @@ use itertools::Itertools;
 use uci;
 
 use std::hash::{Hash, Hasher};
-use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseUndoMove};
+use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
 
 #[derive(Clone, Eq)]
 pub struct CrazyhouseBoard {
@@ -54,7 +54,7 @@ impl PartialEq for CrazyhouseBoard {
 
 impl Board for CrazyhouseBoard {
     type Move = CrazyhouseMove;
-    type UndoMove = CrazyhouseUndoMove;
+    type ReverseMove = CrazyhouseReverseMove;
 
     fn side_to_move(&self) -> Color {
         self.base_board.side_to_move()
@@ -119,7 +119,7 @@ impl Board for CrazyhouseBoard {
         }
     }
 
-    fn do_move(&mut self, mv : Self::Move) -> Self::UndoMove {
+    fn do_move(&mut self, mv : Self::Move) -> Self::ReverseMove {
         match mv {
             CrazyhouseMove::NormalMove(normal_move) => {
                 let capture = self.base_board[normal_move.to].piece_type();
@@ -131,7 +131,7 @@ impl Board for CrazyhouseBoard {
                             self.white_available_pieces.push(capture);
                         }
                 }
-                CrazyhouseUndoMove::NormalMove(self.base_board.do_move(normal_move))
+                CrazyhouseReverseMove::NormalMove(self.base_board.do_move(normal_move))
 
             },
             CrazyhouseMove::CrazyMove(piecetype, square, n) => {
@@ -160,16 +160,16 @@ impl Board for CrazyhouseBoard {
                 self.base_board.to_move = !self.base_board.to_move;
                 self.base_board.move_num += 1;
                 self.crazyhouse_moves.push((self.base_board.move_num, mv));
-                CrazyhouseUndoMove::CrazyMove(piecetype, square, n)
+                CrazyhouseReverseMove::CrazyMove(piecetype, square, n)
             },
         }
     }
 
-    fn undo_move(&mut self, mv : Self::UndoMove) {
+    fn reverse_move(&mut self, mv : Self::ReverseMove) {
         match mv {
             // If the normal move was a capture, remove
-            CrazyhouseUndoMove::NormalMove(normal_move) => {
-                self.base_board.undo_move(normal_move);
+            CrazyhouseReverseMove::NormalMove(normal_move) => {
+                self.base_board.reverse_move(normal_move);
                 match (self.side_to_move(), normal_move.capture) {
                     (_, PieceType::Empty) => PieceType::Empty, // This is not used for anything
                     (White, piecetype) =>
@@ -186,7 +186,7 @@ impl Board for CrazyhouseBoard {
                         },
                 };
             },
-            CrazyhouseUndoMove::CrazyMove(piecetype, square, castling_en_passant) => {
+            CrazyhouseReverseMove::CrazyMove(piecetype, square, castling_en_passant) => {
                 let (file, rank) = square.file_rank();
                 if self.side_to_move() == Black {
                     self.white_available_pieces.push(piecetype);

@@ -14,13 +14,13 @@ fn available_moves_at_start() {
                moves.len());
     for mv in moves {
         let old_board = board.clone();
-        let undo_move = board.do_move(mv);
+        let reverse_move = board.do_move(mv);
         let mut black_moves = vec![];
         board.generate_moves(&mut black_moves);
         assert_eq!(black_moves.len(), 20,
                "Found {} legal moves for black's first crazyhouse move, expected 20",
                    black_moves.len());
-        board.undo_move(undo_move);
+        board.reverse_move(reverse_move);
         assert_eq!(old_board, board);
     }
 }
@@ -62,9 +62,9 @@ fn legal_moves_after_plies<B>(board : &mut B, n : u8) -> u64
         for c_move in moves {
             let old_board = board.clone();
             {
-                let undo_move = board.do_move(c_move.clone());
+                let reverse_move = board.do_move(c_move.clone());
                 total_moves += legal_moves_after_plies(board, n - 1);
-                board.undo_move(undo_move);
+                board.reverse_move(reverse_move);
             }
 
             assert_eq!(&old_board, board,

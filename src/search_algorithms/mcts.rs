@@ -189,7 +189,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         .iter().take(options.multipv as usize)
         
     {
-        let undo_move = board.do_move(go_move.clone());
+        let reverse_move = board.do_move(go_move.clone());
         let mut pv = board.to_alg(go_move);
         pv.push(' ');
         pv.push_str(&node.pv(board).iter()
@@ -198,7 +198,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
                     .join(" "));
         let score = alpha_beta::Score::Val((node.score().into_inner() as f32 - 0.5) * 20.0);
         pvs.push((score, pv));
-        board.undo_move(undo_move);
+        board.reverse_move(reverse_move);
     }
 
     let depth = pvs[0].1.split_whitespace().count() as u16;
@@ -365,23 +365,23 @@ impl<B: Board + fmt::Debug + Clone + PartialEq> MonteCarloTree<B> {
 
                 for (i, ref mv) in moves.iter().enumerate() {
                     let old_board = board.clone();
-                    let undo_move = board.do_move((*mv).clone());
+                    let reverse_move = board.do_move((*mv).clone());
                     if let Some(ref child) = self.children[i] {
                         debug_assert_eq!(*board, child.board,
                                          "\nAfter doing {:?}, boards were mismatched. Old board:{:?}\nParent node board:{:?}\n",
                                          mv, old_board, self.board);
                     }
-                    board.undo_move(undo_move);
+                    board.reverse_move(reverse_move);
                 }
 
                 let game_move = moves[index].clone();
                 let old_board = board.clone();
-                let undo_move = board.do_move(game_move.clone());
+                let reverse_move = board.do_move(game_move.clone());
                 debug_assert_eq!(*board, child_node.board,
                                  "\nAfter doing {:?}, boards were mismatched. Old board:\n{:?}\n",
                                  game_move, old_board);
                 let mut result = child_node.pv(board);
-                board.undo_move(undo_move);
+                board.reverse_move(reverse_move);
                 debug_assert_eq!(*board, old_board);
                 result.insert(0, game_move);
                 result

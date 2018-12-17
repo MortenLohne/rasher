@@ -388,9 +388,9 @@ pub fn legal_moves_after_plies<B: Board + Eq + fmt::Debug + Clone>(board : &mut 
         let mut moves = vec![];
         board.generate_moves(&mut moves);
         for c_move in moves {
-            let undo_move = board.do_move(c_move.clone());
+            let reverse_move = board.do_move(c_move.clone());
             total_moves += legal_moves_after_plies(board, n - 1);
-            board.undo_move(undo_move);
+            board.reverse_move(reverse_move);
             debug_assert_eq!(old_board, *board,
                              "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
                              c_move, old_board, board);
@@ -408,9 +408,9 @@ pub fn perf_prop<B: Board + Eq + fmt::Debug + Clone>(board: &mut B, n: u8) -> Ve
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     for c_move in moves {
-        let undo_move = board.do_move(c_move.clone());
+        let reverse_move = board.do_move(c_move.clone());
         results.push((c_move.clone(), legal_moves_after_plies(board, n - 1)));
-        board.undo_move(undo_move);
+        board.reverse_move(reverse_move);
         debug_assert_eq!(old_board, *board,
                          "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
                          c_move, old_board, board);

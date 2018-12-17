@@ -5,7 +5,7 @@ use search_algorithms::board::Board;
 use std::fmt;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-pub struct ChessUndoMove {
+pub struct ChessReverseMove {
     pub from : Square,
     pub to : Square,
     pub capture : PieceType,
@@ -14,11 +14,11 @@ pub struct ChessUndoMove {
     pub old_half_move_clock : u8,
 }
 
-impl ChessUndoMove {
+impl ChessReverseMove {
     /// Returns the corresponding undo move for a move
     /// Must be called before the move was done on the board
-    pub fn from_move(c_move: ChessMove, board: &ChessBoard) -> ChessUndoMove {
-        ChessUndoMove { from: c_move.from, to: c_move.to, capture: board[c_move.to].piece_type(),
+    pub fn from_move(c_move: ChessMove, board: &ChessBoard) -> ChessReverseMove {
+        ChessReverseMove { from: c_move.from, to: c_move.to, capture: board[c_move.to].piece_type(),
                         prom: c_move.prom.is_some(),
                         old_castling_en_passant: board.castling_en_passant,
                         old_half_move_clock: board.half_move_clock

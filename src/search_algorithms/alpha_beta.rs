@@ -70,10 +70,10 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             let mut moves = vec![];
             board.generate_moves(&mut moves);
             for mv in moves {
-                let undo_move = board.do_move(mv.clone());
+                let reverse_move = board.do_move(mv.clone());
 
                 if board.game_result() == Some(GameResult::Draw) {
-                    board.undo_move(undo_move);
+                    board.reverse_move(reverse_move);
                     let uci_info = uci::UciInfo {
                         depth: 1, seldepth: 1, time: 0, nodes: 1,
                         hashfull: 0.0,
@@ -82,7 +82,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                     return;
                 }
 
-                board.undo_move(undo_move);
+                board.reverse_move(reverse_move);
             }
 
             let uci_info = uci::UciInfo {
@@ -291,7 +291,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             let active_moves = board.active_moves();
 
             for mv in active_moves {
-                let undo_move = board.do_move(mv.clone());
+                let reverse_move = board.do_move(mv.clone());
                 
                 let (mut score, _, best_moves) = find_best_move_ab_rec(
                     board, depth, !decrement_score(beta), !decrement_score(alpha),
@@ -299,7 +299,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                     start_time, node_counter, None, &[None, None], table)?;
 
                 score = !score;
-                board.undo_move(undo_move);
+                board.reverse_move(reverse_move);
                 
                 if score >= beta {
                     node_type = Ordering::Greater; // Cute-node: True value is >= beta
@@ -376,7 +376,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
 
             #[cfg(debug_assertions)]
             let old_board = board.clone();
-            let undo_move = board.do_move(c_move.clone());
+            let reverse_move = board.do_move(c_move.clone());
 
             match alpha {
                 // Do null-move pruning
@@ -388,7 +388,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 {
                     let eval = board.static_eval() * color.multiplier() as f32;
                     if eval < old_eval {
-                        board.undo_move(undo_move);
+                        board.reverse_move(reverse_move);
                         continue;
                     }
                 }
@@ -407,7 +407,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
             
             tried_score = !tried_score;
             
-            board.undo_move(undo_move);
+            board.reverse_move(reverse_move);
 
             #[cfg(debug_assertions)]
             debug_assert_eq!(board, &old_board,

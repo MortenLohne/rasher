@@ -18,8 +18,8 @@ fn hash_stays_equal() {
     board.generate_moves(&mut moves);
 
     for mv in moves {
-        let undo_move = board.do_move(mv.clone());
-        board.undo_move(undo_move);
+        let reverse_move = board.do_move(mv.clone());
+        board.reverse_move(reverse_move);
 
         hasher = DefaultHasher::new();
         board.hash(&mut hasher);
