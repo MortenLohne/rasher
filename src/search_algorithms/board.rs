@@ -3,8 +3,6 @@ use std::fmt;
 use self::Color::*;
 use std::hash;
 
-use rand;
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
     White = 0,
@@ -95,12 +93,6 @@ pub trait EvalBoard : Board + PartialEq + Clone {
     fn static_eval(&self) -> f32;
 
     fn hash_board(&self) -> Self::HashBoard;
-    
-    fn do_random_move<R: rand::Rng>(&mut self, rng: &mut R) {
-        let mut moves = vec![];
-        self.generate_moves(&mut moves);
-        self.do_move(moves[rng.gen_range(0, moves.len())].clone());
-    }
     
     const BRANCH_FACTOR: u64 = 20;
 }

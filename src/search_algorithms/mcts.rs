@@ -1,6 +1,6 @@
 use search_algorithms::board::GameResult;
 use search_algorithms::board::GameResult::*;
-use search_algorithms::board::EvalBoard;
+use search_algorithms::board::Board;
 use uci::UciBoard;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
@@ -90,7 +90,6 @@ pub fn play_human<B: fmt::Debug + UciBoard>(mut board: B) {
 }
 
 use std::thread;
-use search_algorithms::board::Board;
 
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
@@ -108,7 +107,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
                      channel: mpsc::Sender<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + Send, <B as Board>::Move: Sync
+    where B: UciBoard + fmt::Debug + Send + Clone, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::Instant::now();
@@ -143,7 +142,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                 }
             },
             Depth(n) | Mate(n)
-                if mc_tree.searches() >= (<B as EvalBoard>::BRANCH_FACTOR).pow(n as u32)
+                if mc_tree.searches() >= (10 as u64).pow(n as u32)
                 => break,
             Nodes(n) => if mc_tree.searches() >= n { break } else { },
             MoveTime(time) => {
@@ -201,7 +200,9 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         pvs.push((score, pv));
         board.undo_move(undo_move);
     }
-    let uci_info = uci::UciInfo { depth: 0, seldepth: 0, time: ms_taken as i64,
+
+    let depth = pvs[0].1.split_whitespace().count() as u16;
+    let uci_info = uci::UciInfo { depth: depth, seldepth: depth, time: ms_taken as i64,
                                   nodes: mc_tree.searches(), hashfull: 0.0, pvs: pvs,
                                   color: board.side_to_move() };
     channel.send(uci_info).unwrap();
@@ -209,7 +210,7 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
 
 /// Scecial non-uci search that gives additional debug information
 pub fn search_position<B>(board: &mut B)
-    where B: EvalBoard + fmt::Debug + Send, <B as Board>::Move: Sync
+    where B: Board + fmt::Debug + Send + Clone + PartialEq, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(board);
     let start_time = time::Instant::now();
@@ -274,7 +275,7 @@ impl<B> MonteCarloTree<B> {
     }
 }
 
-impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
+impl<B: Board + fmt::Debug + Clone + PartialEq> MonteCarloTree<B> {
 
     pub fn new_root(board : &mut B) -> Self {
         let mut moves = vec![];
@@ -375,7 +376,6 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
 
                 let game_move = moves[index].clone();
                 let old_board = board.clone();
-                debug_assert!(board.move_is_legal(game_move.clone()));
                 let undo_move = board.do_move(game_move.clone());
                 debug_assert_eq!(*board, child_node.board,
                                  "\nAfter doing {:?}, boards were mismatched. Old board:\n{:?}\n",
@@ -570,12 +570,16 @@ impl<B: EvalBoard + fmt::Debug + Clone> MonteCarloTree<B> {
         if let Some(result) = board.game_result() {
             return result
         }
-        board.do_random_move(rng);
+
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        board.do_move(moves[rng.gen_range(0, moves.len())].clone());
+
         Self::simulate(board, rng, search_data)
     }    
 }
 
-impl<B: EvalBoard + fmt::Debug + Send> MonteCarloTree<B> {
+impl<B: Board + fmt::Debug + Send + Clone + PartialEq> MonteCarloTree<B> {
 // Select the node. If the selected child is not fully expanded, expand it
     pub fn select_parallel<Ra> (&mut self, rng: &mut Ra,
                                   total_searches: u64, search_data: &mut SearchData,
