@@ -14,6 +14,7 @@ use std::fmt::Write;
 use std::mem;
 use std::hash::{Hash, Hasher};
 use search_algorithms::board::Board;
+use search_algorithms::board::ExtendedBoard;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
@@ -784,40 +785,6 @@ impl Board for ChessBoard {
 }
 
 impl EvalBoard for ChessBoard {
-    type HashBoard = Self;
-
-    fn move_is_legal(&self, mv: Self::Move) -> bool {
-
-        if self[mv.from].color() != Some(self.side_to_move()) {
-            return false;
-        }
-
-        let mut moves1 = vec![];
-        let mut moves2 = vec![];
-        let mut moves3 = vec![];
-        let king_pos = move_gen::king_pos(&self);
-        let is_in_check = move_gen::is_attacked(&self, king_pos);
-        move_gen::legal_moves_for_piece(&mut self.clone(), mv.from,
-                                        &mut moves1, &mut moves2, &mut moves3,
-                                        is_in_check, king_pos);
-        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            let mut moves = vec![];
-            self.generate_moves(&mut moves);
-            debug_assert!(moves.contains(&mv),
-            "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
-        }
-        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
-    }
-
-    fn active_moves(&self) -> Vec<Self::Move> {
-        let (active_moves, _) = move_gen::all_legal_moves(self);
-        active_moves
-    }
-
-    fn hash_board(&self) -> Self {
-        self.clone()
-    }
-    
     #[inline(never)]
     fn static_eval (&self) -> f32 {
         const POS_VALS : [[u8; 8]; 8] = 
@@ -859,6 +826,42 @@ impl EvalBoard for ChessBoard {
             }
         }
         value
+    }
+}
+
+impl ExtendedBoard for ChessBoard {
+    type HashBoard = Self;
+
+    fn hash_board(&self) -> Self {
+        self.clone()
+    }
+
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+
+        if self[mv.from].color() != Some(self.side_to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+        let king_pos = move_gen::king_pos(&self);
+        let is_in_check = move_gen::is_attacked(&self, king_pos);
+        move_gen::legal_moves_for_piece(&mut self.clone(), mv.from,
+                                        &mut moves1, &mut moves2, &mut moves3,
+                                        is_in_check, king_pos);
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            debug_assert!(moves.contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
+    }
+
+    fn active_moves(&self) -> Vec<Self::Move> {
+        let (active_moves, _) = move_gen::all_legal_moves(self);
+        active_moves
     }
 }
 

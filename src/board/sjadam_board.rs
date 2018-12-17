@@ -405,6 +405,7 @@ use std::hash::Hasher;
 use std::hash::Hash;
 use std::iter::FromIterator;
 use search_algorithms::board::Board;
+use search_algorithms::board::ExtendedBoard;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -998,47 +999,6 @@ impl Board for SjadamBoard {
 }
 
 impl EvalBoard for SjadamBoard {
-
-    type HashBoard = u64;
-    
-
-
-    fn hash_board(&self) -> Self::HashBoard {
-        self.hash
-    }
-    
-
-
-    #[inline(never)]
-    fn move_is_legal(&self, mv: Self::Move) -> bool {
-        let piece_moved = self.get_square(mv.from());
-
-        if piece_moved.color() != Some(self.side_to_move()) {
-            return false;
-        }
-
-        let mut moves1 = vec![];
-        let mut moves2 = vec![];
-        let mut moves3 = vec![];
-
-        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
-                                                &mut moves1, &mut moves2, &mut moves3);
-
-        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            let mut moves = vec![];
-            self.generate_moves(&mut moves);
-            debug_assert!(moves.contains(&mv),
-                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
-        }
-        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
-    }
-
-    #[inline(never)]
-    fn active_moves (&self) -> Vec<Self::Move> {
-        let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
-        active_moves
-    }
-    
     #[inline(never)]
     fn static_eval (&self) -> f32 {
         debug_assert!(self.game_result() == None);
@@ -1204,4 +1164,42 @@ impl EvalBoard for SjadamBoard {
     }
 
     const BRANCH_FACTOR : u64 = 30;
+}
+
+impl ExtendedBoard for SjadamBoard {
+    type HashBoard = u64;
+
+    fn hash_board(&self) -> Self::HashBoard {
+        self.hash
+    }
+
+    #[inline(never)]
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        let piece_moved = self.get_square(mv.from());
+
+        if piece_moved.color() != Some(self.side_to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+
+        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
+                                                &mut moves1, &mut moves2, &mut moves3);
+
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            debug_assert!(moves.contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
+    }
+
+    #[inline(never)]
+    fn active_moves (&self) -> Vec<Self::Move> {
+        let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
+        active_moves
+    }
 }

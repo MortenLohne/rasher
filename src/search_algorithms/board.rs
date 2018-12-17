@@ -102,9 +102,21 @@ pub trait Board {
     fn game_result(&self) -> Option<GameResult>;
 }
 
+/// A game board that also includes a heuristic static eval function
 pub trait EvalBoard : Board + PartialEq + Clone {
+    /// A fast, static evaluation of the current board position
+    /// Returns a number between -100 and 100, where 0.0 is a draw, positive number means better for white, and negative number means better for black
+    fn static_eval(&self) -> f32;
+
+    const BRANCH_FACTOR: u64 = 20;
+}
+
+pub trait ExtendedBoard : EvalBoard {
+
     // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
     type HashBoard : hash::Hash + Eq;
+
+    fn hash_board(&self) -> Self::HashBoard;
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
         let mut moves = vec![];
@@ -115,10 +127,4 @@ pub trait EvalBoard : Board + PartialEq + Clone {
     fn active_moves(&self) -> Vec<Self::Move> {
         vec![]
     }
-    
-    fn static_eval(&self) -> f32;
-
-    fn hash_board(&self) -> Self::HashBoard;
-    
-    const BRANCH_FACTOR: u64 = 20;
 }

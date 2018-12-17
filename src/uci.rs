@@ -16,7 +16,7 @@ use std::str::FromStr;
 use std::time;
 use std::hash::Hash;
  
-pub trait UciBoard: board::EvalBoard {
+pub trait UciBoard: Sized + board::Board {
     fn from_fen(&str) -> Result<Self, String>;
     fn to_fen(&self) -> String;
 
@@ -349,11 +349,12 @@ impl EngineComm {
 }
 
 use std::sync::mpsc;
+use search_algorithms::board::ExtendedBoard;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
                         -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
-    where B: 'static + UciBoard + fmt::Debug + Send,
+    where B: 'static + UciBoard + fmt::Debug + Send + Clone + PartialEq,
 <B as board::Board>::Move: Sync
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
@@ -519,7 +520,7 @@ pub fn parse_go (input : &str)
 }
 
 pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
-    where Board: 'static + UciBoard + fmt::Debug + Send + Hash + Eq,
+    where Board: 'static + UciBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
 <Board as board::Board>::Move: Send + Sync
 {
 
@@ -617,7 +618,7 @@ fn parse_position<Board> (input : &str) -> Result<Board, String>
     // moves_pos is the position on the input string where the token "moves" is expected
     let (mut board, moves_pos) =
         if words[1] == "startpos" {
-            (Board::start_board().clone(), 2)
+            (Board::start_board(), 2)
         }
     else if words[1] == "fen" {
         let mut fen_string : String = "".to_string();

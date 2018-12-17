@@ -213,12 +213,6 @@ impl Board for CrazyhouseBoard {
 }
 
 impl EvalBoard for CrazyhouseBoard {
-    type HashBoard = Self;
-
-    fn hash_board(&self) -> Self {
-        self.clone()
-    }
-
     fn static_eval(&self) -> f32 {
         // TODO: Make this take into account available pieces
         let score = self.base_board.static_eval();
@@ -228,8 +222,18 @@ impl EvalBoard for CrazyhouseBoard {
     }
 }
 
+impl ExtendedBoard for CrazyhouseBoard {
+    type HashBoard = Self;
+
+    fn hash_board(&self) -> Self {
+        self.clone()
+    }
+
+}
+
 use std::fmt;
 use search_algorithms::board::Board;
+use search_algorithms::board::ExtendedBoard;
 
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

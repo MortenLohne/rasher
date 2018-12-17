@@ -43,6 +43,7 @@ use std::io::Write;
 #[cfg(feature = "profile")]
 use cpuprofiler::PROFILER;
 use search_algorithms::board::Board;
+use search_algorithms::board::ExtendedBoard;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -164,7 +165,7 @@ fn main() {
 
 /// Makes the engine play a game against itself
 fn play_game<B> (mut board : B) 
-    where B: UciBoard + fmt::Debug + Send + 'static + Hash + Eq,
+    where B: UciBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq + Clone,
 <B as Board>::Move: Sync + Send {
     println!("Board:\n{:?}", board);
     println!("\n");
@@ -188,7 +189,8 @@ fn play_game<B> (mut board : B)
 }
 /// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B)
-    where B: 'static + UciBoard + fmt::Debug + Send + Hash + Eq, <B as Board>::Move: Sync + Send
+    where B: 'static + UciBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
+          <B as Board>::Move: Sync + Send
 {
     match board.game_result() {
         None => {
