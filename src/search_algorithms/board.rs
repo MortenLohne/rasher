@@ -1,7 +1,13 @@
+//! Traits for abstract game board representations.
+//! 
+//! General game-agnostic tools and engines can be built on this module
+//! Represents any 2-player sequential, deterministic, perfect-information game. This includes many popular games such as chess, go, xiangqi, othello, connect four and tic-tac-toe.
+
 use std::ops;
 use std::fmt;
 use self::Color::*;
 use std::hash;
+
 
 /// Represents a player's color
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -71,6 +77,7 @@ impl ops::Not for GameResult {
     }
 }
 
+/// The simplest abstract representation of a game board. Together, the provided methods encode all the rules of the game.
 pub trait Board {
     /// The type for moves in the game.
     type Move: Eq + Clone + fmt::Debug;
@@ -102,15 +109,19 @@ pub trait Board {
     fn game_result(&self) -> Option<GameResult>;
 }
 
-/// A game board that also includes a heuristic static eval function
+/// A game board that also includes a heuristic static evaluation function.
+/// Enables the use of many game-playing algorithms, such as minimax.
 pub trait EvalBoard : Board + PartialEq + Clone {
     /// A fast, static evaluation of the current board position
     /// Returns a number between -100 and 100, where 0.0 is a draw, positive number means better for white, and negative number means better for black
     fn static_eval(&self) -> f32;
 
+    /// Returns an estimate for the average branch factor of the game.
+    /// Helps search algorithms guide pruning and time management.
     const BRANCH_FACTOR: u64 = 20;
 }
 
+/// An extended game representation, which includes many additional methods to help game-playing algorithms search more effectively.
 pub trait ExtendedBoard : EvalBoard {
 
     // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
@@ -118,12 +129,17 @@ pub trait ExtendedBoard : EvalBoard {
 
     fn hash_board(&self) -> Self::HashBoard;
 
+    /// Checks if a move is legal in the current position.
+    /// Enables minimax algorithms to use the killer-move heuristic in their search.
     fn move_is_legal(&self, mv: Self::Move) -> bool {
         let mut moves = vec![];
         self.generate_moves(&mut moves);
         moves.contains(&mv)
     }
 
+    /// Returns only the "active" moves in a position. These are moves that radically change the static evaluation of a position, e.g. captures or promotions in chess.
+    /// Search algorithms may recursively search all active moves, so only a limited number of moves should be returned.
+    /// Required for search algorithms to use quiescence search.
     fn active_moves(&self) -> Vec<Self::Move> {
         vec![]
     }
