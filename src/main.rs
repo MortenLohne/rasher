@@ -1,7 +1,7 @@
 mod uci;
-mod board;
+pub mod board;
 mod tests;
-mod search_algorithms;
+pub mod search_algorithms;
 
 #[cfg(test)]
 #[macro_use]

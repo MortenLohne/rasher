@@ -57,22 +57,33 @@ impl ops::Not for GameResult {
 }
 
 pub trait Board {
+    /// The type for moves in the game.
     type Move: Eq + Clone + fmt::Debug;
+    /// The type for a reverse move in the game.
     type UndoMove;
 
+    /// Returns the starting position for the game. This function always produces identical values.
     fn start_board() -> Self;
 
+    /// Returns the side to move for the current board.
     fn side_to_move(&self) -> Color;
 
+    /// Generates all legal moves for the side to move, and appends them to a provided vector.
     fn generate_moves(&self, moves: &mut Vec<Self::Move>);
 
+    /// Plays a move on the board. Also returns an UndoMove do take the move back.
+    ///
+    /// Doing and then undoing a move always restores the board to exactly the same state.
     fn do_move(&mut self, mv: Self::Move) -> Self::UndoMove;
 
+    /// Reverse a move made by `do_move`.
+    ///
+    /// Doing and then undoing a move always restores the board to exactly the same state.
     fn undo_move(&mut self, mv: Self::UndoMove);
 
     /// Returns the result if the game is decided, otherwise returns None.
-    /// If the game is over, it must be the losing player's turn,
-    /// otherwise the function may return anything
+    /// If the winning player always plays the last move (as in chess), implementations are allowed
+    /// to only return a win when the losing player is to move
     fn game_result(&self) -> Option<GameResult>;
 }
 
