@@ -1162,8 +1162,6 @@ impl EvalBoard for SjadamBoard {
         _ => 0.0,
          */    
     }
-
-    const BRANCH_FACTOR : u64 = 30;
 }
 
 impl ExtendedBoard for SjadamBoard {
@@ -1202,4 +1200,6 @@ impl ExtendedBoard for SjadamBoard {
         let (active_moves, _) = sjadam_move_gen::all_legal_moves(self);
         active_moves
     }
+
+    const BRANCH_FACTOR : u64 = 30;
 }
