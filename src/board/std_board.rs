@@ -6,7 +6,7 @@ use board::std_move_gen::move_gen;
 use board::std_move::ChessMove;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
-use ::uci::UciBoard;
+use pgn::UciBoard;
 
 use std::ops;
 use std::fmt;

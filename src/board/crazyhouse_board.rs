@@ -11,8 +11,6 @@ use search_algorithms::board;
 
 use itertools::Itertools;
 
-use uci;
-
 use std::hash::{Hash, Hasher};
 use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
 
@@ -235,6 +233,7 @@ impl ExtendedBoard for CrazyhouseBoard {
 use std::fmt;
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
+use pgn::UciBoard;
 
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -244,7 +243,7 @@ impl fmt::Debug for CrazyhouseBoard {
     }
 }
 
-impl uci::UciBoard for CrazyhouseBoard {
+impl UciBoard for CrazyhouseBoard {
     fn from_fen(fen : &str) -> Result<Self, String> {
         
         let fen_split : Vec<&str> = fen.split_whitespace().collect();

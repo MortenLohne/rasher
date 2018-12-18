@@ -1,7 +1,7 @@
 use search_algorithms::board::GameResult;
 use search_algorithms::board::GameResult::*;
 use search_algorithms::board::Board;
-use uci::UciBoard;
+use pgn::UciBoard;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
 use uci::TimeRestriction::*;

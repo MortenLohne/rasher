@@ -2,6 +2,7 @@ mod uci;
 pub mod board;
 mod tests;
 pub mod search_algorithms;
+pub mod pgn;
 
 #[cfg(test)]
 #[macro_use]
@@ -29,7 +30,7 @@ use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::mcts;
 use search_algorithms::board::GameResult;
-use uci::UciBoard;
+use pgn::UciBoard;
 
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;

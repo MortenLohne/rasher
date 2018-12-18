@@ -15,14 +15,6 @@ use std::io;
 use std::str::FromStr;
 use std::time;
 use std::hash::Hash;
- 
-pub trait UciBoard: Sized + board::Board {
-    fn from_fen(&str) -> Result<Self, String>;
-    fn to_fen(&self) -> String;
-
-    fn from_alg(&self, &str) -> Result<Self::Move, String>; // Rename move_from_lan
-    fn to_alg(&self, &Self::Move) -> String; // lan_move_string
-}
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
@@ -350,6 +342,7 @@ impl EngineComm {
 
 use std::sync::mpsc;
 use search_algorithms::board::ExtendedBoard;
+use pgn::UciBoard;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)

@@ -14,7 +14,7 @@ use std::ops;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::ExtendedBoard;
-use uci::UciBoard;
+use pgn::UciBoard;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use self::Score::*;

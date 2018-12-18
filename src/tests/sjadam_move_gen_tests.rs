@@ -1,5 +1,5 @@
 use board::sjadam_board::SjadamBoard;
-use uci::UciBoard;
+use pgn::UciBoard;
 use search_algorithms::board::{GameResult, Board};
 use tests::move_gen_tests;
 use board::sjadam_board::BitBoard;

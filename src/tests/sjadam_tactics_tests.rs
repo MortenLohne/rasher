@@ -1,5 +1,5 @@
 use board::sjadam_board::SjadamBoard;
-use uci::UciBoard;
+use pgn::UciBoard;
 use search_algorithms::alpha_beta;
 use board::sjadam_move::SjadamMove;
 use search_algorithms::board::Board;

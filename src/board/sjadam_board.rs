@@ -13,7 +13,7 @@ use board::std_board::PieceType::*;
 
 use std::ops;
 use std::fmt;
-use uci::UciBoard;
+use pgn::UciBoard;
 
 use rand;
 use rand::Rng;
