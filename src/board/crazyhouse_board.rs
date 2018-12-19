@@ -295,7 +295,7 @@ impl UciBoard for CrazyhouseBoard {
         "".to_string() // TODO: write
     }
 
-    fn move_from_san(&self, input : &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_lan(&self, input : &str) -> Result<Self::Move, pgn::Error> {
         use board::std_board::PieceType::*;
         if input.contains('@') {
             let piece_type = match input.chars().next().unwrap() {
@@ -317,14 +317,14 @@ impl UciBoard for CrazyhouseBoard {
             square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
         }
         else {
-            self.base_board.move_from_san(input).map(CrazyhouseMove::NormalMove)
+            self.base_board.move_from_lan(input).map(CrazyhouseMove::NormalMove)
         }
     }
     
-    fn move_to_san(&self, mv: &Self::Move) -> String {
+    fn move_to_lan(&self, mv: &Self::Move) -> String {
         use board::std_board::PieceType::*;
         match *mv {
-            CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_san(&mv),
+            CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_lan(&mv),
             CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
                 Knight => "N",
                 Bishop => "B",

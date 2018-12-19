@@ -131,7 +131,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| board.move_from_san(move_string))
+                                         .map(|move_string| board.move_from_lan(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -153,7 +153,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| board.move_from_san(move_string))
+                                         .map(|move_string| board.move_from_lan(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -175,7 +175,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| board.move_from_san(move_string))
+                                         .map(|move_string| board.move_from_lan(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
@@ -531,10 +531,10 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
     let mut last_eval = eval;
     let mut last_correct_move = pv_str.split_whitespace()
         .next()
-        .map(|mv_str| board.move_from_san(mv_str).unwrap()).unwrap();
+        .map(|mv_str| board.move_from_lan(mv_str).unwrap()).unwrap();
     
     for mv_str in moves {
-        let mv = board.move_from_san(mv_str).unwrap();
+        let mv = board.move_from_lan(mv_str).unwrap();
         {
             let mut moves = vec![];
             board.generate_moves(&mut moves);
@@ -551,7 +551,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
                 
         let best_move = pv_str.split_whitespace()
             .next()
-            .map(|mv_str| board.move_from_san(mv_str).unwrap()).unwrap();
+            .map(|mv_str| board.move_from_lan(mv_str).unwrap()).unwrap();
         let delta_score = eval.to_cp(board.side_to_move()) - last_eval.to_cp(board.side_to_move());
         
         if best_move != mv && delta_score > 0 {
@@ -563,7 +563,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             uci_send(&format!(
                 "{} ({}): {}, {} was better. ({} vs {}, delta={})",
                 mv_str, !board.side_to_move(), verdict,
-                board.move_to_san(&last_correct_move),
+                board.move_to_lan(&last_correct_move),
                 eval.uci_string(board.side_to_move()), last_eval.uci_string(board.side_to_move()),
                 delta_score));
         }
@@ -635,7 +635,7 @@ fn parse_position<Board> (input : &str) -> Result<Board, Box<error::Error>>
         if words[moves_pos] == "moves" {
             for c_move_str in words.iter().skip(moves_pos + 1) {
                 let c_move =
-                    board.move_from_san(c_move_str)?;
+                    board.move_from_lan(c_move_str)?;
                 board.do_move(c_move);
             }
         }

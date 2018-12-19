@@ -92,8 +92,8 @@ fn respond_to_checks() {
             format!("Error: King should be under attack here:\n{}", board5));
     legal_moves.clear();
 
-    let mv = board6.move_from_san("h4g4").unwrap();
-    let mv2 = board6.move_from_san("f4g3").unwrap();
+    let mv = board6.move_from_lan("h4g4").unwrap();
+    let mv2 = board6.move_from_lan("f4g3").unwrap();
     move_is_available_prop(&mut board6, mv);
     move_is_unavailable_prop(&mut board6, mv2);
 }
@@ -101,8 +101,8 @@ fn respond_to_checks() {
 #[test]
 fn en_passant_test () {
     let mut board1 = ChessBoard::from_fen("7k/p7/8/1P6/8/8/8/7K b - - 0 1").unwrap();
-    let move1 = board1.move_from_san("a7a5").unwrap();
-    let move2 = board1.move_from_san("b5a6").unwrap();
+    let move1 = board1.move_from_lan("a7a5").unwrap();
+    let move2 = board1.move_from_lan("b5a6").unwrap();
     // Do a move that allows en passant
     board1.do_move(move1);
 
@@ -175,7 +175,7 @@ fn capture_from_check() {
     let board = ChessBoard::from_fen("7Q/5p1k/P5p1/5p2/7q/K7/8/8 b - - 1 41").unwrap();
     let mut moves = vec![];
     board.generate_moves(&mut moves);
-    assert_eq!(moves, vec![board.move_from_san("h7h8").unwrap()]);
+    assert_eq!(moves, vec![board.move_from_lan("h7h8").unwrap()]);
 }
 
 #[test]
@@ -190,15 +190,15 @@ fn castling_test () {
 
     // Checks that black queenside castling works in a tactic
     let board3 = ChessBoard::from_fen("r3k3/1R6/8/8/8/8/8/3K4 b q - 0 1").unwrap();
-    let move3 = board3.move_from_san("e8c8").unwrap();
+    let move3 = board3.move_from_lan("e8c8").unwrap();
     basic_tactics_prop(&board3, move3);
 
     // Positions with both castlings available
     let mut board4 = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    let mv = board4.move_from_san("e1c1").unwrap();
-    let mv2 = board4.move_from_san("e1g1").unwrap();
-    let mv3 = board4.move_from_san("e1h1").unwrap();
+    let mv = board4.move_from_lan("e1c1").unwrap();
+    let mv2 = board4.move_from_lan("e1g1").unwrap();
+    let mv3 = board4.move_from_lan("e1h1").unwrap();
     move_is_available_prop(&mut board4, mv);
     move_is_available_prop(&mut board4, mv2);
     move_is_unavailable_prop(&mut board4, mv3);
@@ -206,8 +206,8 @@ fn castling_test () {
     // Positions where castling is legal, but rook is attacked
     let mut board5 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
-    let mv4 = board5.move_from_san("e1g1").unwrap();
-    let mv5 = board5.move_from_san("e1f1").unwrap();
+    let mv4 = board5.move_from_lan("e1g1").unwrap();
+    let mv5 = board5.move_from_lan("e1f1").unwrap();
     move_is_available_prop(&mut board5, mv4);
     move_is_available_prop(&mut board5, mv5);
 }
@@ -217,7 +217,7 @@ fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
     board.generate_moves(&mut all_moves);
     assert!(all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should be legal here, board:{}Legal moves: {:?}",
-            board.move_to_san(&c_move), board, all_moves);
+            board.move_to_lan(&c_move), board, all_moves);
 }
 
 fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
@@ -225,7 +225,7 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
     board.generate_moves(&mut all_moves);
     assert!(!all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should not be legal here, board:{}Legal moves: {:?}",
-            board.move_to_san(&c_move), board, all_moves);
+            board.move_to_lan(&c_move), board, all_moves);
 }
 
 #[test]

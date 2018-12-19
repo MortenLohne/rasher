@@ -630,7 +630,7 @@ impl UciBoard for SjadamBoard {
         self.to_chess_board().to_fen()
     }
 
-    fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
         if input.len() < 4 {
             return Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
@@ -687,7 +687,7 @@ impl UciBoard for SjadamBoard {
                 format!("Couldn't parse move {}", input)))
         }
     }
-    fn move_to_san(&self, mv: &Self::Move) -> String {
+    fn move_to_lan(&self, mv: &Self::Move) -> String {
         #[cfg(feature = "legacy_sjadam_move_format")]
         {
             let dia_neighbours = |square: i8| [square - 9, square - 7, square + 7, square + 9]

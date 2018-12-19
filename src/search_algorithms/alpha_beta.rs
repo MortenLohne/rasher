@@ -77,7 +77,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                     let uci_info = uci::UciInfo {
                         depth: 1, seldepth: 1, time: 0, nodes: 1,
                         hashfull: 0.0,
-                        pvs: vec![(Score::Draw(0), board.move_to_san(&mv))], color: board.side_to_move() };
+                        pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))], color: board.side_to_move() };
                     channel.send(uci_info).unwrap();
                     return;
                 }
@@ -146,7 +146,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                 let mut pv_board = board.clone();
 
                 for mv in &moves {
-                    pv_str.push_str(&pv_board.move_to_san(mv));
+                    pv_str.push_str(&pv_board.move_to_lan(mv));
                     pv_str.push(' ');
                     let mut pv_board_moves = vec![];
                     pv_board.generate_moves(&mut pv_board_moves);

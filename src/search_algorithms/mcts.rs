@@ -34,7 +34,7 @@ pub fn play_human<B: fmt::Debug + UciBoard + PartialEq + Clone>(mut board: B) {
             while input.ends_with('\n') {
                 input.pop();
             }
-            if let Ok(human_move) = board.move_from_san(&input) {
+            if let Ok(human_move) = board.move_from_lan(&input) {
                 let mut moves = vec![];
                 board.generate_moves(&mut moves);
                 if moves.contains(&human_move) {
@@ -190,10 +190,10 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         
     {
         let reverse_move = board.do_move(go_move.clone());
-        let mut pv = board.move_to_san(go_move);
+        let mut pv = board.move_to_lan(go_move);
         pv.push(' ');
         pv.push_str(&node.pv(board).iter()
-                    .map(|mv| board.move_to_san(mv))
+                    .map(|mv| board.move_to_lan(mv))
                     .collect::<Vec<_>>()
                     .join(" "));
         let score = alpha_beta::Score::Val((node.score().into_inner() as f32 - 0.5) * 20.0);

@@ -499,7 +499,7 @@ impl UciBoard for ChessBoard {
         string
     }
 
-    fn move_to_san(&self, mv: &Self::Move) -> String {
+    fn move_to_lan(&self, mv: &Self::Move) -> String {
         let (file_from, rank_from) = mv.from.file_rank();
         let (file_to, rank_to) = mv.to.file_rank();
         let mut s : String = "".to_string();
@@ -518,13 +518,13 @@ impl UciBoard for ChessBoard {
     }
 
     // Parse a ChessMove from short algebraic notation (e2e4, g2g1Q, etc)
-    fn move_from_san(&self, alg : &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_lan(&self, alg : &str) -> Result<Self::Move, pgn::Error> {
         // Some GUIs send moves as "e2-e4" instead of "e2e4".
         // In that case, remove the dash and try again
         if alg.chars().nth(2) == Some('-') {
             let mut fixed_alg = alg.to_string();
             fixed_alg.remove(2);
-            self.move_from_san(&fixed_alg)
+            self.move_from_lan(&fixed_alg)
         }
         else if alg.len() == 4 || alg.len() == 5 {
             let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
