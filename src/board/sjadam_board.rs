@@ -10,9 +10,6 @@ use search_algorithms::board::GameResult;
 
 use pgn;
 
-#[cfg(feature = "legacy_sjadam_move_format")]
-use board::std_board::PieceType::*;
-
 use std::ops;
 use std::fmt;
 use pgn::UciBoard;
@@ -765,6 +762,7 @@ impl UciBoard for SjadamBoard {
                    }).unwrap();
             return f;
         }
+        #[cfg(not(feature = "legacy_sjadam_move_format"))]
         mv.to_string()
     }
 }
