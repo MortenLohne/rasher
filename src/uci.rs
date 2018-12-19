@@ -8,6 +8,7 @@ use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::board::EvalBoard;
 
+use std::error;
 use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
@@ -18,7 +19,7 @@ use std::hash::Hash;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
+pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>> {
 
     // Do the standard handshake with the GUI
     info!("Received uci command from GUI");
@@ -120,63 +121,66 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), String> {
                 
                 let (handle, rx) = match engine_options.variant {
                     ChessVariant::Standard => {
+                        let board = parse_position::<ChessBoard>(&board_string)?;
                         match engine_string.as_str() {
                             "minimax" => alpha_beta::start_uci_search(
-                                parse_position::<ChessBoard>(&board_string)?,
+                                board.clone(),
                                 time_restriction,
                                 engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| parse_position::<ChessBoard>(&board_string)?.from_alg(move_string))
+                                         .map(|move_string| board.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
                             "mcts" => start_mcts_engine(
-                                parse_position::<ChessBoard>(&board_string)?,
+                                board,
                                 time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
                         }
                     },
                     ChessVariant::Crazyhouse => {
+                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
                         match engine_string.as_str() {
                             "minimax" => alpha_beta::start_uci_search(
-                                parse_position::<CrazyhouseBoard>(&board_string)?,
+                                board.clone(),
                                 time_restriction,
                                 engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| parse_position::<CrazyhouseBoard>(&board_string)?.from_alg(move_string))
+                                         .map(|move_string| board.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
                             "mcts" => start_mcts_engine(
-                                parse_position::<CrazyhouseBoard>(&board_string)?,
+                                board,
                                 time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
                         }
                     },
                     ChessVariant::Sjadam => {
+                        let board = parse_position::<SjadamBoard>(&board_string)?;
                         match engine_string.as_str() {
                             "minimax" => alpha_beta::start_uci_search(
-                                parse_position::<SjadamBoard>(&board_string)?,
+                                board.clone(),
                                 time_restriction,
                                 engine_options,
                                 engine_comm.clone(), searchmoves_input
                                     .clone()
                                     .map(|moves|
                                          moves.iter()
-                                         .map(|move_string| parse_position::<SjadamBoard>(&board_string)?.from_alg(move_string))
+                                         .map(|move_string| board.from_alg(move_string))
                                          .map(Result::unwrap)
                                          .collect::<Vec<_>>()
                                          )),
                             "mcts" => start_mcts_engine(
-                                parse_position::<SjadamBoard>(&board_string)?,
+                                board,
                                 time_restriction, engine_options,
                                 engine_comm.clone()),
                             _ => panic!("Unknown engine {}", engine_string),
@@ -600,12 +604,12 @@ pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
-fn parse_position<Board> (input : &str) -> Result<Board, String>
+fn parse_position<Board> (input : &str) -> Result<Board, Box<error::Error>>
     where Board: 'static + UciBoard {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {
-        return Err(format!("Illegal position string: had length {}", words.len()));
+        return Err(format!("Illegal position string: had length {}", words.len()).into());
     }
     
     // moves_pos is the position on the input string where the token "moves" is expected
@@ -620,31 +624,25 @@ fn parse_position<Board> (input : &str) -> Result<Board, String>
             fen_string.push(' ');
         }
         fen_string = fen_string.trim().to_string();
-        match Board::from_fen(&fen_string) {
-            Ok(b) => (b, 8),
-            Err(err) => return Err(err),
-        }
+        (Board::from_fen(&fen_string)?, 8)
     }
     else {
-        return Err(format!("Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
-                           input, words[1], words.len()))
+        return Err(format!(
+            "Illegally formatted position string: \"{}\": 2nd token is {} and string has {} tokens",
+            input, words[1], words.len()).into())
     };
     if words.len() > moves_pos  {
         if words[moves_pos] == "moves" {
             for c_move_str in words.iter().skip(moves_pos + 1) {
-                let c_move = match board.from_alg(c_move_str) {
-                    Ok(m) => m,
-                    Err(err) => {
-                        return Err(err.to_string());
-                    },
-                };
+                let c_move =
+                    board.from_alg(c_move_str)?;
                 board.do_move(c_move);
             }
         }
         
         else {
             return Err(format!("Illegally formatted position string: 
-Expected words.len() to be {} if no moves are included, was {}", moves_pos, words.len()))
+Expected words.len() to be {} if no moves are included, was {}", moves_pos, words.len()).into())
         }
     }
     Ok(board)

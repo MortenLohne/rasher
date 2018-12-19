@@ -8,6 +8,7 @@ use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use board::std_move_gen::move_gen;
 use search_algorithms::board;
+use pgn;
 
 use itertools::Itertools;
 
@@ -244,17 +245,21 @@ impl fmt::Debug for CrazyhouseBoard {
 }
 
 impl UciBoard for CrazyhouseBoard {
-    fn from_fen(fen : &str) -> Result<Self, String> {
+    fn from_fen(fen : &str) -> Result<Self, pgn::Error> {
         
         let fen_split : Vec<&str> = fen.split_whitespace().collect();
         if fen_split.len() < 5 || fen_split.len() > 7 {
-            return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [5, 6, 7]",
-                           fen, fen_split.len()));
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Invalid FEN string \"{}\": Had {} fields instead of [5, 6, 7]",
+                           fen, fen_split.len())));
         }
         let mut ranks : Vec<&str> = fen_split[0].split('/').collect();
         if ranks.len() != 9 {
-            return Err(format!("Invalid FEN string \"{}\": Found {} ranks, expected 9",
-                               fen, ranks.len()));
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Invalid FEN string \"{}\": Found {} ranks, expected 9",
+                               fen, ranks.len())));
         }
         let captured_pieces = ranks.pop().unwrap();
 
@@ -277,7 +282,10 @@ impl UciBoard for CrazyhouseBoard {
                 }
             }
             else {
-                return Err(format!("Found unknown character {} in available pieces list {} in fen string {}", ch, fen_split[1], fen));
+                return Err(pgn::Error::new(
+                    pgn::ErrorKind::ParseError,
+                    format!("Illegal character {} in available pieces list {} in fen string {}",
+                            ch, fen_split[1], fen)));
             }
         }
         Ok(board)
@@ -287,7 +295,7 @@ impl UciBoard for CrazyhouseBoard {
         "".to_string() // TODO: write
     }
 
-    fn from_alg(&self, input : &str) -> Result<Self::Move, String> {
+    fn from_alg(&self, input : &str) -> Result<Self::Move, pgn::Error> {
         use board::std_board::PieceType::*;
         if input.contains('@') {
             let piece_type = match input.chars().next().unwrap() {
@@ -297,11 +305,15 @@ impl UciBoard for CrazyhouseBoard {
                 'R' => Rook,
                 'Q' => Queen,
                 'K' => King,
-                _ => return Err(format!("Couldn't parse move {}.", input)),
+                _ => return Err(pgn::Error::new(
+                    pgn::ErrorKind::ParseError,
+                    format!("Couldn't parse move {}.", input))),
             };
             let square_str : String = input.chars().skip_while(|&c| c != '@').collect();
-            let square = Square::from_alg(&square_str).ok_or_else(||
-                format!("Failed to parse destination square for move {}", input));
+            let square = Square::from_alg(&square_str).map_err(|err|
+                pgn::Error::new(
+                    pgn::ErrorKind::ParseError,
+                    format!("Invalid destination square for move {}\n\t{}", input, err)));
             square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
         }
         else {

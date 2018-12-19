@@ -6,6 +6,7 @@ use board::std_move_gen::move_gen;
 use board::std_move::ChessMove;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
+use pgn;
 use pgn::UciBoard;
 
 use std::ops;
@@ -192,15 +193,21 @@ impl fmt::Display for Square {
 }
 
 impl Square {
-    pub fn from_alg (alg : &str) -> Option<Self> {
-        if alg.len() != 2 { None }
+    pub fn from_alg (alg : &str) -> Result<Self, pgn::Error> {
+        if alg.len() != 2 { Err(pgn::Error::new(
+            pgn::ErrorKind::ParseError,
+            format!("Invalid square {}", alg))) }
         else {
             let (file, rank) = (alg.chars().nth(0).unwrap(), alg.chars().nth(1).unwrap());
-            let (file_u8, rank_u8) = (file as u8 - b'a',
-                                      8 - (rank as u8 - b'0'));
-            let square = rank_u8 * 8 + file_u8;
+            if file < 'a' || file > 'h' || rank < '1' || rank > '8' { Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Invalid square {}", alg))) }
+            else {
+                let (file_u8, rank_u8) = (file as u8 - b'a',
+                                          8 - (rank as u8 - b'0'));
 
-            if square > 64 { None } else { Some(Square(square)) }
+            let square = rank_u8 * 8 + file_u8;
+                Ok(Square(square)) }
         }
     }
     pub fn from_ints (file : u8, rank : u8) -> Self {
@@ -289,12 +296,14 @@ impl IntoIterator for ChessBoard {
 
 // Parses the first token in a FEN string, which describes the positions
 /// of the pieces
-fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
+fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], pgn::Error> {
     let mut board = [[Piece::empty(); 8]; 8];
     let ranks : Vec<&str> = fen_board.split('/').collect();
     if ranks.len() != 8 {
-        return Err(format!("Invalid FEN board string \"{}\": Had {} ranks instead of 8",
-                           fen_board, ranks.len()));
+        return Err(
+            pgn::Error::new(pgn::ErrorKind::ParseError,
+                            format!("Invalid FEN \"{}\": Had {} ranks instead of 8",
+                                    fen_board, ranks.len())));
     }
     for i in 0..8 {
         let mut cur_rank : Vec<Piece> = Vec::new();
@@ -308,13 +317,17 @@ fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
                             i -= 1;
                         }
                     },
-                    None => return Err(format!("Invalid FEN string: Illegal character {}", c)),
+                    None => return Err(pgn::Error::new(
+                        pgn::ErrorKind::ParseError,
+                        format!("Invalid FEN \"{}\":: Illegal character {}", fen_board, c))),
                 },
             }
         }
         if cur_rank.len() != 8 {
-            return Err(format!("Invalid FEN string \"{}\": Specified {} pieces on rank {}.",
-                               fen_board, cur_rank.len(), i))
+            return Err(
+                pgn::Error::new(pgn::ErrorKind::ParseError,
+                                format!("Invalid FEN \"{}\": Specified {} pieces on rank {}.",
+                                        fen_board, cur_rank.len(), i)))
         }
         else {
             board[i][..8].clone_from_slice(&cur_rank[..8]);
@@ -323,15 +336,17 @@ fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], String> {
     Ok(board)
 }
 
-fn parse_fen_to_move (to_move : &str) -> Result<Color, String> {
+fn parse_fen_to_move (to_move : &str) -> Result<Color, pgn::Error> {
     let char_to_move = to_move.chars().collect::<Vec<_>>()[0];
     if char_to_move == 'w' { Ok(White) }
     else if char_to_move == 'b' { Ok(Black) }
-    else { Err(format!("Invalid FEN string: Found {} in side-to-move-field, expected 'w' or 'b'",
-                       to_move)) }
+    else { Err(pgn::Error::new(
+        pgn::ErrorKind::ParseError,
+        format!("Invalid FEN: Found {} in side-to-move-field, expected 'w' or 'b'",
+                to_move))) }
 }
 
-fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Result<(), String> {
+fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Result<(), pgn::Error> {
     let mut castling_rights = [false; 4];
     for c in castling_str.chars() {
         match c {
@@ -340,7 +355,9 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
             'Q' => castling_rights[1] = true,
             'k' => castling_rights[2] = true,
             'q' => castling_rights[3] = true,
-            _ => return Err("Invalid FEN string: Error in castling field.".to_string()),
+            _ => return Err(
+                pgn::Error::new(pgn::ErrorKind::ParseError,
+                                "Invalid FEN string: Error in castling field.".to_string())),
         }
     }
     if !castling_rights[0] { board.disable_castling_kingside(White) }
@@ -352,11 +369,13 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
 
 impl UciBoard for ChessBoard {
     
-    fn from_fen(fen : &str) -> Result<Self, String> {
+    fn from_fen(fen : &str) -> Result<Self, pgn::Error> {
         let fen_split : Vec<&str> = fen.split(' ').collect();
         if fen_split.len() < 4 || fen_split.len() > 6 {
-            return Err(format!("Invalid FEN string \"{}\": Had {} fields instead of [4, 5, 6]",
-                               fen, fen_split.len()));
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("FEN string \"{}\" has {} fields instead of [4, 5, 6]",
+                               fen, fen_split.len())));
         }
 
         let mut board = ChessBoard { board: [[Piece::empty(); 8]; 8], to_move: White,
@@ -364,7 +383,9 @@ impl UciBoard for ChessBoard {
         board.board = parse_fen_board(fen_split[0])?;
         
         if fen_split[1].len() != 1 {
-            return Err("Invalid FEN string: Error in side to move-field".to_string());
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Invalid FEN string: Error in side to move-field"));
         }
 
         // Check side to move
@@ -375,16 +396,26 @@ impl UciBoard for ChessBoard {
 
         // Check en passant field
         if fen_split[3] != "-" {
-            match Square::from_alg(fen_split[3]) {
-                Some(square) => board.set_en_passant_square(Some(square)),
-                None => return Err(format!("Invalid en passant square {}.", fen_split[3])),
-            }
-        };
+            let ep_square = Square::from_alg(fen_split[3])
+                .map_err(|err| pgn::Error::new(
+                    pgn::ErrorKind::ParseError,
+                    format!("Invalid en passant square on {}\n\t{}", fen, err))
+                )?;
+            board.set_en_passant_square(Some(ep_square));
+        }
 
         let (half_clock, move_num) : (u8, u16) =
             if fen_split.len() > 4 {
-                (fen_split[4].parse().map_err(|_|"Invalid half_move number in FEN string")?,
-                 fen_split[5].parse().map_err(|_|"Invalid half_move number in FEN string")?)
+                (fen_split[4].parse().map_err(|_|
+                    pgn::Error::new(
+                        pgn::ErrorKind::ParseError,
+                        "Invalid half_move number in FEN string")
+                )?,
+                 fen_split[5].parse().map_err(|_|
+                     pgn::Error::new(
+                         pgn::ErrorKind::ParseError,
+                         "Invalid half_move number in FEN string")
+                 )?)
             }
         else {
             (0, 0)
@@ -395,14 +426,16 @@ impl UciBoard for ChessBoard {
 
         if (board.can_castle_kingside(White) || board.can_castle_queenside(White))
             && board[Square::E1] != Piece::new(King, White) {
-            return Err("FEN string has white castling rights, but white's king is not on e1"
-                       .to_string());
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::IllegalPosition,
+                "FEN string has white castling rights, but white's king is not on e1"));
             }
 
         if (board.can_castle_kingside(Black) || board.can_castle_queenside(Black))
             && board[Square::E8] != Piece::new(King, Black) {
-            return Err("FEN string has black castling rights, but black's king is not on e8"
-                       .to_string());
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::IllegalPosition,
+                "FEN string has black castling rights, but black's king is not on e8"));
         }
     
         Ok(board)
@@ -485,7 +518,7 @@ impl UciBoard for ChessBoard {
     }
 
     // Parse a ChessMove from short algebraic notation (e2e4, g2g1Q, etc)
-    fn from_alg(&self, alg : &str) -> Result<Self::Move, String> {
+    fn from_alg(&self, alg : &str) -> Result<Self::Move, pgn::Error> {
         // Some GUIs send moves as "e2-e4" instead of "e2e4".
         // In that case, remove the dash and try again
         if alg.chars().nth(2) == Some('-') {
@@ -510,15 +543,21 @@ impl UciBoard for ChessBoard {
                         Some('n') => Knight,
                         Some('B') => Bishop,
                         Some('b') => Bishop,
-                        Some(ch) => return Err(format!("Bad promotion letter {} in move {}", ch, alg)),
-                        None => return Err(format!("No promotion letter in move {}", alg)),
+                        Some(ch) => return Err(pgn::Error::new(
+                            pgn::ErrorKind::ParseError,
+                            format!("Bad promotion letter {} in move {}", ch, alg))),
+                        None => return Err(pgn::Error::new(
+                            pgn::ErrorKind::IllegalMove,
+                            format!("No promotion letter in move {}", alg))),
                     })
                 })
             }
         }
         
         else {
-            Err(format!("Move {} had incorrect length: Found {}, expected 4/5", alg, alg.len()))
+            Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Move {} had incorrect length: Found {}, expected 4/5", alg, alg.len())))
         }
     }
 }

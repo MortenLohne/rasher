@@ -8,6 +8,8 @@ use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::GameResult;
 
+use pgn;
+
 #[cfg(feature = "legacy_sjadam_move_format")]
 use board::std_board::PieceType::*;
 
@@ -623,7 +625,7 @@ impl fmt::Debug for SjadamBoard {
 }
 
 impl UciBoard for SjadamBoard {
-    fn from_fen(fen: &str) -> Result<Self, String> {
+    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
         ChessBoard::from_fen(fen).map(|b| Self::from_chess_board(&b))
     }
 
@@ -631,40 +633,50 @@ impl UciBoard for SjadamBoard {
         self.to_chess_board().to_fen()
     }
 
-    fn from_alg(&self, input: &str) -> Result<Self::Move, String> {
+    fn from_alg(&self, input: &str) -> Result<Self::Move, pgn::Error> {
         if input.len() < 4 {
-            return Err(format!("Move \"{}\" was too short to parse", input))
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Move \"{}\" was too short to parse", input)))
         }
         #[cfg(feature = "legacy_sjadam_move_format")]
         {
             if input.len() == 5 && (input.as_bytes()[4] as char == '-' || input.as_bytes()[0] as char == '-') || input.len() == 6 {
                 let mut chars = input.chars().peekable();
                 if *chars.peek().unwrap() == '-' {
-                    let from = Square::from_alg(&input[1..3]).ok_or("Illegal square")?;
-                    let to = Square::from_alg(&input[3..5]).ok_or("Illegal square")?;
+                    let from = Square::from_alg(&input[1..3])?;
+                    let to = Square::from_alg(&input[3..5])?;
                     // TODO: Check for castling
                     return Ok(SjadamMove::new(from, to, false,
                                               self.get_square(from).piece_type()))
                 }
                 let alg : String = chars.by_ref().collect();
-                let from = Square::from_alg(&alg[0..2]).ok_or("Illegal square")?;
-                let sjadam = Square::from_alg(&alg[2..4]).ok_or("Illegal square")?;
+                let from = Square::from_alg(&alg[0..2])?;
+                let sjadam = Square::from_alg(&alg[2..4])?;
                 if alg.chars().last().unwrap() == '-' {
                     return Ok(SjadamMove::new(from, sjadam,
                                               false, self.get_square(from).piece_type()));
                 }
                 else {
-                    let to = Square::from_alg(&alg[4..]).ok_or("Illegal square")?;
+                    let to = Square::from_alg(&alg[4..])?;
                     return Ok(SjadamMove::new(from, to, false,
                                               self.get_square(from).piece_type()));
                 }
             }
         }
         if input.len() > 5 {
-            return Err(format!("Move \"{}\" was too long to parse", input))
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Move \"{}\" was too long to parse", input)))
         }
-        let from = Square::from_alg(&input[0..2]).ok_or("Illegal square")?;
-        let to = Square::from_alg(&input[2..4]).ok_or("Illegal square")?;
+        let from = Square::from_alg(&input[0..2]).map_err(|err|
+            pgn::Error::new(
+            pgn::ErrorKind::ParseError,
+            format!("Invalid square in move {}\n\t{}", input, err)))?;
+        let to = Square::from_alg(&input[2..4]).map_err(|err|
+            pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Invalid square in move {}\n\t{}", input, err)))?;
         debug_assert!(!self.get_square(from).is_empty(), "Cannot parse move {} on \n{:?}",
                       input, self);
         match input.len() {
@@ -673,7 +685,9 @@ impl UciBoard for SjadamBoard {
             5 if input.as_bytes()[4] == b'c' =>
                 Ok(SjadamMove::new(from, to, true,
                                    self.get_square(from).piece_type())),
-            _ => Err(format!("Couldn't parse move {}", input))
+            _ => Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Couldn't parse move {}", input)))
         }
     }
     fn to_alg(&self, mv: &Self::Move) -> String {
