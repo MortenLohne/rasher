@@ -499,6 +499,84 @@ impl UciBoard for ChessBoard {
         string
     }
 
+    fn move_to_san(&self, mv: &<Self as Board>::Move) -> String {
+        let color = self.side_to_move();
+        let piece_type = self.piece_at(mv.from).piece_type();
+
+        let mut output = String::new();
+
+        if piece_type == King && mv.from.file() == 4 && mv.to.file() == 2 {
+            output.push_str("0-0-0");
+        }
+        else if piece_type == King && mv.from.file() == 4 && mv.to.file() == 6 {
+            output.push_str("0-0");
+        }
+        else {
+            if piece_type != Pawn {
+                output.push(piece_type.letter());
+            }
+
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+
+            let alternative_from_squares = moves.iter()
+                .filter(|&cand_mv| cand_mv.from != cand_mv.from)
+                .filter(|&cand_mv|
+                    cand_mv.to == mv.to && self.piece_at(cand_mv.from) == self.piece_at(mv.from))
+                .map(|cand_mv| cand_mv.from)
+                .collect::<Vec<_>>();
+
+            if alternative_from_squares.is_empty()
+                && (piece_type != Pawn || mv.from.file() == mv.to.file()) {
+                ();
+            }
+                // Disambiguate with departure file
+            else if alternative_from_squares.iter().all(|square| square.file() != mv.from.file()) {
+                output.push(mv.from.to_string().chars().next().unwrap());
+            }
+                // Disambiguate with departure rank
+            else if alternative_from_squares.iter().all(|square| square.rank() != mv.from.rank()) {
+                output.push(mv.from.to_string().chars().last().unwrap());
+            }
+                // Disambiguate with full square
+            else {
+                output.push_str(&mv.from.to_string());
+            };
+
+            if self.piece_at(mv.to) != Piece::Empty {
+                output.push('x');
+            }
+
+            output.push_str(&mv.to.to_string());
+
+            match mv.prom {
+                Some(Queen) => output.push_str("=Q"),
+                Some(Rook) => output.push_str("=R"),
+                Some(Knight) => output.push_str("=N"),
+                Some(Bishop) => output.push_str("=Q"),
+                None => (),
+                _ => panic!("Illegal promotion move"),
+            };
+        }
+
+        let mut cloned_board = self.clone();
+        cloned_board.do_move(mv.clone());
+        if cloned_board.game_result() == Some(board::GameResult::WhiteWin)
+            || cloned_board.game_result() == Some(board::GameResult::BlackWin) {
+            output.push('#');
+        }
+        else if move_gen::is_attacked(&cloned_board, cloned_board.king_pos(!color)) {
+            output.push('+');
+        }
+
+        return output;
+
+    }
+
+    fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
+        unimplemented!()
+    }
+
     fn move_to_lan(&self, mv: &Self::Move) -> String {
         let (file_from, rank_from) = mv.from.file_rank();
         let (file_to, rank_to) = mv.to.file_rank();

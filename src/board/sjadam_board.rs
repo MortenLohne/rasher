@@ -765,6 +765,14 @@ impl UciBoard for SjadamBoard {
         #[cfg(not(feature = "legacy_sjadam_move_format"))]
         mv.to_string()
     }
+
+    fn move_to_san(&self, mv: &<Self as Board>::Move) -> String {
+        unimplemented!()
+    }
+
+    fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
+        unimplemented!()
+    }
 }
 
 

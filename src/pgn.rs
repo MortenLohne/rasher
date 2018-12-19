@@ -48,6 +48,10 @@ pub trait UciBoard: Sized + board::Board {
     fn from_fen(fen: &str) -> Result<Self, Error>;
     fn to_fen(&self) -> String;
 
+    fn move_to_san(&self, mv: &Self::Move) -> String;
+
+    fn mv_from_san(&self, input: &str) -> Result<Self::Move, Error>;
+
     /// Converts a move to an alternative, long algebraic notation.
     /// This is mostly used for chess and chess variations in the uci interface, or for convenient debugging.
     /// Implementations may simply wrap this function around move_to_san
