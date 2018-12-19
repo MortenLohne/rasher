@@ -41,7 +41,7 @@ fn repetitions_do_not_preserve_hash() {
     let start_hash = hasher.finish();
 
     for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8"].iter() {
-        let mv = board.from_alg(mv_str).unwrap();
+        let mv = board.move_from_san(mv_str).unwrap();
         board.do_move(mv);
     }
 
@@ -58,13 +58,13 @@ fn repetitions_are_drawn() {
 
     for mv_str in ["c1c3", "c8c6", "c3c1", "c6c8", "c1c3", "c8c6", "c3c1", "c6c8"].iter() {
         assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
-        let mv = board.from_alg(mv_str).unwrap();
+        let mv = board.move_from_san(mv_str).unwrap();
         board.do_move(mv);
     }
 
     assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
 
-    let mv = board.from_alg("g1e3").unwrap();
+    let mv = board.move_from_san("g1e3").unwrap();
     board.do_move(mv);
     
     assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
@@ -77,7 +77,7 @@ fn pawn_moves_can_repeat() {
     // There is no repetition from move 1, because of en passant
     for mv_str in ["e2e4", "e7e5", "c2e2", "c7e7", "e2c2", "e7c7", "c2e2", "c7e7", "e2c2", "e7c7", "c2e2"].iter() {
         assert_eq!(board.game_result(), None, "Wrong game result for board:\n{:?}", board);
-        let mv = board.from_alg(mv_str).unwrap();
+        let mv = board.move_from_san(mv_str).unwrap();
         board.do_move(mv);
     }
 

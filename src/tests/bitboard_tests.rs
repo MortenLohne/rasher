@@ -111,7 +111,7 @@ fn file() {
     let start_board = BitBoard::all_from_board(&ChessBoard::start_board());
     assert_eq!(start_board.file(0), 0b1100_0011);
     let mut board = ChessBoard::start_board();
-    let mv = board.from_alg("a2a4").unwrap();
+    let mv = board.move_from_san("a2a4").unwrap();
     board.do_move(mv);
     let bit_board = BitBoard::all_from_board(&board);
     assert_eq!(bit_board.file(0), 0b1100_1001);

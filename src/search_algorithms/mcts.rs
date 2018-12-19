@@ -34,7 +34,7 @@ pub fn play_human<B: fmt::Debug + UciBoard + PartialEq + Clone>(mut board: B) {
             while input.ends_with('\n') {
                 input.pop();
             }
-            if let Ok(human_move) = board.from_alg(&input) {
+            if let Ok(human_move) = board.move_from_san(&input) {
                 let mut moves = vec![];
                 board.generate_moves(&mut moves);
                 if moves.contains(&human_move) {

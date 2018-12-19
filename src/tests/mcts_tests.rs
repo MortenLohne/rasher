@@ -57,7 +57,7 @@ fn block_pawn() {
 #[test]
 fn capture_to_promote() {
     let board5 = ChessBoard::from_fen("q6k/1P6/8/8/8/8/8/K7 w - - 0 1").unwrap();
-    let best_move5 = board5.from_alg("b7a8Q").unwrap();
+    let best_move5 = board5.move_from_san("b7a8Q").unwrap();
     basic_tactics_prop(&board5, best_move5);
 }
 

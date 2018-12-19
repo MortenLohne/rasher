@@ -633,7 +633,7 @@ impl UciBoard for SjadamBoard {
         self.to_chess_board().to_fen()
     }
 
-    fn from_alg(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
         if input.len() < 4 {
             return Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,

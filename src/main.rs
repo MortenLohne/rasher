@@ -179,7 +179,7 @@ fn play_game<B> (mut board : B)
             
             let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
             println!("Found move {} with score {}.", move_str, score.uci_string(board.side_to_move()));
-            let mv = board.from_alg(&move_str).unwrap();
+            let mv = board.move_from_san(&move_str).unwrap();
             board.do_move(mv);
             play_game(board);
         }
@@ -210,7 +210,7 @@ fn play_human<B>(mut board : B)
                     input_str.clear();
                     reader.read_line(&mut input_str).expect("Failed to read line");
                     
-                    match board.from_alg(input_str.trim()) {
+                    match board.move_from_san(input_str.trim()) {
                         Ok(val) => {
                             if legal_moves.contains(&val) { break; }
                             println!("Move {:?} is illegal! Legal moves: {:?}", val, legal_moves);
@@ -222,7 +222,7 @@ fn play_human<B>(mut board : B)
                         },
                     }
                 }
-                let c_move = board.from_alg(input_str.trim()).unwrap();
+                let c_move = board.move_from_san(input_str.trim()).unwrap();
                 board.do_move(c_move);
                 play_human(board);
             }
@@ -233,7 +233,7 @@ fn play_human<B>(mut board : B)
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 
                 let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-                let best_move = board.from_alg(&move_str);
+                let best_move = board.move_from_san(&move_str);
                 println!("Computer played {:?} with score {}",
                          best_move, score.uci_string(board.side_to_move()));
                 board.do_move(best_move.unwrap());
