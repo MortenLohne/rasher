@@ -48,6 +48,6 @@ pub trait UciBoard: Sized + board::Board {
     fn from_fen(fen: &str) -> Result<Self, Error>;
     fn to_fen(&self) -> String;
 
-    fn move_from_san(&self, input: &str) -> Result<Self::Move, Error>; // Rename move_from_lan
-    fn to_alg(&self, mv: &Self::Move) -> String; // lan_move_string
+    fn move_from_san(&self, input: &str) -> Result<Self::Move, Error>;
+    fn move_to_san(&self, mv: &Self::Move) -> String;
 }

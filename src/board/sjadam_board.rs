@@ -687,7 +687,7 @@ impl UciBoard for SjadamBoard {
                 format!("Couldn't parse move {}", input)))
         }
     }
-    fn to_alg(&self, mv: &Self::Move) -> String {
+    fn move_to_san(&self, mv: &Self::Move) -> String {
         #[cfg(feature = "legacy_sjadam_move_format")]
         {
             let dia_neighbours = |square: i8| [square - 9, square - 7, square + 7, square + 9]

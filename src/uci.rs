@@ -563,7 +563,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             uci_send(&format!(
                 "{} ({}): {}, {} was better. ({} vs {}, delta={})",
                 mv_str, !board.side_to_move(), verdict,
-                board.to_alg(&last_correct_move),
+                board.move_to_san(&last_correct_move),
                 eval.uci_string(board.side_to_move()), last_eval.uci_string(board.side_to_move()),
                 delta_score));
         }

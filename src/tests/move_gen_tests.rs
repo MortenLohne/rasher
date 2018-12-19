@@ -217,7 +217,7 @@ fn move_is_available_prop(board : &mut ChessBoard, c_move : ChessMove) {
     board.generate_moves(&mut all_moves);
     assert!(all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should be legal here, board:{}Legal moves: {:?}",
-            board.to_alg(&c_move), board, all_moves);
+            board.move_to_san(&c_move), board, all_moves);
 }
 
 fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
@@ -225,7 +225,7 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
     board.generate_moves(&mut all_moves);
     assert!(!all_moves.iter().find(|mv|c_move == **mv).is_some(),
             "{} should not be legal here, board:{}Legal moves: {:?}",
-            board.to_alg(&c_move), board, all_moves);
+            board.move_to_san(&c_move), board, all_moves);
 }
 
 #[test]

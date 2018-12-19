@@ -499,7 +499,7 @@ impl UciBoard for ChessBoard {
         string
     }
 
-    fn to_alg(&self, mv: &Self::Move) -> String {
+    fn move_to_san(&self, mv: &Self::Move) -> String {
         let (file_from, rank_from) = mv.from.file_rank();
         let (file_to, rank_to) = mv.to.file_rank();
         let mut s : String = "".to_string();

@@ -35,7 +35,7 @@ pub struct ChessMove {
 
 impl fmt::Display for ChessMove {
     fn fmt(&self, fmt : &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        fmt.write_str(&format!("{}", ChessBoard::start_board().to_alg(self))).unwrap();
+        fmt.write_str(&format!("{}", ChessBoard::start_board().move_to_san(self))).unwrap();
         Ok(())
     }
 }

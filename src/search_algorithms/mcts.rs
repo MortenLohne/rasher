@@ -190,10 +190,10 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         
     {
         let reverse_move = board.do_move(go_move.clone());
-        let mut pv = board.to_alg(go_move);
+        let mut pv = board.move_to_san(go_move);
         pv.push(' ');
         pv.push_str(&node.pv(board).iter()
-                    .map(|mv| board.to_alg(mv))
+                    .map(|mv| board.move_to_san(mv))
                     .collect::<Vec<_>>()
                     .join(" "));
         let score = alpha_beta::Score::Val((node.score().into_inner() as f32 - 0.5) * 20.0);

@@ -27,7 +27,7 @@ fn hash_stays_equal() {
 
         assert_eq!(start_hash, new_hash,
                    "\nHash was not preserved after undoing move {} on \n{:?}",
-                   board.to_alg(&mv), board);
+                   board.move_to_san(&mv), board);
 
     }
 }

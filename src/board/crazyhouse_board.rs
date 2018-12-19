@@ -321,10 +321,10 @@ impl UciBoard for CrazyhouseBoard {
         }
     }
     
-    fn to_alg(&self, mv: &Self::Move) -> String {
+    fn move_to_san(&self, mv: &Self::Move) -> String {
         use board::std_board::PieceType::*;
         match *mv {
-            CrazyhouseMove::NormalMove(mv) => self.base_board.to_alg(&mv),
+            CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_san(&mv),
             CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
                 Knight => "N",
                 Bishop => "B",
