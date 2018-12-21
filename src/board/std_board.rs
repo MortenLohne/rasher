@@ -553,7 +553,7 @@ impl UciBoard for ChessBoard {
                 Some(Queen) => output.push_str("=Q"),
                 Some(Rook) => output.push_str("=R"),
                 Some(Knight) => output.push_str("=N"),
-                Some(Bishop) => output.push_str("=Q"),
+                Some(Bishop) => output.push_str("=B"),
                 None => (),
                 _ => panic!("Illegal promotion move"),
             };
@@ -603,6 +603,15 @@ impl UciBoard for ChessBoard {
             reverse_chars.next();
         }
 
+        let promotion = reverse_chars.peek().cloned().and_then(PieceType::from_letter);
+        if promotion.is_some() {
+            reverse_chars.next();
+            if reverse_chars.next() != Some('=') {
+                return Err(pgn::Error::new(pgn::ErrorKind::ParseError,
+                                           format!("Illegal promotion on {}", input)));
+            }
+        }
+
         let dest_square =
             Square::from_alg(&[reverse_chars.next(), reverse_chars.next()]
                 .iter().rev()
@@ -623,8 +632,8 @@ impl UciBoard for ChessBoard {
             match (disambig_string.chars().count(), disambig_string.chars().next().clone()) {
             (0, None) => Box::new(|mv: &ChessMove| true),
 
-            (1, Some(rank)) if rank >= '0' && rank <= '8' =>
-                Box::new(move |mv: &ChessMove| mv.from.rank() == (rank as u8 - '1' as u8)),
+            (1, Some(rank)) if rank >= '1' && rank <= '8' =>
+                Box::new(move |mv: &ChessMove| mv.from.rank() == 7 - (rank as u8 - '1' as u8)),
 
             (1, Some(file)) if file >= 'a' && file <= 'h' =>
                 Box::new(move |mv: &ChessMove| mv.from.file() == (file as u8 - 'a' as u8)),
@@ -640,7 +649,9 @@ impl UciBoard for ChessBoard {
         self.generate_moves(&mut moves);
         let filtered_moves = moves.iter()
             .filter(|mv|
-                mv.to == dest_square && self.piece_at(mv.from).piece_type() == piece_type)
+                mv.to == dest_square
+                    && self.piece_at(mv.from).piece_type() == piece_type
+                    && mv.prom == promotion)
             .filter(|mv| move_filter(mv))
             .collect::<Vec<_>>();
 
@@ -649,8 +660,9 @@ impl UciBoard for ChessBoard {
         }
         else if filtered_moves.len() == 0 {
             Err(pgn::Error::new(pgn::ErrorKind::IllegalMove,
-                                format!("{} {} {} {:?} {:?} is not a legal move in the position", input, piece_type, dest_square, moves.iter().filter(|mv| move_filter(mv)).collect::<Vec<_>>(), moves.iter().filter(|mv|
-                mv.to == dest_square && self.piece_at(mv.from).piece_type() == piece_type).collect::<Vec<_>>())))
+                                format!("{} ({} to {}) {:?} {:?} is not a legal move in the position",
+                                        input, piece_type, dest_square, moves.iter().filter(|mv| move_filter(mv)).collect::<Vec<_>>(),
+                                        moves.iter().filter(|mv| mv.to == dest_square && self.piece_at(mv.from).piece_type() == piece_type).collect::<Vec<_>>())))
         }
         else {
             Ok(filtered_moves[0].clone())

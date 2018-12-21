@@ -72,12 +72,18 @@ fn test_san_with_random_game<B: UciBoard> (mut board: B) {
     loop {
         board.generate_moves(&mut moves);
         for ref mv in moves.iter() {
-            assert_eq!(board.mv_from_san(&board.move_to_san(mv)).unwrap(), **mv);
+            assert_eq!(board.mv_from_san(&board.move_to_san(mv)).unwrap(), **mv, "{}", board.move_to_san(mv));
             assert_eq!(board.move_from_lan(&board.move_to_lan(mv)).unwrap(), **mv);
         }
 
         let movecount = moves.len();
-        let mv = moves.remove(rng.gen_range(0, movecount - 1));
+        let mv = if movecount == 1 {
+            moves.remove(0)
+        }
+        else {
+            moves.remove(rng.gen_range(0, movecount - 1))
+        };
+
         board.do_move(mv);
         if board.game_result().is_some() {
             break;
