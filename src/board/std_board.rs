@@ -624,13 +624,14 @@ impl UciBoard for ChessBoard {
             reverse_chars.next();
         }
 
-        let disambig_string = reverse_chars
+        let mut disambig_string = reverse_chars
             .take_while(|&ch| PieceType::from_letter(ch).is_none())
             .collect::<String>();
+        disambig_string = disambig_string.chars().rev().collect();
 
         let move_filter : Box<Fn(&ChessMove) -> bool> =
             match (disambig_string.chars().count(), disambig_string.chars().next().clone()) {
-            (0, None) => Box::new(|mv: &ChessMove| true),
+            (0, None) => Box::new(|_| true),
 
             (1, Some(rank)) if rank >= '1' && rank <= '8' =>
                 Box::new(move |mv: &ChessMove| mv.from.rank() == 7 - (rank as u8 - '1' as u8)),

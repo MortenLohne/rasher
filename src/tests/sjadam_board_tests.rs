@@ -1,6 +1,7 @@
 use board::sjadam_board::SjadamBoard;
 use search_algorithms::board::{GameResult, Board};
 use pgn::UciBoard;
+use tests::board_tests;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
@@ -82,4 +83,11 @@ fn pawn_moves_can_repeat() {
     }
 
     assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
+}
+
+#[test]
+fn san_lan_test() {
+    for _ in 0..10 {
+        board_tests::test_san_lan_with_random_game(SjadamBoard::start_board());
+    }
 }
