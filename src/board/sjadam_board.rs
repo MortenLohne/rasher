@@ -999,7 +999,7 @@ impl Board for SjadamBoard {
             self.disable_castling(color);
         }
 
-        // Remove castling priviledges if anything moves from or to a corner
+        // Remove castling privileges if anything moves from or to a corner
         match mv.from() {
             square if square == Square::A1 =>
                 self.disable_castling_queenside(White),

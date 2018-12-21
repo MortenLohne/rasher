@@ -309,12 +309,16 @@ impl UciBoard for CrazyhouseBoard {
                     pgn::ErrorKind::ParseError,
                     format!("Couldn't parse move {}.", input))),
             };
-            let square_str : String = input.chars().skip_while(|&c| c != '@').collect();
+            let square_str : String = input.chars()
+                .skip_while(|&c| c != '@')
+                .skip(1)
+                .collect();
             let square = Square::from_alg(&square_str).map_err(|err|
                 pgn::Error::new(
                     pgn::ErrorKind::ParseError,
                     format!("Invalid destination square for move {}\n\t{}", input, err)));
-            square.map(|sq| CrazyhouseMove::CrazyMove(piece_type, sq, 0))
+            square.map(|sq|
+                CrazyhouseMove::CrazyMove(piece_type, sq, self.base_board.castling_en_passant))
         }
         else {
             self.base_board.move_from_lan(input).map(CrazyhouseMove::NormalMove)
@@ -339,10 +343,18 @@ impl UciBoard for CrazyhouseBoard {
     }
 
     fn move_to_san(&self, mv: &<Self as Board>::Move) -> String {
-        unimplemented!()
+        match *mv {
+            CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_san(&mv),
+            CrazyhouseMove::CrazyMove(_, _, _) => self.move_to_lan(mv),
+        }
     }
 
     fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
-        unimplemented!()
+        if input.contains('@') {
+            self.move_from_lan(input)
+        }
+        else {
+            self.base_board.mv_from_san(input).map(CrazyhouseMove::NormalMove)
+        }
     }
 }
