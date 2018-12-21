@@ -52,7 +52,7 @@ impl PieceType {
         }
     }
     pub fn from_letter(ch: char) -> Option<Self> {
-        match ch.to_ascii_uppercase() {
+        match ch {
             ' ' => Some(Empty),
             'P' => Some(Pawn),
             'N' => Some(Knight),
@@ -122,7 +122,7 @@ impl fmt::Display for Piece {
 
 impl Piece {
     pub fn from_letter(ch: char) -> Option<Self> {
-        match (PieceType::from_letter(ch), ch.is_lowercase()) {
+        match (PieceType::from_letter(ch.to_ascii_uppercase()), ch.is_lowercase()) {
             (Some(Empty), _) => Some(Piece::Empty),
             (Some(piece_type), true) => Some(Self::new(piece_type, Black)),
             (Some(piece_type), false) => Some(Self::new(piece_type, White)),
@@ -520,7 +520,7 @@ impl UciBoard for ChessBoard {
             self.generate_moves(&mut moves);
 
             let alternative_from_squares = moves.iter()
-                .filter(|&cand_mv| cand_mv.from != cand_mv.from)
+                .filter(|&cand_mv| cand_mv.from != mv.from)
                 .filter(|&cand_mv|
                     cand_mv.to == mv.to && self.piece_at(cand_mv.from) == self.piece_at(mv.from))
                 .map(|cand_mv| cand_mv.from)
@@ -570,11 +570,91 @@ impl UciBoard for ChessBoard {
         }
 
         return output;
-
     }
 
     fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
-        unimplemented!()
+
+        if input == "0-0-0" || input == "0-0-0+" || input == "0-0-0#" {
+            match self.side_to_move() {
+                White => return self.move_from_lan("e1c1"),
+                Black => return self.move_from_lan("e8c8"),
+            }
+        }
+
+            else if input == "0-0" || input == "0-0+" || input == "0-0#" {
+                match self.side_to_move() {
+                    White => return self.move_from_lan("e1g1"),
+                    Black => return self.move_from_lan("e8g8"),
+                }
+            }
+
+        if input.chars().count() < 2 {
+            return Err(pgn::Error::new(pgn::ErrorKind::ParseError,
+                                       format!("Invalid move {}: Too short at length {:?}",
+                                               input, input.chars().count())));
+        }
+
+        let piece_type = PieceType::from_letter(input.chars().next().unwrap())
+            .unwrap_or(PieceType::Pawn);
+
+        let mut reverse_chars = input.chars().rev().peekable();
+
+        if reverse_chars.peek() == Some(&'+') || reverse_chars.peek() == Some(&'#') {
+            reverse_chars.next();
+        }
+
+        let dest_square =
+            Square::from_alg(&[reverse_chars.next(), reverse_chars.next()]
+                .iter().rev()
+                .filter_map(|&ch| ch)
+                .collect::<String>())
+                .map_err(|err| pgn::Error::new(pgn::ErrorKind::ParseError,
+                format!("Illegal move {}\n\t{}", input, err)))?;
+
+        if reverse_chars.peek() == Some(&'x') {
+            reverse_chars.next();
+        }
+
+        let disambig_string = reverse_chars
+            .take_while(|&ch| PieceType::from_letter(ch).is_none())
+            .collect::<String>();
+
+        let move_filter : Box<Fn(&ChessMove) -> bool> =
+            match (disambig_string.chars().count(), disambig_string.chars().next().clone()) {
+            (0, None) => Box::new(|mv: &ChessMove| true),
+
+            (1, Some(rank)) if rank >= '0' && rank <= '8' =>
+                Box::new(move |mv: &ChessMove| mv.from.rank() == (rank as u8 - '1' as u8)),
+
+            (1, Some(file)) if file >= 'a' && file <= 'h' =>
+                Box::new(move |mv: &ChessMove| mv.from.file() == (file as u8 - 'a' as u8)),
+
+            (2, _) if Square::from_alg(&disambig_string).is_ok() =>
+                Box::new(move |mv: &ChessMove| mv.from == Square::from_alg(&disambig_string).unwrap()),
+
+            _ => return Err(pgn::Error::new(pgn::ErrorKind::ParseError,
+                                        format!("Invalid move disambiguation in {}", input))),
+        };
+
+        let mut moves = vec![];
+        self.generate_moves(&mut moves);
+        let filtered_moves = moves.iter()
+            .filter(|mv|
+                mv.to == dest_square && self.piece_at(mv.from).piece_type() == piece_type)
+            .filter(|mv| move_filter(mv))
+            .collect::<Vec<_>>();
+
+        if filtered_moves.len() > 1 {
+            Err(pgn::Error::new(pgn::ErrorKind::AmbiguousMove, format!("{} could be any of {:?}", input, filtered_moves)))
+        }
+        else if filtered_moves.len() == 0 {
+            Err(pgn::Error::new(pgn::ErrorKind::IllegalMove,
+                                format!("{} {} {} {:?} {:?} is not a legal move in the position", input, piece_type, dest_square, moves.iter().filter(|mv| move_filter(mv)).collect::<Vec<_>>(), moves.iter().filter(|mv|
+                mv.to == dest_square && self.piece_at(mv.from).piece_type() == piece_type).collect::<Vec<_>>())))
+        }
+        else {
+            Ok(filtered_moves[0].clone())
+        }
     }
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {
