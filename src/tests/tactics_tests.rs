@@ -10,7 +10,7 @@ use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
 
 use uci;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 use std::sync;
 

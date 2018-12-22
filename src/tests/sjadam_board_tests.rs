@@ -1,6 +1,6 @@
 use board::sjadam_board::SjadamBoard;
 use search_algorithms::board::{GameResult, Board};
-use pgn::UciBoard;
+use pgn::PgnBoard;
 use tests::board_tests;
 
 use std::collections::hash_map::DefaultHasher;

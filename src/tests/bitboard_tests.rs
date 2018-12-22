@@ -7,7 +7,7 @@ use board::std_board::Piece;
 use board::std_board::PieceType::*;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::Board;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 #[test]
 fn rotate() {

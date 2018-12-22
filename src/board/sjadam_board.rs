@@ -12,7 +12,7 @@ use pgn;
 
 use std::ops;
 use std::fmt;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 use rand;
 use rand::Rng;
@@ -621,7 +621,7 @@ impl fmt::Debug for SjadamBoard {
     }
 }
 
-impl UciBoard for SjadamBoard {
+impl PgnBoard for SjadamBoard {
     fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
         ChessBoard::from_fen(fen).map(|b| Self::from_chess_board(&b))
     }

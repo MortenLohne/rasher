@@ -2,7 +2,7 @@ use board::std_board::*;
 use board::std_move::ChessMove;
 use search_algorithms::board::Board;
 
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 use super::super::board::std_move_gen::move_gen;
 

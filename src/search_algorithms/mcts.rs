@@ -1,7 +1,7 @@
 use search_algorithms::board::GameResult;
 use search_algorithms::board::GameResult::*;
 use search_algorithms::board::Board;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 use search_algorithms::board::Color;
 use search_algorithms::alpha_beta;
 use uci::TimeRestriction::*;
@@ -21,7 +21,7 @@ use std::time;
 
 use rayon::prelude::*;
 
-pub fn play_human<B: fmt::Debug + UciBoard + PartialEq + Clone>(mut board: B) {
+pub fn play_human<B: fmt::Debug + PgnBoard + PartialEq + Clone>(mut board: B) {
     let stdin = io::stdin();
     while board.game_result() == None {
         println!("{:?}", board);
@@ -94,7 +94,7 @@ use std::thread;
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + Send + Clone + PartialEq + 'static, <B as Board>::Move: Sync
+    where B: PgnBoard + fmt::Debug + Send + Clone + PartialEq + 'static, <B as Board>::Move: Sync
 {
     let (sender, receiver) = mpsc::channel();
     
@@ -107,7 +107,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
                      channel: mpsc::Sender<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + Send + Clone + PartialEq, <B as Board>::Move: Sync
+    where B: PgnBoard + fmt::Debug + Send + Clone + PartialEq, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
     let start_time = time::Instant::now();
@@ -164,7 +164,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
 fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
                     board: &mut B, start_time: time::Instant,
                     options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo>)
-    where B: UciBoard + fmt::Debug + PartialEq + Clone
+    where B: PgnBoard + fmt::Debug + PartialEq + Clone
 {
     debug_assert_eq!(mc_tree.board, *board);
 

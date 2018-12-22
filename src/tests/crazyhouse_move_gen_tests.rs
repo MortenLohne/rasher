@@ -1,5 +1,5 @@
 use search_algorithms::board::Board;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use std::fmt;

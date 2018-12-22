@@ -21,11 +21,10 @@ pub enum ErrorKind {
     AmbiguousMove,
     IllegalMove,
     IllegalPosition,
-    IOError,
     Other,
 }
 
-/// The error type for operations on UciBoard.
+/// The error type for operations on a `PgnBoard`.
 ///
 /// The error can be created with an arbitrary payload and optionally an underlying source error for error chaining.
 #[derive(Debug)]
@@ -72,7 +71,7 @@ impl fmt::Display for Error {
 /// Trait for text representations of board positions and moves.
 ///
 /// The terminology used in this trait is specific to chess and chess variants, but it can be implemented for any game.
-pub trait UciBoard: Sized + board::Board {
+pub trait PgnBoard: Sized + board::Board {
     /// Constructs a board from [Forsyth–Edwards Notation][1].
     ///
     /// Extensions to this notation exist for all large chess variants

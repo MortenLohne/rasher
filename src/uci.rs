@@ -346,12 +346,12 @@ impl EngineComm {
 
 use std::sync::mpsc;
 use search_algorithms::board::ExtendedBoard;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
                         -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
-    where B: 'static + UciBoard + fmt::Debug + Send + Clone + PartialEq,
+    where B: 'static + PgnBoard + fmt::Debug + Send + Clone + PartialEq,
 <B as board::Board>::Move: Sync
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
@@ -517,7 +517,7 @@ pub fn parse_go (input : &str)
 }
 
 pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
-    where Board: 'static + UciBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
+    where Board: 'static + PgnBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
 <Board as board::Board>::Move: Send + Sync
 {
 
@@ -605,7 +605,7 @@ pub fn get_engine_input(stdin : &mut io::BufRead) -> Result<String, String> {
 /// Turns the whole position string from the GUI (Like "position startpos moves e2e4")
 /// into an internal board representation
 fn parse_position<Board> (input : &str) -> Result<Board, Box<error::Error>>
-    where Board: 'static + UciBoard {
+    where Board: 'static + PgnBoard {
     
     let words : Vec<&str> = input.split_whitespace().collect();
     if words.len() < 2 || words[0] != "position" {

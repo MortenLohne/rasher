@@ -14,7 +14,7 @@ use std::ops;
 
 use search_algorithms::board::GameResult;
 use search_algorithms::board::ExtendedBoard;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use self::Score::*;
@@ -30,7 +30,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
                             -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: UciBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq,
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq,
 <B as Board>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
@@ -42,7 +42,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
-    where B: UciBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
 <B as Board>::Move: Sync
 {
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
@@ -53,7 +53,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         options: uci::EngineOptions,
                         channel: mpsc::Sender<uci::UciInfo>,
                         move_list: &Option<Vec<B::Move>>) 
-    where B: UciBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
 {
     
     let max_depth : u16 = match time_restriction {
@@ -207,7 +207,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                          start_time: time::Instant, move_list: Option<Vec<B::Move>>,
                          table: &mut Table<B::HashBoard, B::Move>)
                           -> Option<(Score, Vec<B::Move>, NodeCount)>
-    where B: UciBoard + ExtendedBoard + fmt::Debug + Hash + Eq
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
 {
     
     fn find_best_move_ab_rec<B> (board: &mut B, depth : u16,
@@ -221,7 +221,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                  killer_moves: &[Option<B::Move>; 2],
                                  table: &mut Table<B::HashBoard, B::Move>)
                                  -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
-        where B: UciBoard + ExtendedBoard + fmt::Debug + Hash + Eq
+        where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
     {
         debug_assert!(alpha <= beta, "alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board);

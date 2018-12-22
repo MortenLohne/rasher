@@ -1,7 +1,7 @@
 use board::std_board::PieceType;
 use board::std_board::Square;
 use board::std_board::ChessBoard;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 use search_algorithms::board::Board;
 use board::std_move::ChessMove;
 use rand::Rng;
@@ -67,7 +67,7 @@ fn san_lan_test() {
     }
 }
 
-pub fn test_san_lan_with_random_game<B: UciBoard> (mut board: B) {
+pub fn test_san_lan_with_random_game<B: PgnBoard> (mut board: B) {
     let mut rng = rand::thread_rng();
     let mut moves = vec![];
     loop {

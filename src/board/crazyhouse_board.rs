@@ -234,7 +234,7 @@ impl ExtendedBoard for CrazyhouseBoard {
 use std::fmt;
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -244,7 +244,7 @@ impl fmt::Debug for CrazyhouseBoard {
     }
 }
 
-impl UciBoard for CrazyhouseBoard {
+impl PgnBoard for CrazyhouseBoard {
     fn from_fen(fen : &str) -> Result<Self, pgn::Error> {
         
         let fen_split : Vec<&str> = fen.split_whitespace().collect();

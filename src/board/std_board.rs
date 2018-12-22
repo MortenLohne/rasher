@@ -7,7 +7,7 @@ use board::std_move::ChessMove;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use pgn;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 use std::ops;
 use std::fmt;
@@ -367,7 +367,7 @@ fn parse_fen_castling_rights(castling_str : &str, board: &mut ChessBoard) -> Res
     Ok(())
 }
 
-impl UciBoard for ChessBoard {
+impl PgnBoard for ChessBoard {
     
     fn from_fen(fen : &str) -> Result<Self, pgn::Error> {
         let fen_split : Vec<&str> = fen.split(' ').collect();

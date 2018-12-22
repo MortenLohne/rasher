@@ -30,7 +30,7 @@ use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::mcts;
 use search_algorithms::board::GameResult;
-use pgn::UciBoard;
+use pgn::PgnBoard;
 
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
@@ -166,7 +166,7 @@ fn main() {
 
 /// Makes the engine play a game against itself
 fn play_game<B> (mut board : B) 
-    where B: UciBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq + Clone,
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq + Clone,
 <B as Board>::Move: Sync + Send {
     println!("Board:\n{:?}", board);
     println!("\n");
@@ -190,7 +190,7 @@ fn play_game<B> (mut board : B)
 }
 /// Play a game against the engine through stdin 
 fn play_human<B>(mut board : B)
-    where B: 'static + UciBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
+    where B: 'static + PgnBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
           <B as Board>::Move: Sync + Send
 {
     match board.game_result() {
