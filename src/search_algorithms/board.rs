@@ -39,7 +39,7 @@ impl fmt::Display for Color {
 impl Color {
     /// Returns the color's discriminant. 0 for white, 1 for black
     /// # Examples
-    /// ```
+    /// ```rust
     /// assert_eq!(Color::White.disc(), 0);
     /// assert_eq!(Color::Black.disc(), 1);
     /// ```
@@ -49,7 +49,7 @@ impl Color {
 
     /// Returns the color's multiplier. -1 for black, 1 for white.
     /// # Examples
-    /// ```
+    /// ```rust
     /// assert_eq!(Color::White.multiplier(), 1);
     /// assert_eq!(Color::Black.multiplier(), -1);
     /// ```

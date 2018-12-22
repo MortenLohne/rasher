@@ -5,6 +5,7 @@ use pgn::UciBoard;
 use search_algorithms::board::Board;
 use board::std_move::ChessMove;
 use rand::Rng;
+use rand;
 
 #[test]
 fn from_alg_test() {
