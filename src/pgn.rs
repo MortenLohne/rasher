@@ -1,4 +1,4 @@
-//! Traits for text representations of boards and moves, which may be used for [Portable game notation][1].
+//! Data types for text representations of board positions and moves, which may be used for [Portable game notation][1].
 //!
 //! The terminology used in this module is specific to chess and chess variants, but it can be implemented for any game.
 //!
@@ -21,6 +21,7 @@ pub enum ErrorKind {
     AmbiguousMove,
     IllegalMove,
     IllegalPosition,
+    IOError,
     Other,
 }
 
@@ -35,11 +36,13 @@ pub struct Error {
 }
 
 impl Error {
+    /// Returns a new error of the specific `ErrorKind` with an arbitrary payload.
     pub fn new<E>(kind: ErrorKind, error: E) -> Error
     where E: Into<Box<dyn error::Error + Send + Sync>> {
         Error { kind, error: error.into(), source: None}
     }
 
+    /// Returns a new error of the specific `ErrorKind` with an arbitrary payload and source error.
     pub fn new_caused_by<E, F>(kind: ErrorKind, error: E, source: F) -> Error
     where E: Into<Box<dyn error::Error + Send + Sync>>,
           F: Into<Box<dyn error::Error + Send + Sync>> {
@@ -66,6 +69,9 @@ impl fmt::Display for Error {
     }
 }
 
+/// Trait for text representations of board positions and moves.
+///
+/// The terminology used in this trait is specific to chess and chess variants, but it can be implemented for any game.
 pub trait UciBoard: Sized + board::Board {
     /// Constructs a board from [Forsyth–Edwards Notation][1].
     ///
@@ -74,7 +80,7 @@ pub trait UciBoard: Sized + board::Board {
     /// [1]: https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
     fn from_fen(fen: &str) -> Result<Self, Error>;
 
-    /// Creates a string representation of the board in [Forsyth–Edwards Notation][1].
+    /// Returns a string representation of the board in [Forsyth–Edwards Notation][1].
     ///
     /// Extensions to this notation exist for all large chess variants.
     ///
@@ -89,7 +95,7 @@ pub trait UciBoard: Sized + board::Board {
     /// [2]: https://en.wikipedia.org/wiki/Portable_Game_Notation
     fn move_from_san(&self, input: &str) -> Result<Self::Move, Error>;
 
-    /// Creates a string representation of the move in [Standard Algebraic Notation][1], specifically the format used in [pgn notation][2].
+    /// Returns a string representation of the move in [Standard Algebraic Notation][1], specifically the format used in [pgn notation][2].
     ///
     /// Extensions to this notation exist for all large chess variants.
     ///
@@ -105,7 +111,7 @@ pub trait UciBoard: Sized + board::Board {
     /// [1]: https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation
     fn move_from_lan(&self, input: &str) -> Result<Self::Move, Error>;
 
-    /// Creates a string representation of the move in an alternative, [long algebraic notation][1].
+    /// Returns a string representation of the move in an alternative, [long algebraic notation][1].
     ///
     /// This is mostly used for chess and chess variations in the uci interface, or for convenient debugging.
     /// Implementations may simply wrap this function around `move_to_san` where appropriate.
