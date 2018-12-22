@@ -667,13 +667,13 @@ impl UciBoard for SjadamBoard {
                 format!("Move \"{}\" was too long to parse", input)))
         }
         let from = Square::from_alg(&input[0..2]).map_err(|err|
-            pgn::Error::new(
+            pgn::Error::new_caused_by(
             pgn::ErrorKind::ParseError,
-            format!("Invalid square in move {}\n\t{}", input, err)))?;
+            format!("Invalid square in move {}", input), err))?;
         let to = Square::from_alg(&input[2..4]).map_err(|err|
-            pgn::Error::new(
+            pgn::Error::new_caused_by(
                 pgn::ErrorKind::ParseError,
-                format!("Invalid square in move {}\n\t{}", input, err)))?;
+                format!("Invalid square in move {}", input), err))?;
         debug_assert!(!self.get_square(from).is_empty(), "Cannot parse move {} on \n{:?}",
                       input, self);
         match input.len() {
@@ -870,8 +870,10 @@ impl UciBoard for SjadamBoard {
                 .iter().rev()
                 .filter_map(|&ch| ch)
                 .collect::<String>())
-                .map_err(|err| pgn::Error::new(pgn::ErrorKind::ParseError,
-                                               format!("Illegal move {}\n\t{}", input, err)))?;
+                .map_err(|err| pgn::Error::new_caused_by(
+                    pgn::ErrorKind::ParseError,
+                    format!("Illegal move {}", input),
+                    err))?;
 
         if reverse_chars.peek() == Some(&'x') {
             reverse_chars.next();

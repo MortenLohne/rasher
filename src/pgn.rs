@@ -26,7 +26,7 @@ pub enum ErrorKind {
 
 /// The error type for operations on UciBoard.
 ///
-/// The error can have
+/// The error can be created with an arbitrary payload and optionally an underlying source error for error chaining.
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -40,8 +40,9 @@ impl Error {
         Error { kind, error: error.into(), source: None}
     }
 
-    pub fn new_caused_by<E>(kind: ErrorKind, error: E, source: E) -> Error
-    where E: Into<Box<dyn error::Error + Send + Sync>> {
+    pub fn new_caused_by<E, F>(kind: ErrorKind, error: E, source: F) -> Error
+    where E: Into<Box<dyn error::Error + Send + Sync>>,
+          F: Into<Box<dyn error::Error + Send + Sync>> {
         Error { kind, error: error.into(), source: Some(source.into())}
     }
 }

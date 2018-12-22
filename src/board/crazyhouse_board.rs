@@ -314,9 +314,9 @@ impl UciBoard for CrazyhouseBoard {
                 .skip(1)
                 .collect();
             let square = Square::from_alg(&square_str).map_err(|err|
-                pgn::Error::new(
+                pgn::Error::new_caused_by(
                     pgn::ErrorKind::ParseError,
-                    format!("Invalid destination square for move {}\n\t{}", input, err)));
+                    format!("Invalid destination square for move {}", input), err));
             square.map(|sq|
                 CrazyhouseMove::CrazyMove(piece_type, sq, self.base_board.castling_en_passant))
         }

@@ -397,9 +397,9 @@ impl UciBoard for ChessBoard {
         // Check en passant field
         if fen_split[3] != "-" {
             let ep_square = Square::from_alg(fen_split[3])
-                .map_err(|err| pgn::Error::new(
+                .map_err(|err| pgn::Error::new_caused_by(
                     pgn::ErrorKind::ParseError,
-                    format!("Invalid en passant square on {}\n\t{}", fen, err))
+                    format!("Invalid en passant square on {}", fen), err)
                 )?;
             board.set_en_passant_square(Some(ep_square));
         }
@@ -617,8 +617,9 @@ impl UciBoard for ChessBoard {
                 .iter().rev()
                 .filter_map(|&ch| ch)
                 .collect::<String>())
-                .map_err(|err| pgn::Error::new(pgn::ErrorKind::ParseError,
-                format!("Illegal move {}\n\t{}", input, err)))?;
+                .map_err(|err|
+                    pgn::Error::new_caused_by(pgn::ErrorKind::ParseError,
+                                              format!("Illegal move {}", input), err))?;
 
         if reverse_chars.peek() == Some(&'x') {
             reverse_chars.next();
