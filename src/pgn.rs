@@ -21,6 +21,7 @@ pub enum ErrorKind {
     AmbiguousMove,
     IllegalMove,
     IllegalPosition,
+    IOError,
     Other,
 }
 
@@ -58,6 +59,7 @@ impl fmt::Display for Error {
             ErrorKind::AmbiguousMove => write!(fmt, "Ambiguous move. "),
             ErrorKind::IllegalMove => write!(fmt, "Illegal move. "),
             ErrorKind::IllegalPosition => write!(fmt, "Illegal position. "),
+            ErrorKind::IOError => write!(fmt, "IO error. "),
             ErrorKind::Other => Ok(()),
         }?;
         write!(fmt, "{}", self.error)?;
