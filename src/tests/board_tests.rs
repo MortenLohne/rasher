@@ -50,11 +50,11 @@ fn from_san_test() {
     for mv in ["e4", "d5", "Nc3", "Nf6", "Bb5", "Nbd7", "Nge2", "dxe4", "0-0"].iter() {
         board.generate_moves(&mut moves);
         for &mv in moves.iter() {
-            assert_eq!(board.mv_from_san(&board.move_to_san(&mv)).unwrap(), mv)
+            assert_eq!(board.move_from_san(&board.move_to_san(&mv)).unwrap(), mv)
         }
         moves.clear();
 
-        let mv = board.mv_from_san(mv).unwrap();
+        let mv = board.move_from_san(mv).unwrap();
         board.do_move(mv);
     };
 }
@@ -72,7 +72,7 @@ pub fn test_san_lan_with_random_game<B: UciBoard> (mut board: B) {
     loop {
         board.generate_moves(&mut moves);
         for ref mv in moves.iter() {
-            assert_eq!(board.mv_from_san(&board.move_to_san(mv)).unwrap(), **mv, "{}", board.move_to_san(mv));
+            assert_eq!(board.move_from_san(&board.move_to_san(mv)).unwrap(), **mv, "{}", board.move_to_san(mv));
         }
 
         let movecount = moves.len();

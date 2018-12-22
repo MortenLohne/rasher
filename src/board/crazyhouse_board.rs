@@ -349,12 +349,12 @@ impl UciBoard for CrazyhouseBoard {
         }
     }
 
-    fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
+    fn move_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
         if input.contains('@') {
             self.move_from_lan(input)
         }
         else {
-            self.base_board.mv_from_san(input).map(CrazyhouseMove::NormalMove)
+            self.base_board.move_from_san(input).map(CrazyhouseMove::NormalMove)
         }
     }
 }

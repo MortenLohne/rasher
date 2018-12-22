@@ -572,7 +572,7 @@ impl UciBoard for ChessBoard {
         return output;
     }
 
-    fn mv_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
+    fn move_from_san(&self, input: &str) -> Result<<Self as Board>::Move, pgn::Error> {
 
         if input == "0-0-0" || input == "0-0-0+" || input == "0-0-0#" {
             match self.side_to_move() {
