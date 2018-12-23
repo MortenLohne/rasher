@@ -28,10 +28,16 @@ fn available_moves_at_start() {
 #[test]
 fn starting_position_perf_test() {
     let mut board = CrazyhouseBoard::start_board().clone();
-    assert_eq!(tools::perft(&mut board, 1), 20);
-    assert_eq!(tools::perft(&mut board, 2), 400);
-    assert_eq!(tools::perft(&mut board, 3), 8_902);
-    assert_eq!(tools::perft(&mut board, 4), 197_281);
+
+    tools::perft_check_answers(&mut board, &[1, 20, 400, 8_902, 197_281, 4_888_832]);
+}
+
+#[ignore]
+#[test]
+fn starting_position_perf_test_long() {
+    let mut board = CrazyhouseBoard::start_board().clone();
+
+    tools::perft_check_answers(&mut board, &[1, 20, 400, 8_902, 197_281, 4_888_832, 120_812_942]);
 }
 
 #[test]
