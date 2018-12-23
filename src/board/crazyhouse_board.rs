@@ -245,6 +245,10 @@ impl fmt::Debug for CrazyhouseBoard {
 }
 
 impl PgnBoard for CrazyhouseBoard {
+
+    /// Constructs a board from a [fen string][1]. Uses Lichess' Crazyhouse fen format.
+    ///
+    /// [1]: https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
     fn from_fen(fen : &str) -> Result<Self, pgn::Error> {
         
         let fen_split : Vec<&str> = fen.split_whitespace().collect();
@@ -290,9 +294,26 @@ impl PgnBoard for CrazyhouseBoard {
         }
         Ok(board)
     }
-        
+
+    /// Returns a [fen string][1] representation of the board. Uses Lichess' Crazyhouse fen format.
+    ///
+    /// [1]: https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
     fn to_fen(&self) -> String {
-        "".to_string() // TODO: write
+        let mut fen = self.base_board.to_fen();
+        let board_end_index = fen.find(' ').unwrap();
+
+        let mut piece_reserve_string = String::new();
+        piece_reserve_string.push('/');
+
+        for &piece_type in self.white_available_pieces.iter() {
+            piece_reserve_string.push(piece_type.letter().to_ascii_uppercase());
+        }
+        for &piece_type in self.black_available_pieces.iter() {
+            piece_reserve_string.push(piece_type.letter().to_ascii_lowercase());
+        }
+
+        fen.insert_str(board_end_index, &piece_reserve_string);
+        fen
     }
 
     fn move_from_lan(&self, input : &str) -> Result<Self::Move, pgn::Error> {

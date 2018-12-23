@@ -394,7 +394,6 @@ impl PartialEq for SjadamBoard {
             && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
             && self.repetitions == other.repetitions
-            && self.last_move == other.last_move
     }
 }
 

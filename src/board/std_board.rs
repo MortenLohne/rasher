@@ -488,8 +488,7 @@ impl PgnBoard for ChessBoard {
         
         match self.en_passant_square() {
             Some(square) => {
-                let (file, _) = square.file_rank();
-                write!(string, " {}", file).unwrap();
+                write!(string, " {}", square).unwrap();
             },
             None => string.push_str(" -"),
         }
