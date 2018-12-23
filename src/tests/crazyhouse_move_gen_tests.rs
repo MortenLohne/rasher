@@ -2,7 +2,7 @@ use search_algorithms::board::Board;
 use pgn::PgnBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
-use std::fmt;
+use tests::tools;
 
 #[test]
 fn available_moves_at_start() {
@@ -28,10 +28,10 @@ fn available_moves_at_start() {
 #[test]
 fn starting_position_perf_test() {
     let mut board = CrazyhouseBoard::start_board().clone();
-    assert_eq!(legal_moves_after_plies(&mut board, 1), 20);
-    assert_eq!(legal_moves_after_plies(&mut board, 2), 400);
-    assert_eq!(legal_moves_after_plies(&mut board, 3), 8_902);
-    assert_eq!(legal_moves_after_plies(&mut board, 4), 197_281);
+    assert_eq!(tools::perft(&mut board, 1), 20);
+    assert_eq!(tools::perft(&mut board, 2), 400);
+    assert_eq!(tools::perft(&mut board, 3), 8_902);
+    assert_eq!(tools::perft(&mut board, 4), 197_281);
 }
 
 #[test]
@@ -48,29 +48,4 @@ fn crazyhouse_moves_test() {
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     assert_eq!(moves.len(), 127);
-}
-
-/// Checks that the engine finds the total number of legal moves after n plies.
-/// This provides a very strong indication that the move generator is correct
-fn legal_moves_after_plies<B>(board : &mut B, n : u8) -> u64
-    where B: Board + fmt::Debug + Clone + PartialEq {
-    if n == 0 { 1 }
-    else {
-        let mut total_moves = 0;
-        let mut moves = vec![];
-        board.generate_moves(&mut moves);
-        for c_move in moves {
-            let old_board = board.clone();
-            {
-                let reverse_move = board.do_move(c_move.clone());
-                total_moves += legal_moves_after_plies(board, n - 1);
-                board.reverse_move(reverse_move);
-            }
-
-            assert_eq!(&old_board, board,
-                             "Board was not the same after undoing move {:?}:\nOld:{:?}New:{:?}",
-                             c_move, old_board, board);
-        }
-        total_moves
-    }
 }

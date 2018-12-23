@@ -4,8 +4,7 @@ use board::std_board::ChessBoard;
 use pgn::PgnBoard;
 use search_algorithms::board::Board;
 use board::std_move::ChessMove;
-use rand::Rng;
-use rand;
+use tests::tools;
 
 #[test]
 fn from_alg_test() {
@@ -63,31 +62,6 @@ fn from_san_test() {
 #[test]
 fn san_lan_test() {
     for _ in 0..10 {
-        test_san_lan_with_random_game(ChessBoard::start_board());
-    }
-}
-
-pub fn test_san_lan_with_random_game<B: PgnBoard> (mut board: B) {
-    let mut rng = rand::thread_rng();
-    let mut moves = vec![];
-    loop {
-        board.generate_moves(&mut moves);
-        for ref mv in moves.iter() {
-            assert_eq!(board.move_from_san(&board.move_to_san(mv)).unwrap(), **mv, "{}", board.move_to_san(mv));
-        }
-
-        let movecount = moves.len();
-        let mv = if movecount == 1 {
-            moves.remove(0)
-        }
-        else {
-            moves.remove(rng.gen_range(0, movecount - 1))
-        };
-
-        board.do_move(mv);
-        if board.game_result().is_some() {
-            break;
-        }
-        moves.clear();
+        tools::test_san_lan_with_random_game(ChessBoard::start_board());
     }
 }

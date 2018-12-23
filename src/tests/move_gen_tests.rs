@@ -10,6 +10,7 @@ use board::std_board::PieceType::*;
 use search_algorithms::board::Color::{Black, White};
 
 use tests::tactics_tests::basic_tactics_prop;
+use tests::tools;
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
 /// Also assumes that std_board::START_BOARD is correct
@@ -230,191 +231,120 @@ fn move_is_unavailable_prop(board : &mut ChessBoard, c_move : ChessMove) {
 
 #[test]
 fn starting_position_perf_test() {
-    let mut board1 = ChessBoard::start_board().clone();
-    assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
-    assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
-    assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
-    assert_eq!(legal_moves_after_plies(&mut board1, 4), 197_281);
+    let mut board = ChessBoard::start_board().clone();
+    tools::perft_check_answers(&mut board,
+                               &[1, 20, 400, 8_902, 197_281]);
 }
 
 #[test]
 #[ignore]
 fn starting_position_perf_test_long() {
-    let mut board1 =  ChessBoard::start_board().clone();
-    assert_eq!(legal_moves_after_plies(&mut board1, 1), 20);
-    assert_eq!(legal_moves_after_plies(&mut board1, 2), 400);
-    assert_eq!(legal_moves_after_plies(&mut board1, 3), 8_902);
-    assert_eq!(legal_moves_after_plies(&mut board1, 4), 197_281);
-    assert_eq!(legal_moves_after_plies(&mut board1, 5), 4_865_617);
-    assert_eq!(legal_moves_after_plies(&mut board1, 6), 119_060_679);
-    assert_eq!(legal_moves_after_plies(&mut board1, 7), 3_195_913_043); //~10 min
-    //assert_eq!(legal_moves_after_plies(&mut board, 8), 84_998_978_956);
+    let mut board =  ChessBoard::start_board().clone();
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 20, 400, 8_902, 197_281, 4_865_609, 119_060_324, 3_195_901_860]);
 }
 
 #[test]
 fn correct_move_gen_test1() {
     let mut board = ChessBoard::from_fen(
         "rnbqkbnr/pp2pppp/8/2pp4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 1").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board, 1), 30);
-    assert_eq!(legal_moves_after_plies(&mut board, 2), 895);
+
+    assert_eq!(tools::perft(&mut board, 1), 30);
+    assert_eq!(tools::perft(&mut board, 2), 895);
 }
 
 #[test]
 fn correct_move_gen_test2() {
-    let mut board2 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    let mut moves = vec![];
-    board2.generate_moves(&mut moves);
-    assert_eq!(legal_moves_after_plies(&mut board2, 1), 48,
-    "Expected 48 legal moves on:\n{}\nGot: {:?}", board2, moves);
-    
-    let mut temp_board = board2.clone();
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 48, 2_039, 97_862]);
+
     let mv = ChessMove::new(Square(48), Square(32));
-    temp_board.do_move(mv);
-    assert!(temp_board.en_passant_square().unwrap() == Square(40),
-            "Error: En passant square was: {:?}", temp_board.en_passant_square());
-    
-    assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
-    assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
+    board.do_move(mv);
+    assert_eq!(board.en_passant_square().unwrap(), Square(40),
+            "Error: En passant square was: {:?}", board.en_passant_square());
 }
 
 #[test]
 #[ignore]
 fn correct_move_gen_test2_long() {
-    let mut board2 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board2, 1), 48);
-    assert_eq!(legal_moves_after_plies(&mut board2, 2), 2_039);
-    assert_eq!(legal_moves_after_plies(&mut board2, 3), 97_862);
-    assert_eq!(legal_moves_after_plies(&mut board2, 4), 4_085_604);
-    assert_eq!(legal_moves_after_plies(&mut board2, 5), 193_690_734);
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 48, 2_039, 97_862, 4_085_603, 193_690_690]);
 }
 
 #[test]
 fn correct_move_gen_test3() {
-    let mut board3 = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board3, 1), 14);
-    assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
-    assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
-    assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
+    let mut board = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 14, 191, 2_812, 43_238, 674_624]);
 }
 
 #[test]
 #[ignore]
 fn correct_move_gen_test3_long() {
-    let mut board3 = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board3, 1), 14);
-    assert_eq!(legal_moves_after_plies(&mut board3, 2), 191);
-    assert_eq!(legal_moves_after_plies(&mut board3, 3), 2_812);
-    assert_eq!(legal_moves_after_plies(&mut board3, 4), 43_238);
-    assert_eq!(legal_moves_after_plies(&mut board3, 5), 674_641);
-    assert_eq!(legal_moves_after_plies(&mut board3, 6), 11_030_100);
-    assert_eq!(legal_moves_after_plies(&mut board3, 7), 178_636_411);
+    let mut board = ChessBoard::from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1").unwrap();
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 14, 191, 2_812, 43_238, 674_624, 11_030_083, 178_633_661]);
 }
 
 #[test]
 fn correct_move_gen_test4() {
-    let mut board4 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
-    for (depth, nodes) in (1..6).zip(
-        [6, 264, 9_467, 422_355].iter()) 
-    {
-        assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
-    }
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 6, 264, 9_467, 422_333]);
 }
 
 #[test]
 #[ignore]
 fn correct_move_gen_test4_long() {
-    let mut board4 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1").unwrap();
-    for (depth, nodes) in (1..7).zip(
-        [6, 264, 9_467, 422_355, 15_833_319, 706_095_622].iter()) 
-    {
-        assert_eq!(legal_moves_after_plies(&mut board4, depth), *nodes);
-    }
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 6, 264, 9_467, 422_333, 15_833_292, 706_045_033]);
 }
 
 #[test]
 fn correct_move_gen_test5() {
-    let mut board5 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq - 1 8").unwrap();
-    for (depth, nodes) in (1..).zip([42, 1352, 53_392].iter()) 
-    {
-        assert_eq!(legal_moves_after_plies(&mut board5, depth), *nodes);
-    }
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 42, 1352, 53_392]);
 }
 
 #[test]
 fn correct_move_gen_test6() {
-    let mut board6 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
-    for (depth, nodes) in (1..5).zip(
-        [46, 2_079, 89_890].iter()) {
-        assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
-    }
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 46, 2_079, 89_890]);
 }
 
 #[test]
 #[ignore]
 fn correct_move_gen_test6_long() {
-    let mut board6 = ChessBoard::from_fen(
+    let mut board = ChessBoard::from_fen(
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10").unwrap();
-    for (depth, nodes) in (1..7).zip(
-        [46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_365].iter()) {
-        assert_eq!(legal_moves_after_plies(&mut board6, depth), *nodes);
-    }
+
+    tools::perft_check_answers(&mut board,
+                               &[1, 46, 2_079, 89_890, 3_894_594, 164_075_551, 6_923_051_137]);
 }
 
 #[test]
 fn correct_move_gen_test7() {
     let mut board7 = ChessBoard::from_fen(
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8").unwrap();
-    assert_eq!(legal_moves_after_plies(&mut board7, 3), 62_379);
+    assert_eq!(tools::perft(&mut board7, 3), 62_379);
 }
-
-use std::fmt;
-
-/// Checks that the engine finds the total number of legal moves after n plies.
-/// This provides a very strong indication that the move generator is correct
-pub fn legal_moves_after_plies<B: Board + Eq + fmt::Debug + Clone>(board : &mut B, n : u8) -> u64
-    where <B as Board>::Move: fmt::Display
-{
-    if n == 0 || board.game_result() != None { 1 }
-    else {
-        let mut total_moves = 0;
-        let old_board = board.clone();
-        let mut moves = vec![];
-        board.generate_moves(&mut moves);
-        for c_move in moves {
-            let reverse_move = board.do_move(c_move.clone());
-            total_moves += legal_moves_after_plies(board, n - 1);
-            board.reverse_move(reverse_move);
-            debug_assert_eq!(old_board, *board,
-                             "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
-                             c_move, old_board, board);
-        }
-        total_moves
-    }
-}
-
-#[allow(dead_code)]
-pub fn perf_prop<B: Board + Eq + fmt::Debug + Clone>(board: &mut B, n: u8) -> Vec<(B::Move, u64)>
-    where <B as Board>::Move: fmt::Display
-{
-    let mut results = vec![];
-    let old_board = board.clone();
-    let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    for c_move in moves {
-        let reverse_move = board.do_move(c_move.clone());
-        results.push((c_move.clone(), legal_moves_after_plies(board, n - 1)));
-        board.reverse_move(reverse_move);
-        debug_assert_eq!(old_board, *board,
-                         "Couldn't restore board after {}:\nOld:\n{:?}\nNew:\n{:?}",
-                         c_move, old_board, board);
-    }
-    results
-}
-

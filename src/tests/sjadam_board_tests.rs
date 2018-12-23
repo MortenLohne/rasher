@@ -1,7 +1,7 @@
 use board::sjadam_board::SjadamBoard;
 use search_algorithms::board::{GameResult, Board};
 use pgn::PgnBoard;
-use tests::board_tests;
+use tests::tools;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
@@ -88,6 +88,6 @@ fn pawn_moves_can_repeat() {
 #[test]
 fn san_lan_test() {
     for _ in 0..10 {
-        board_tests::test_san_lan_with_random_game(SjadamBoard::start_board());
+        tools::test_san_lan_with_random_game(SjadamBoard::start_board());
     }
 }
