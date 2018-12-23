@@ -1,9 +1,12 @@
 use search_algorithms::board::Board;
+#[cfg(test)]
 use pgn::PgnBoard;
+#[cfg(test)]
 use rand::Rng;
+#[cfg(test)]
 use std::fmt::Debug;
 
-/// Checks how many moves the move generator finds after after searching `depth` plies deep.
+/// Returns how many moves the move generator finds after after searching `depth` plies deep.
 /// This provides confidence that the move generator is correct
 pub fn perft<B: Board>(board : &mut B, depth : u16) -> u64
 {
@@ -22,7 +25,7 @@ pub fn perft<B: Board>(board : &mut B, depth : u16) -> u64
         }
     }
 }
-
+#[cfg(test)]
 /// Verifies the perft result of a position against a known answer
 pub fn perft_check_answers<B: Board>(board: &mut B, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
@@ -30,6 +33,7 @@ pub fn perft_check_answers<B: Board>(board: &mut B, answers: &[u64]) {
     }
 }
 
+#[cfg(test)]
 pub fn test_san_lan_with_random_game<B: PgnBoard + PartialEq + Debug> (mut board: B) {
     let mut rng = rand::thread_rng();
     let mut moves = vec![];

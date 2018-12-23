@@ -1,7 +1,7 @@
 use board::std_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
-
+use tests::tools;
 use search_algorithms::board;
 use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
@@ -53,6 +53,26 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
             "ucinewgame" => (), // Ignore this for now
             "position" => board_string = input.to_string(),
             "setoption" => parse_setoption(&input, &mut engine_options)?,
+            "perft" => {
+                if let Some(depth) = tokens.get(1)
+                    .and_then(|depth| depth.parse::<u16>().ok()) {
+                    let result = match engine_options.variant {
+                        ChessVariant::Standard => {
+                            let mut board = parse_position::<ChessBoard>(&board_string)?;
+                            tools::perft(&mut board, depth)
+                        }
+                        ChessVariant::Sjadam => {
+                            let mut board = parse_position::<SjadamBoard>(&board_string)?;
+                            tools::perft(&mut board, depth)
+                        }
+                        ChessVariant::Crazyhouse => {
+                            let mut board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                            tools::perft(&mut board, depth)
+                        }
+                    };
+                    println!("{:?}", result);
+                }
+            },
             "eval" => {
                 match engine_options.variant {
                     ChessVariant::Standard => {

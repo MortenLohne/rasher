@@ -34,5 +34,4 @@ mod bitboard_tests;
 #[cfg(test)]
 mod sjadam_board_tests;
 
-#[cfg(test)]
-mod tools;
+pub mod tools;
