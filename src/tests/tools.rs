@@ -6,12 +6,12 @@ use rand::Rng;
 /// This provides confidence that the move generator is correct
 pub fn perft<B: Board>(board : &mut B, depth : u16) -> u64
 {
-    if depth == 0 {1}
-        else if board.game_result() != None { 0 }
-        else {
+    if depth == 0 { 1 }
+    else if board.game_result() != None { 0 } else {
+        let mut moves = Vec::with_capacity(100);
+        board.generate_moves(&mut moves);
+        if depth == 1 { moves.len() as u64 } else {
             let mut total_moves = 0;
-            let mut moves = vec![];
-            board.generate_moves(&mut moves);
             for c_move in moves {
                 let reverse_move = board.do_move(c_move.clone());
                 total_moves += perft(board, depth - 1);
@@ -19,6 +19,7 @@ pub fn perft<B: Board>(board : &mut B, depth : u16) -> u64
             }
             total_moves
         }
+    }
 }
 
 /// Verifies the perft result of a position against a known answer
