@@ -255,86 +255,24 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                node_counter, board.side_to_move())?;
         }
 
-        if let Some(result) = board.game_result() {
-            return Some((Score::from_game_result(result, board.side_to_move()),
-                         None, Vec::new()))
-        }
-
         // Helpful alias
         let color = board.side_to_move();
         let mut best_line = vec![];
 
-        if depth == 0 { // Quiescence search
-
-            // If searching for mate, don't do quiescence search
-            if let Mate(_) = time_restriction {
-                return Some((Val(board.static_eval() * color.multiplier() as f32),
-                             None, vec![]));
-            }
-
-            node_counter.intern += 1;
-
-            let stand_pat = Val(board.static_eval() * color.multiplier() as f32);
-
-            if stand_pat >= beta {
-                return Some((beta, None, vec![]));
-            }
-
-            alpha = alpha.max(stand_pat);
-            let mut node_type = if alpha == Loss(0) && beta == Win(0) {
-                Ordering::Equal // Pv-node
-            }
-            else {
-                Ordering::Less // All-node: True value is < score
-            };
-
-            let mut active_moves = vec![];
-            board.active_moves(&mut active_moves);
-
-            for mv in active_moves {
-                let reverse_move = board.do_move(mv.clone());
-                
-                let (mut score, _, best_moves) = find_best_move_ab_rec(
-                    board, depth, !decrement_score(beta), !decrement_score(alpha),
-                    engine_comm, time_restriction, options,
-                    start_time, node_counter, None, &[None, None], table)?;
-
-                score = !score;
-                board.reverse_move(reverse_move);
-                
-                if score >= beta {
-                    node_type = Ordering::Greater; // Cute-node: True value is >= beta
-                    alpha = score; // TODO: Could be beta as well. Test.
-                    best_line = best_moves;
-                    best_line.push(mv.clone());
-                    break;
-                }
-                if score > alpha {
-                    alpha = score;
-                    best_line = best_moves;
-                    best_line.push(mv.clone());
-                }
-            }
-
-            let killer_move = if node_type == Ordering::Greater {
-                best_line.last().cloned()
-            }
-            else {
-                None
-            };
-
-            let score = increment_score(alpha);
-            
-            table.insert(board.hash_board(), HashEntry {
-                best_reply: best_line.last().cloned(), score: (node_type, score), depth
-            });
-            return Some((score, killer_move, best_line));  
+        if depth == 0 {
+            return qsearch(board, depth, alpha, beta, engine_comm,
+                           time_restriction, options, start_time, node_counter, table)
+                .map(|(a, b)| (a, b, vec![]));
         }
+
         debug_assert!(depth > 0);
+
+        if let Some(result) = board.game_result() {
+            return Some((Score::from_game_result(result, board.side_to_move()),
+                         None, Vec::new()))
+        }
         
         node_counter.intern += 1;
-
-        //let mut best_score = None;
     
         let mut legal_moves = if move_list.is_some() {
             move_list.take().unwrap()
@@ -454,7 +392,86 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         };
         Some((score, killer_move, best_line))
     }
-            
+
+    fn qsearch<B: ExtendedBoard>(board: &mut B, depth: u16, mut alpha: Score, beta: Score,
+                  engine_comm: &Mutex<uci::EngineComm>, time_restriction: uci::TimeRestriction,
+                  options: uci::EngineOptions, start_time: time::Instant, node_counter: &mut NodeCount,
+                  table: &mut Table<<B as ExtendedBoard>::HashBoard, <B as Board>::Move>)
+        -> Option<(Score, Option<B::Move>)> {
+
+        if let Some(result) = board.game_result() {
+            return Some((Score::from_game_result(result, board.side_to_move()),
+                         None))
+        }
+
+        let color = board.side_to_move();
+
+        // If searching for mate, don't do quiescence search
+        if let Mate(_) = time_restriction {
+            return Some((Val(board.static_eval() * color.multiplier() as f32),
+                         None));
+        }
+
+        node_counter.intern += 1;
+
+        let stand_pat = Val(board.static_eval() * color.multiplier() as f32);
+
+        if stand_pat >= beta {
+            return Some((beta, None));
+        }
+
+        alpha = alpha.max(stand_pat);
+        let mut node_type = if alpha == Loss(0) && beta == Win(0) {
+            Ordering::Equal // Pv-node
+        } else {
+            Ordering::Less // All-node: True value is < score
+        };
+
+        let mut active_moves = vec![];
+        board.active_moves(&mut active_moves);
+
+        let mut best_move = None;
+
+        for mv in active_moves {
+            let reverse_move = board.do_move(mv.clone());
+
+            let (mut score, _) = qsearch(
+                board, depth, !decrement_score(beta), !decrement_score(alpha),
+                engine_comm, time_restriction, options, start_time, node_counter,
+                 table)?;
+
+            score = !score;
+            board.reverse_move(reverse_move);
+
+            if score >= beta {
+                node_type = Ordering::Greater; // Cute-node: True value is >= beta
+                alpha = score; // TODO: Could be beta as well. Test.
+                best_move = Some(mv.clone());
+                break;
+            }
+            if score > alpha {
+                alpha = score;
+                best_move = Some(mv.clone());
+            }
+        }
+
+        let killer_move = if node_type == Ordering::Greater {
+            best_move.clone()
+        } else {
+            None
+        };
+
+        let score = increment_score(alpha);
+
+        table.insert(board.hash_board(), HashEntry {
+            best_reply: best_move,
+            score: (node_type, score),
+            depth
+        });
+        return Some((score, killer_move));
+
+    }
+
     let mut node_counter = NodeCount::new();
     if let Some((score, _, mut moves)) =
         find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
