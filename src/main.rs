@@ -251,20 +251,34 @@ fn play_human<B>(mut board : B)
 pub struct NodeCount {
     intern: u64,
     leaf: u64,
+    qsearch: u64,
+    hash_full_hits: u64, // TT hit causes a cutoff
+    hash_partial_hits: u64, // TT hit, hash move is used, but no cutoff
+    hash_misses: u64, // No TT hit
+    hash_move_cutoffs: u64, // Hash move causes a cutoff before other moves are tried
 }
 
 impl NodeCount {
     fn new() -> Self {
-        NodeCount { intern: 0, leaf: 0 }
+        NodeCount { intern: 0, leaf: 0, qsearch: 0, hash_full_hits: 0,
+            hash_partial_hits: 0, hash_misses: 0, hash_move_cutoffs: 0 }
     }
     fn total(&self) -> u64 {
-        self.intern + self.leaf
+        self.intern + self.leaf + self.qsearch
     }
 }
 
 impl std::ops::Add for NodeCount {
     type Output = NodeCount;
     fn add(self, other: NodeCount) -> Self {
-        NodeCount { intern: self.intern + other.intern, leaf: self.leaf + other.leaf }
+        NodeCount {
+            intern: self.intern + other.intern, leaf: self.leaf + other.leaf,
+            qsearch: self.qsearch + other.qsearch,
+            hash_full_hits: self.hash_full_hits + other.hash_full_hits,
+            hash_partial_hits: self.hash_partial_hits + other.hash_partial_hits,
+            hash_misses: self.hash_misses + other.hash_misses,
+            hash_move_cutoffs: self.hash_move_cutoffs + other.hash_move_cutoffs
+
+        }
     }
 }

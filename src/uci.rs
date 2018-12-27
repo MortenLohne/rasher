@@ -29,6 +29,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
     uci_send("option name Hash type spin default 256 min 0 max 32768");
     uci_send("option name Threads type spin default 1 min 1 max 128");
     uci_send("option name MultiPV type spin default 1 min 1 max 128");
+    uci_send("option name DebugInfo type check default false");
     uci_send("option name UCI_Variant type combo default Chess var Chess var Sjadam var Crazyhouse");
     
     uci_send("uciok");
@@ -392,12 +393,13 @@ pub struct EngineOptions {
     pub hash_memory: u32, // In megabytes
     pub multipv: u32,
     pub null_move_pruning: bool,
+    pub debug_info: bool,
 }
 
 impl EngineOptions {
     pub fn new() -> EngineOptions {
         EngineOptions { variant: ChessVariant::Standard, threads: 1,
-                        hash_memory: 256, multipv: 1, null_move_pruning: true }
+            hash_memory: 256, multipv: 1, null_move_pruning: true, debug_info: false}
     }
 }
 
@@ -407,12 +409,19 @@ fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), Stri
     let (option_name, value) = try!(parse_setoption_data(input));
 
     match &option_name.to_lowercase()[..] {
-        "variant" | "uci_variant" => match &value.to_lowercase()[..] {
+        "variant" | "uci_variant" => match value.to_lowercase().as_str() {
             "standard" => options.variant = ChessVariant::Standard,
             "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
             "sjadam" => options.variant = ChessVariant::Sjadam,
             _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
         },
+
+        "debuginfo" => match value.to_lowercase().as_str() {
+            "true" => options.debug_info = true,
+            "false" => options.debug_info = false,
+            _ => return Err(format!("Invalid DebugInfo value {}", value)),
+        }
+
         "uci_standard" => options.variant = ChessVariant::Standard,
         
         "uci_crazyhouse" => options.variant = ChessVariant::Crazyhouse,
