@@ -110,6 +110,7 @@ fn startpos_perf_test_long() {
     let mut board = SjadamBoard::start_board();
     assert_eq!(tools::perft(&mut board, 4), 498_450_154);
     assert_eq!(tools::perft(&mut board, 5), 77_726_188_083);
+    assert_eq!(tools::perft(&mut board, 6), 12_161_357_522_619);
 }
 
 #[test]
