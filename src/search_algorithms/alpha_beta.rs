@@ -456,18 +456,13 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         }
 
         let killer_move = if node_type == Ordering::Greater {
-            best_move.clone()
+            best_move
         } else {
             None
         };
 
         let score = increment_score(alpha);
 
-        table.insert(board.hash_board(), HashEntry {
-            best_reply: best_move,
-            score: (node_type, score),
-            depth
-        });
         return Some((score, killer_move));
 
     }
