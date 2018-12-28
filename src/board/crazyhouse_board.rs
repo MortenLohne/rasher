@@ -222,6 +222,7 @@ impl EvalBoard for CrazyhouseBoard {
 }
 
 impl ExtendedBoard for CrazyhouseBoard {
+    type ReverseNullMove = ChessReverseNullMove;
     type HashBoard = Self;
 
     fn hash_board(&self) -> Self {
@@ -229,12 +230,25 @@ impl ExtendedBoard for CrazyhouseBoard {
     }
 
     fn active_moves(&self, _: &mut Vec<<Self as Board>::Move>) {}
+
+    fn null_move_is_available(&self) -> bool {
+        self.base_board.null_move_is_available()
+    }
+
+    fn do_null_move(&mut self) -> Self::ReverseNullMove {
+        self.base_board.do_null_move()
+    }
+
+    fn reverse_null_move(&mut self, reverse_move: Self::ReverseNullMove) {
+        self.base_board.reverse_null_move(reverse_move)
+    }
 }
 
 use std::fmt;
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
 use pgn::PgnBoard;
+use board::std_move::ChessReverseNullMove;
 
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

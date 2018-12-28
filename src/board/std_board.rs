@@ -16,6 +16,7 @@ use std::mem;
 use std::hash::{Hash, Hasher};
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
+use board::std_move::ChessReverseNullMove;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
 pub enum PieceType {
@@ -1040,6 +1041,7 @@ impl EvalBoard for ChessBoard {
 }
 
 impl ExtendedBoard for ChessBoard {
+    type ReverseNullMove = ChessReverseNullMove;
     type HashBoard = Self;
 
     fn hash_board(&self) -> Self {
@@ -1072,6 +1074,25 @@ impl ExtendedBoard for ChessBoard {
     fn active_moves(&self, moves: &mut Vec<Self::Move>) {
         let (mut active_moves, _) = move_gen::all_legal_moves(self);
         moves.append(&mut active_moves);
+    }
+
+    fn null_move_is_available(&self) -> bool {
+        move_gen::is_attacked(self, self.king_pos(!self.to_move))
+    }
+
+    fn do_null_move(&mut self) -> Self::ReverseNullMove {
+        let reverse_move = ChessReverseNullMove {
+            old_castling_en_passant: self.castling_en_passant,
+        };
+        self.set_en_passant_square(None);
+        self.to_move = !self.to_move;
+
+        reverse_move
+    }
+
+    fn reverse_null_move(&mut self, mv: <Self as ExtendedBoard>::ReverseNullMove) {
+        self.castling_en_passant = mv.old_castling_en_passant;
+        self.to_move = !self.to_move;
     }
 }
 

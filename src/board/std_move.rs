@@ -26,7 +26,7 @@ impl ChessReverseMove {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ChessMove {
     pub from : Square,
     pub to : Square,
@@ -54,4 +54,9 @@ impl ChessMove {
     pub fn new_prom(from : Square, to : Square, prom : PieceType) -> ChessMove {
         ChessMove { from: from, to: to, prom: Some(prom) }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ChessReverseNullMove {
+    pub old_castling_en_passant : u8,
 }

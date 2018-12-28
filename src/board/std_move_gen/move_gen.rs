@@ -406,30 +406,32 @@ pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : 
 /// Returns whether a square is under attack by the side not to move
 #[inline(never)]
 pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
+
+    let color = board.to_move;
     
     // Direction enemy pawns are coming from
-    let pawn_direction : i8 = if board.to_move == White { -1 } else { 1 };
+    let pawn_direction : i8 = if color == White { -1 } else { 1 };
     let file = square.file() as i8;
     let rank = square.rank() as i8;
     
-    if file > 0 && ((board.side_to_move() == White && rank > 1) || (board.side_to_move() == Black && rank < 6))
+    if file > 0 && ((color == White && rank > 1) || (color == Black && rank < 6))
     {
         let pawn_square = Square::from_ints(file as u8 - 1, (rank as i8 + pawn_direction) as u8);
 
         if board[pawn_square].piece_type() == Pawn
-            && board[pawn_square].color().unwrap() != board.to_move
+            && board[pawn_square].color().unwrap() != color
         {
             return true;
         }
     }
     
-    if file < 7 && ((board.side_to_move() == White && rank > 1) || (board.side_to_move() == Black && rank < 6))
+    if file < 7 && ((color == White && rank > 1) || (color == Black && rank < 6))
     {
         
         let pawn_square = Square::from_ints(file as u8 + 1, (rank as i8 + pawn_direction) as u8);
 
         if board[pawn_square].piece_type() == Pawn
-            && board[pawn_square].color().unwrap() != board.to_move
+            && board[pawn_square].color().unwrap() != color
         {
             return true;
         }
@@ -455,7 +457,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
         let new_pos = Square(((rank + j) * 8 + file + i) as u8);
 
         if board[new_pos].piece_type() == Knight
-            && board[new_pos].color().unwrap() != board.to_move {
+            && board[new_pos].color().unwrap() != color {
                 return true;
             }
     }
@@ -469,7 +471,7 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 
             // Check that there is no enemy king around
             if board[new_pos].piece_type() == King
-                && board[new_pos].color().unwrap() != board.to_move
+                && board[new_pos].color().unwrap() != color
                 {
                     return true;
                 }

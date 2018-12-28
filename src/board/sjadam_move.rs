@@ -35,7 +35,7 @@ impl SjadamReverseMove {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub struct SjadamMove {
     from: Square,
     to: Square,
@@ -87,4 +87,11 @@ impl fmt::Display for SjadamMove {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(self, f)
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct SjadamReverseNullMove {
+    pub old_last_move: Option<SjadamMove>,
+    pub old_castling_en_passant: u8,
+    pub old_hash: u64,
 }

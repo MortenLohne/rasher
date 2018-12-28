@@ -120,7 +120,10 @@ pub trait EvalBoard : Board + PartialEq + Clone {
 /// An extended game representation, which includes many additional methods to help game-playing algorithms search more effectively.
 pub trait ExtendedBoard : EvalBoard {
 
-    // A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
+    /// The type for a reverse null move
+    type ReverseNullMove;
+
+    /// A representation of the board that can be hashed. Can be Self, or unit if no hashing is desired.
     type HashBoard : hash::Hash + Eq;
 
     fn hash_board(&self) -> Self::HashBoard;
@@ -137,6 +140,15 @@ pub trait ExtendedBoard : EvalBoard {
     /// Search algorithms may recursively search all active moves, so eventually, no moves will be appended.
     /// Required for search algorithms to use quiescence search.
     fn active_moves(&self, moves: &mut Vec<Self::Move>);
+
+    fn null_move_is_available(&self) -> bool;
+
+    /// Does a passing "null move".
+    /// A null move is an empty which just transfers the turn to the other player. Enables the null move reduction heuristic.
+    fn do_null_move(&mut self) -> Self::ReverseNullMove;
+
+    /// Reverses a passing "null move".
+    fn reverse_null_move(&mut self, reverse_move: Self::ReverseNullMove);
 
     /// Returns an estimate for the average branch factor of the game.
     /// Helps search algorithms guide pruning and time management.

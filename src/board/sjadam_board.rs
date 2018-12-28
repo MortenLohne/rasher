@@ -404,6 +404,7 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
+use board::sjadam_move::SjadamReverseNullMove;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -1336,6 +1337,7 @@ impl EvalBoard for SjadamBoard {
 }
 
 impl ExtendedBoard for SjadamBoard {
+    type ReverseNullMove = SjadamReverseNullMove;
     type HashBoard = u64;
 
     fn hash_board(&self) -> Self::HashBoard {
@@ -1370,6 +1372,45 @@ impl ExtendedBoard for SjadamBoard {
     fn active_moves (&self, moves: &mut Vec<Self::Move>) {
         let (mut active_moves, _) = sjadam_move_gen::all_legal_moves(self);
         moves.append(&mut active_moves);
+    }
+
+    fn null_move_is_available(&self) -> bool {
+        true
+    }
+
+    fn do_null_move(&mut self) -> Self::ReverseNullMove {
+        let reverse_move = Self::ReverseNullMove {
+            old_last_move: self.last_move.clone(),
+            old_castling_en_passant: self.castling_en_passant,
+            old_hash: self.hash
+        };
+
+        self.move_history.push(self.hash);
+
+        self.hash ^= self.castling_en_passant_key();
+
+        self.set_en_passant_square(None);
+
+        self.hash ^= self.castling_en_passant_key();
+
+        self.to_move = !self.side_to_move();
+        self.hash ^= ZOBRIST_KEYS[768];
+
+        reverse_move
+    }
+
+    fn reverse_null_move(&mut self, mv: Self::ReverseNullMove) {
+        let old_hash = self.move_history.pop();
+        debug_assert!(old_hash.is_some());
+
+        self.castling_en_passant = mv.old_castling_en_passant;
+        self.hash = mv.old_hash;
+        self.last_move = mv.old_last_move.clone();
+
+        self.to_move = !self.side_to_move();
+        debug_assert_eq!(self.hash, self.hash_from_scratch(),
+                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
+        debug_assert_eq!(old_hash, Some(self.hash));
     }
 
     const BRANCH_FACTOR : u64 = 30;
