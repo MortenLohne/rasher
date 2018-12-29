@@ -206,7 +206,7 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
                 } else {
                     // In multipv search, the hash table needs to be cleared for correct behaviour. Don't know why.
                     // TODO: Fix this. Clearing the hash table loses a ton of performance in multipv mode
-                    self.table.clear();
+                    self.table.remove(&board.hash_board());
                     self.move_list = Some(moves_to_search);
                     //table.remove(&board);
                     self.find_best_move_ab(&mut board, depth)
@@ -721,11 +721,6 @@ impl<B: Eq + Hash, M> Table<B, M> {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.hash_table.clear();
-        self.mem_usage = 0;
-    }
-
     fn value_mem_usage() -> usize {
         mem::size_of::<HashEntry<M>>() + mem::size_of::<u64>() + mem::size_of::<u64>()
     }
@@ -757,7 +752,7 @@ impl<B: Eq + Hash, M> Table<B, M> {
 
     #[allow(dead_code)]
     pub fn remove(&mut self, key: &B) -> Option<HashEntry<M>>
-        where B: ExtendedBoard + Eq + Hash {
+        where B: Eq + Hash {
         //key.hash(&mut self.hasher);
         self.hash_table.remove(key).map(|value| {
             self.mem_usage -= Self::value_mem_usage();
