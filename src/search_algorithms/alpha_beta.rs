@@ -24,6 +24,13 @@ use std::time;
 use std::sync::{Arc, Mutex};
 use uci::TimeRestriction::{Nodes, Mate, GameTime};
 use search_algorithms::board::Board;
+use uci_engine;
+use uci_engine::UciOption;
+use uci_engine::UciEngine;
+use search_algorithms::alpha_beta::Score::Loss;
+use search_algorithms::alpha_beta::Score::Win;
+use search_algorithms::alpha_beta::Score::Val;
+use uci::EngineComm;
 
 type Depth = u16;
 
@@ -50,230 +57,267 @@ pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
     search_moves(board, engine_comm, time_limit, options, channel, move_list);
 }
 
-pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
-                        time_restriction: uci::TimeRestriction,
-                        options: uci::EngineOptions,
-                        channel: mpsc::Sender<uci::UciInfo>,
-                        move_list: &Option<Vec<B::Move>>) 
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
-{
-    
-    let max_depth : Depth = match time_restriction {
-        uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
-        _ => 128,
-    };
-    debug_assert!(max_depth > 1);
+struct AlphaBeta<B: ExtendedBoard> {
+    time_limit: uci::TimeRestriction,
+    options: uci::EngineOptions,
+    start_time: time::Instant,
+    node_counter: NodeCount,
+    move_list: Option<Vec<B::Move>>,
+    table: Table<B::HashBoard, B::Move>,
+    engine_comm : Arc<Mutex<uci::EngineComm>>,
+}
 
-    // Normally, the root position should never already be decided
-    // If the root position is drawn *anyway*, try to make a move that preserves the draw
-    // If no move is found, return null move
-    match board.game_result() {
-        Some(GameResult::Draw) => {
-            let mut moves = vec![];
-            board.generate_moves(&mut moves);
-            for mv in moves {
-                let reverse_move = board.do_move(mv.clone());
-
-                if board.game_result() == Some(GameResult::Draw) {
-                    board.reverse_move(reverse_move);
-                    let uci_info = uci::UciInfo {
-                        depth: 1, seldepth: 1, time: 0, nodes: 1,
-                        hashfull: 0.0,
-                        pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))], color: board.side_to_move() };
-                    channel.send(uci_info).unwrap();
-                    return;
-                }
-
-                board.reverse_move(reverse_move);
-            }
-
-            let uci_info = uci::UciInfo {
-                depth: 1, seldepth: 1, time: 0, nodes: 1,
-                hashfull: 0.0,
-                pvs: vec![(Score::Draw(0), "null".to_string())], color: board.side_to_move() };
-            channel.send(uci_info).unwrap();
-
-            return;
-        },
-        _ => (),
+impl<B> uci_engine::UciEngine<B> for AlphaBeta<B>
+where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
+    fn init() -> Self {
+        AlphaBeta {
+            time_limit: uci::TimeRestriction::Infinite,
+            options: uci::EngineOptions::new(),
+            start_time: time::Instant::now(),
+            node_counter: NodeCount::new(),
+            move_list: None,
+            table: Table::new(0),
+            engine_comm: Arc::new(Mutex::new(uci::EngineComm::new())),
+        }
     }
-    
-    let mut total_node_count = NodeCount::new();
-    let start_time = time::Instant::now();
-    
-    let mut table = Table::new(options.hash_memory as usize * 1024 * 1024);
 
-    'depth_loop: for depth in 1..=max_depth {
-        
-        let mut pvs : Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
-        let mut pv_moves : Vec<B::Move> = vec![]; // Moves that have been searched
-        for _ in 0..options.multipv {
-            
-            let mut moves_to_search = if move_list.is_some() {
-                move_list.clone().unwrap()
-            }
-            else {
+    fn uci_options(&mut self) -> Vec<UciOption> {
+        unimplemented!()
+    }
+
+    fn set_uci_option(&mut self, uci_option: UciOption) {
+        unimplemented!()
+    }
+
+    fn search(&mut self, mut board: B, time_limit: uci::TimeRestriction,
+              engine_comm: Arc<Mutex<EngineComm>>,
+              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo>) {
+        let max_depth: Depth = match time_limit {
+            uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
+            _ => 128,
+        };
+        debug_assert!(max_depth > 1);
+
+        // Normally, the root position should never already be decided
+        // If the root position is drawn *anyway*, try to make a move that preserves the draw
+        // If no move is found, return null move
+        match board.game_result() {
+            Some(GameResult::Draw) => {
                 let mut moves = vec![];
                 board.generate_moves(&mut moves);
-                moves
-            };
+                for mv in moves {
+                    let reverse_move = board.do_move(mv.clone());
 
-            moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
-            if moves_to_search.is_empty() {
-                continue;
-            }
+                    if board.game_result() == Some(GameResult::Draw) {
+                        board.reverse_move(reverse_move);
+                        let uci_info = uci::UciInfo {
+                            depth: 1,
+                            seldepth: 1,
+                            time: 0,
+                            nodes: 1,
+                            hashfull: 0.0,
+                            pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))],
+                            color: board.side_to_move()
+                        };
+                        channel.send(uci_info).unwrap();
+                        return;
+                    }
 
-            let mut moves = vec![];
-            board.generate_moves(&mut moves);
+                    board.reverse_move(reverse_move);
+                }
 
-            if let Some((score, moves, node_count)) =
+                let uci_info = uci::UciInfo {
+                    depth: 1,
+                    seldepth: 1,
+                    time: 0,
+                    nodes: 1,
+                    hashfull: 0.0,
+                    pvs: vec![(Score::Draw(0), "null".to_string())],
+                    color: board.side_to_move()
+                };
+                channel.send(uci_info).unwrap();
+
+                return;
+            },
+            _ => (),
+        }
+
+        self.engine_comm = engine_comm;
+        self.start_time = time::Instant::now();
+        self.table = Table::new(self.options.hash_memory as usize * 1024 * 1024);
+        self.node_counter = NodeCount::new();
+
+        'depth_loop: for depth in 1..=max_depth {
+            let mut pvs: Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
+            let mut pv_moves: Vec<B::Move> = vec![]; // Moves that have been searched
+            for _ in 0..self.options.multipv {
+                let mut moves_to_search = if move_list.is_some() {
+                    move_list.clone().unwrap()
+                } else {
+                    let mut moves = vec![];
+                    board.generate_moves(&mut moves);
+                    moves
+                };
+
+                moves_to_search.retain(|mv| pv_moves.iter().all(|mv2| mv != mv2));
+                if moves_to_search.is_empty() {
+                    continue;
+                }
+
+                let mut moves = vec![];
+                board.generate_moves(&mut moves);
+
+                if let Some((score, moves)) =
                 // If all moves are to be searched, send None to the function
                 // This way, the root position will still be hashed correctly
 
                 if moves_to_search.len() == moves.len() {
-                    find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction,
-                                      options, start_time, None, &mut table)
-                }
-                else {
+                    self.find_best_move_ab(&mut board, depth)
+                } else {
                     // In multipv search, the hash table needs to be cleared for correct behaviour. Don't know why.
                     // TODO: Fix this. Clearing the hash table loses a ton of performance in multipv mode
-                    table.clear();
+                    self.table.clear();
+                    self.move_list = Some(moves_to_search);
                     //table.remove(&board);
-                    find_best_move_ab(&mut board, depth, &*engine_comm, time_restriction, options,
-                                      start_time, Some(moves_to_search.clone()), &mut table)
+                    self.find_best_move_ab(&mut board, depth)
                 }
-            {
-                let mut pv_str = String::new();
+                {
+                    let mut pv_str = String::new();
 
-                let mut pv_board = board.clone();
+                    let mut pv_board = board.clone();
 
-                for mv in &moves {
-                    pv_str.push_str(&pv_board.move_to_lan(mv));
-                    pv_str.push(' ');
-                    let mut pv_board_moves = vec![];
-                    pv_board.generate_moves(&mut pv_board_moves);
-                    debug_assert!(pv_board_moves.contains(mv),
-                                  "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
-                                  mv, moves, pv_board, board);
-                    pv_board.do_move(mv.clone());
+                    for mv in &moves {
+                        pv_str.push_str(&pv_board.move_to_lan(mv));
+                        pv_str.push(' ');
+                        let mut pv_board_moves = vec![];
+                        pv_board.generate_moves(&mut pv_board_moves);
+                        debug_assert!(pv_board_moves.contains(mv),
+                                      "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
+                                      mv, moves, pv_board, board);
+                        pv_board.do_move(mv.clone());
+                    }
+                    pv_moves.push(moves[0].clone());
+                    pvs.push((score, pv_str));
+                } else {
+                    break 'depth_loop; // The search has been stopped. Do not send any more data.
                 }
-                pv_moves.push(moves[0].clone());
-                pvs.push((score, pv_str));
-                total_node_count = total_node_count + node_count;
             }
-            else {
-                break 'depth_loop; // The search has been stopped. Do not send any more data.
+            let time_taken = time::Instant::now() - self.start_time;
+            let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1_000_000;
+
+            let uci_info = uci::UciInfo {
+                depth: depth,
+                seldepth: depth,
+                time: ms_taken as i64,
+                nodes: self.node_counter.total(),
+                hashfull: self.table.mem_usage as f64 / (self.table.max_memory + 1) as f64,
+                pvs: pvs,
+                color: board.side_to_move()
+            };
+            channel.send(uci_info).unwrap();
+            if self.options.debug_info {
+                println!("leaf nodes: {}, internal nodes: {}, qsearch nodes: {}, null move cutoffs: {}, null_move_skips: {}, full hash hits:  {}, partial hash hits: {}, hash misses: {}, hash_move_cutoffs: {}",
+                         self.node_counter.leaf, self.node_counter.intern, self.node_counter.qsearch,
+                         self.node_counter.null_move_cutoffs, self.node_counter.null_move_skips,
+                         self.node_counter.hash_full_hits, self.node_counter.hash_partial_hits,
+                         self.node_counter.hash_misses, self.node_counter.hash_move_cutoffs)
             }
-        
-        }
-        let time_taken = time::Instant::now() - start_time;
-        let ms_taken = time_taken.as_secs() as u32 * 1000 + time_taken.subsec_nanos() / 1_000_000;
-        
-        let uci_info = uci::UciInfo {
-            depth: depth, seldepth: depth, time: ms_taken as i64, nodes: total_node_count.total(),
-            hashfull: table.mem_usage as f64 / (table.max_memory + 1) as f64 ,
-            pvs: pvs, color: board.side_to_move() };
-        channel.send(uci_info).unwrap();
-        if options.debug_info {
-            println!("leaf nodes: {}, internal nodes: {}, qsearch nodes: {}, null move cutoffs: {}, null_move_skips: {}, full hash hits:  {}, partial hash hits: {}, hash misses: {}, hash_move_cutoffs: {}",
-                    total_node_count.leaf, total_node_count.intern, total_node_count.qsearch,
-                total_node_count.null_move_cutoffs, total_node_count.null_move_skips,
-                    total_node_count.hash_full_hits, total_node_count.hash_partial_hits,
-                    total_node_count.hash_misses, total_node_count.hash_move_cutoffs)
-        }
 
-        // If we're playing a time control, don't start searching deeper
-        // if we have little time left
-        match time_restriction {
-            uci::TimeRestriction::GameTime(info) => {
+            // If we're playing a time control, don't start searching deeper
+            // if we have little time left
+            match time_limit {
+                uci::TimeRestriction::GameTime(info) => {
+                    let time_taken = time::Instant::now() - self.start_time;
+                    let (time, inc) = match board.side_to_move() {
+                        White => (info.white_time, info.white_inc),
+                        Black => (info.black_time, info.black_inc),
+                    };
 
-                let time_taken = time::Instant::now() - start_time;
-                let (time, inc) = match board.side_to_move() {
-                    White => (info.white_time, info.white_inc),
-                    Black => (info.black_time, info.black_inc),
-                };
-                
-                if time_taken > inc / (B::BRANCH_FACTOR as u32 / 5)
-                    + time / (B::BRANCH_FACTOR as u32 * 5) {
+                    if time_taken > inc / (B::BRANCH_FACTOR as u32 / 5)
+                        + time / (B::BRANCH_FACTOR as u32 * 5) {
                         break;
                     }
+                }
+
+                uci::TimeRestriction::MoveTime(time) =>
+                    if time_taken > time / (B::BRANCH_FACTOR as u32 / 10) {
+                        break
+                    },
+
+                _ => (),
             }
-            
-            uci::TimeRestriction::MoveTime(time) =>
-                if time_taken > time / (B::BRANCH_FACTOR as u32 / 10) {
-                    break
-                },
-            
-            _ => (),
-            
         }
     }
 }
 
-/// Returns a score, and a list of moves representing the best line it found
-fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci::EngineComm>,
-                         time_restriction: uci::TimeRestriction, options: uci::EngineOptions,
-                         start_time: time::Instant, move_list: Option<Vec<B::Move>>,
-                         table: &mut Table<B::HashBoard, B::Move>)
-                          -> Option<(Score, Vec<B::Move>, NodeCount)>
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
-{
-    
-    fn find_best_move_ab_rec<B> (board: &mut B, depth : Depth,
-                                 mut alpha: Score, beta : Score,
-                                 engine_comm: &Mutex<uci::EngineComm>,
-                                 time_restriction: uci::TimeRestriction,
-                                 options: uci::EngineOptions,
-                                 start_time: time::Instant,
-                                 node_counter: &mut NodeCount,
-                                 mut move_list: Option<Vec<B::Move>>,
-                                 killer_moves: &[Option<B::Move>; 2],
-                                 table: &mut Table<B::HashBoard, B::Move>,
-                                 allow_null_moves: bool)
-                                 -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
+impl<B> AlphaBeta<B>
+    where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
+
+    /// Returns a score, and a list of moves representing the best line it found
+    fn find_best_move_ab (&mut self, board : &mut B, depth : Depth)
+                             -> Option<(Score, Vec<B::Move>)>
+        where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
+    {
+        if let Some((score, _, mut moves)) =
+        self.find_best_move_ab_rec(board, depth, Loss(0), Win(0), &[None, None], true)
+        {
+            debug_assert!(!moves.is_empty(),
+                          "Found empty pv at depth {}, score was {:?}",
+                          depth, score);
+            moves.reverse();
+            Some((score, moves))
+        }
+        else {
+            None
+        }
+    }
+
+    fn find_best_move_ab_rec (&mut self, board: &mut B, depth : Depth,
+                              mut alpha: Score, beta : Score,
+                              killer_moves: &[Option<B::Move>; 2], allow_null_moves: bool)
+        -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
         where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
     {
         debug_assert!(alpha <= beta, "alpha <= beta. alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board);
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
-            = table.get(&board.hash_board()) {
+            = self.table.get(&board.hash_board()) {
                 if entry_depth >= depth {
                     match ordering {
                         Ordering::Equal => {
-                            node_counter.hash_full_hits += 1;
+                            self.node_counter.hash_full_hits += 1;
                             return Some((score, None,
                                          best_reply.iter().cloned().collect()))
                         },
                         Ordering::Less if score < alpha => {
-                            node_counter.hash_full_hits += 1;
+                            self.node_counter.hash_full_hits += 1;
                             return Some((score, None,
                                          best_reply.iter().cloned().collect()))
                         },
                         Ordering::Greater if score > beta => {
-                            node_counter.hash_full_hits += 1;
+                            self.node_counter.hash_full_hits += 1;
                             return Some((score, None,
                                          best_reply.iter().cloned().collect()))
                         },
                         _ => {
-                            node_counter.hash_partial_hits += 1;
+                            self.node_counter.hash_partial_hits += 1;
                             best_reply.clone()
                         }
                     }
                 }
                 else {
-                    node_counter.hash_partial_hits += 1;
+                    self.node_counter.hash_partial_hits += 1;
                     best_reply.clone()
                 }
             }
-        else {
-            node_counter.hash_misses += 1;
-            None
-        };
+            else {
+                self.node_counter.hash_misses += 1;
+                None
+            };
         // Check if the thread should stop
-        if node_counter.total() % 2048 == 0 {
-            abort_search_check(engine_comm, start_time, time_restriction,
-                               node_counter, board.side_to_move())?;
+        if self.node_counter.total() % 2048 == 0 {
+            self.abort_search_check(board.side_to_move())?;
         }
 
         // Helpful alias
@@ -282,10 +326,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
 
         if depth == 0 {
             if let Some((score, killer_move, best_move, node_type)) =
-            qsearch(board, depth, alpha, beta, first_candidate, engine_comm,
-                    time_restriction, options, start_time, node_counter, table) {
+            self.qsearch(board, depth, alpha, beta, first_candidate) {
 
-                table.insert(board.hash_board(), HashEntry {
+                self.table.insert(board.hash_board(), HashEntry {
                     best_reply: best_move.clone(),
                     score: (node_type, score), depth
                 });
@@ -314,39 +357,37 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         if alpha > Loss(Depth::max_value()) && depth >= 2 && allow_null_moves && board.null_move_is_available() {
             let reverse_null_move = board.do_null_move();
             let (tried_score, _, _) =
-                find_best_move_ab_rec(board, (depth - 1).saturating_sub(R),
+                self.find_best_move_ab_rec(board, (depth - 1).saturating_sub(R),
                                       !decrement_score(beta),
-                                      !decrement_score(alpha),
-                                      engine_comm, time_restriction, options,
-                                      start_time, node_counter, None, &[None, None],
-                                      table, false)?;
+                                      !decrement_score(alpha),  &[None, None],
+                                      false)?;
             board.reverse_null_move(reverse_null_move);
             if !tried_score >= beta {
-                node_counter.null_move_cutoffs += 1;
+                self.node_counter.null_move_cutoffs += 1;
                 // Return immediately for null move cutoffs.
                 // Do not store hash entries or killer moves.
                 return Some((increment_score(!tried_score), None, vec![]));
             }
             else {
-                node_counter.null_move_skips += 1;
+                self.node_counter.null_move_skips += 1;
             }
         }
 
-        node_counter.intern += 1;
-    
-        let mut legal_moves = if move_list.is_some() {
-            move_list.take().unwrap()
+        self.node_counter.intern += 1;
+
+        let mut legal_moves = if self.move_list.is_some() {
+            self.move_list.take().unwrap()
         }
         else {
             let mut moves = vec![];
             board.generate_moves(&mut moves);
             moves
         };
-        
+
         // If there is mate or stalemate on the board, we should already have returned
         debug_assert!(!legal_moves.is_empty(),
-                       "Found 0 legal moves, but game result was {:?} on \n{:?}",
-                       board.game_result(), board);
+                      "Found 0 legal moves, but game result was {:?} on \n{:?}",
+                      board.game_result(), board);
 
         let mut moves = vec![];
 
@@ -354,9 +395,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
             moves.push(mv.clone());
         }
         moves.extend(killer_moves.iter()
-                     .flat_map(|mv| mv.iter())
-                     .cloned()
-                     .filter(|mv| board.move_is_legal(mv.clone())));
+            .flat_map(|mv| mv.iter())
+            .cloned()
+            .filter(|mv| board.move_is_legal(mv.clone())));
         moves.append(&mut legal_moves);
 
         let old_eval = board.static_eval() * color.multiplier() as f32;
@@ -370,11 +411,10 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         };
 
         let mut child_killer_moves = [None, None];
-        
-        for (i, c_move) in moves.iter().enumerate() {
 
+        for (i, c_move) in moves.iter().enumerate() {
             #[cfg(debug_assertions)]
-            let old_board = board.clone();
+                let old_board = board.clone();
             let reverse_move = board.do_move(c_move.clone());
 
             match alpha {
@@ -382,37 +422,35 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
                 // Do not prune if you are getting mated
                 // TODO: Verify sanity
                 Loss(_) => (),
-                _ if depth < 3 && options.null_move_pruning
+                _ if depth < 3 && self.options.null_move_pruning
                     && move_searched && !board.game_result().is_some() =>
-                {
-                    let eval = board.static_eval() * color.multiplier() as f32;
-                    if eval < old_eval {
-                        board.reverse_move(reverse_move);
-                        continue;
+                    {
+                        let eval = board.static_eval() * color.multiplier() as f32;
+                        if eval < old_eval {
+                            board.reverse_move(reverse_move);
+                            continue;
+                        }
                     }
-                }
                 _ => (),
             }
 
 
             let (mut tried_score, child_killer_move, tried_line) =
-                find_best_move_ab_rec(board, depth - 1,
+                self.find_best_move_ab_rec(board, depth - 1,
                                       !decrement_score(beta), !decrement_score(alpha),
-                                      engine_comm, time_restriction, options,
-                                      start_time, node_counter, None, &child_killer_moves,
-                                      table, true)?;
+                                           &child_killer_moves, true)?;
 
             if let Some(mv) = child_killer_move {
                 insert_killer_move(&mut child_killer_moves, mv);
             }
-            
+
             tried_score = !tried_score;
-            
+
             board.reverse_move(reverse_move);
 
             #[cfg(debug_assertions)]
             debug_assert_eq!(board, &old_board,
-                            "Failed to restore board after move {:?}", c_move);
+                             "Failed to restore board after move {:?}", c_move);
 
             if !move_searched {
                 alpha = alpha.max(tried_score);
@@ -420,31 +458,30 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
                 best_line.push(c_move.clone());
                 move_searched = true;
             }
-            
+
             if tried_score >= beta {
                 node_type = Ordering::Greater; // True value is >= beta
                 alpha = tried_score;
                 best_line = tried_line.clone();
                 best_line.push(c_move.clone());
                 if i == 0 && Some(c_move) == first_candidate.as_ref() {
-                    node_counter.hash_move_cutoffs += 1;
+                    self.node_counter.hash_move_cutoffs += 1;
                 }
                 break;
             }
-            
+
             if tried_score > alpha {
                 alpha = tried_score;
                 best_line = tried_line;
                 best_line.push(c_move.clone());
             }
         }
-
         let score = increment_score(alpha);
-        
-        if move_list == None {
+
+        if self.move_list == None {
             // When doing multipv search, the position may already be in the hash
             // In that case, do not overwrite it
-            table.insert(board.hash_board(), HashEntry {
+            self.table.insert(board.hash_board(), HashEntry {
                 best_reply: best_line.last().cloned(),
                 score: (node_type, score), depth
             });
@@ -458,24 +495,21 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         Some((score, killer_move, best_line))
     }
 
-    fn qsearch<B: ExtendedBoard>(board: &mut B, depth: Depth, mut alpha: Score, beta: Score,
-                  hash_move: Option<<B as Board>:: Move>,
-                  engine_comm: &Mutex<uci::EngineComm>, time_restriction: uci::TimeRestriction,
-                  options: uci::EngineOptions, start_time: time::Instant, node_counter: &mut NodeCount,
-                  table: &mut Table<<B as ExtendedBoard>::HashBoard, <B as Board>::Move>)
+    fn qsearch(&mut self, board: &mut B, depth: Depth, mut alpha: Score, beta: Score,
+               hash_move: Option<<B as Board>:: Move>)
         -> Option<(Score, Option<B::Move>, Option<B::Move>, Ordering)>
-    where <B as Board>::Move: PartialEq + fmt::Debug {
+        where <B as Board>::Move: PartialEq + fmt::Debug {
 
         let color = board.side_to_move();
 
         if let Some(result) = board.game_result() {
-            node_counter.leaf += 1;
+            self.node_counter.leaf += 1;
             return Some((Score::from_game_result(result, color),
                          None, None, Ordering::Equal))
         }
 
         // If searching for mate, don't do quiescence search
-        if let Mate(_) = time_restriction {
+        if let Mate(_) = self.time_limit {
             return Some((Val(board.static_eval() * color.multiplier() as f32),
                          None, None, Ordering::Equal));
         }
@@ -483,7 +517,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         let stand_pat = Val(board.static_eval() * color.multiplier() as f32);
 
         if stand_pat >= beta {
-            node_counter.leaf += 1;
+            self.node_counter.leaf += 1;
             return Some((beta, None, None, Ordering::Equal));
         }
 
@@ -509,19 +543,17 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         let mut best_move = None;
 
         if active_moves.is_empty() {
-            node_counter.leaf += 1;
+            self.node_counter.leaf += 1;
         }
         else {
-            node_counter.qsearch += 1;
+            self.node_counter.qsearch += 1;
         }
 
         for (i, mv) in active_moves.iter().enumerate() {
             let reverse_move = board.do_move(mv.clone());
 
-            let (mut score, _, _, _) = qsearch(
-                board, depth, !decrement_score(beta), !decrement_score(alpha), None,
-                engine_comm, time_restriction, options, start_time, node_counter,
-                 table)?;
+            let (mut score, _, _, _) = self.qsearch(
+                board, depth, !decrement_score(beta), !decrement_score(alpha), None)?;
 
             score = !score;
             board.reverse_move(reverse_move);
@@ -531,7 +563,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
                 alpha = score; // TODO: Could be beta as well. Test.
                 best_move = Some(mv.clone());
                 if i == 0 && hash_move.is_some() {
-                    node_counter.hash_move_cutoffs += 1;
+                    self.node_counter.hash_move_cutoffs += 1;
                 }
                 break;
             }
@@ -552,60 +584,53 @@ fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci
         return Some((score, killer_move, best_move, node_type));
 
     }
+    fn abort_search_check(&mut self, to_move: Color) -> Option<()> {
+        {
+            let engine_comm = self.engine_comm.lock().unwrap();
+            if engine_comm.engine_should_stop {
+                return None // "Engine was told to stop"
+            }
+        }
+        let time_taken = time::Instant::now() - self.start_time;
 
-    let mut node_counter = NodeCount::new();
-    if let Some((score, _, mut moves)) =
-        find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
-                              time_restriction, options, start_time,
-                              &mut node_counter, move_list, &[None, None],
-                              table, true)
-    {
-        debug_assert!(!moves.is_empty(),
-                      "Found empty pv at depth {}, score was {:?}",
-                      depth, score);
-        moves.reverse();
-        Some((score, moves, node_counter))
-    }
-    else {
-        None
+        // If we've spent more than half of our time, abort immediately
+        match self.time_limit {
+            Nodes(n) if self.node_counter.total() > n
+            => return None,
+            GameTime(info) => {
+                let time_left = match to_move {
+                    White => info.white_time,
+                    Black => info.black_time,
+                };
+
+                if time_taken > time_left / 2 {
+                    None
+                }
+                else {
+                    Some(())
+                }
+            }
+            // If on movetime restriction, abort if we are getting close to our time limit
+            uci::TimeRestriction::MoveTime(time)
+            if time_taken > time - time::Duration::from_millis(10) => {
+                None
+            },
+            _ => Some(()),
+        }
     }
 }
 
-fn abort_search_check(engine_comm: &Mutex<uci::EngineComm>, start_time: time::Instant,
-                      time_restriction: uci::TimeRestriction, node_counter: &NodeCount,
-                      to_move: Color) -> Option<()> {
-    {
-        let engine_comm = engine_comm.lock().unwrap();
-        if engine_comm.engine_should_stop {
-            return None // "Engine was told to stop"
-        }
-    }
-    let time_taken = time::Instant::now() - start_time;
-
-    // If we've spent more than half of our time, abort immediately
-    match time_restriction {
-        Nodes(n) if node_counter.total() > n
-        => return None,
-        GameTime(info) => {
-            let time_left = match to_move {
-                White => info.white_time,
-                Black => info.black_time,
-            };
-
-            if time_taken > time_left / 2 {
-                None
-            }
-            else {
-                Some(())
-            }
-        }
-        // If on movetime restriction, abort if we are getting close to our time limit
-        uci::TimeRestriction::MoveTime(time)
-        if time_taken > time - time::Duration::from_millis(10) => {
-            None
-        },
-        _ => Some(()),
-    }
+pub fn search_moves<B> (board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
+                        time_restriction: uci::TimeRestriction,
+                        options: uci::EngineOptions,
+                        channel: mpsc::Sender<uci::UciInfo>,
+                        move_list: &Option<Vec<B::Move>>) 
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
+{
+    let mut engine : AlphaBeta<B> = AlphaBeta::init();
+    engine.options = options;
+    engine.time_limit = time_restriction;
+    engine.search(board, time_restriction, engine_comm, move_list, channel);
 }
 
 fn insert_killer_move<T: Eq>(moves: &mut[Option<T>; 2], new_move: T) {
