@@ -1077,10 +1077,12 @@ impl ExtendedBoard for ChessBoard {
     }
 
     fn null_move_is_available(&self) -> bool {
-        move_gen::is_attacked(self, self.king_pos(!self.to_move))
+        !move_gen::is_attacked(self, self.king_pos(self.to_move))
     }
 
     fn do_null_move(&mut self) -> Self::ReverseNullMove {
+        debug_assert!(self.null_move_is_available());
+
         let reverse_move = ChessReverseNullMove {
             old_castling_en_passant: self.castling_en_passant,
         };

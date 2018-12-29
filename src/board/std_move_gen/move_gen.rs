@@ -8,6 +8,7 @@ use search_algorithms::board::Color::*;
 
 use std::cmp::Ordering;
 use search_algorithms::board::Board;
+use search_algorithms::board::Color;
 
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> (Vec<ChessMove>, Vec<ChessMove>) {
@@ -403,17 +404,13 @@ pub fn is_pinned_to_piece(board : &ChessBoard, pinee_pos : Square, pinner_pos : 
     }
 }
 
-/// Returns whether a square is under attack by the side not to move
-#[inline(never)]
-pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
-
-    let color = board.to_move;
-    
+/// Returns whether a square is under attack
+pub fn is_attacked_by_color(board: &ChessBoard, square: Square, color: Color) -> bool {
     // Direction enemy pawns are coming from
     let pawn_direction : i8 = if color == White { -1 } else { 1 };
     let file = square.file() as i8;
     let rank = square.rank() as i8;
-    
+
     if file > 0 && ((color == White && rank > 1) || (color == Black && rank < 6))
     {
         let pawn_square = Square::from_ints(file as u8 - 1, (rank as i8 + pawn_direction) as u8);
@@ -424,10 +421,10 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             return true;
         }
     }
-    
+
     if file < 7 && ((color == White && rank > 1) || (color == Black && rank < 6))
     {
-        
+
         let pawn_square = Square::from_ints(file as u8 + 1, (rank as i8 + pawn_direction) as u8);
 
         if board[pawn_square].piece_type() == Pawn
@@ -436,21 +433,21 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
             return true;
         }
     }
-    
+
 
     for &(i, j) in &[(0, 1), (1, 0), (0, -1), (-1, 0)] {
-        if check_threats_in_direction (i, j, board, square, &[Queen, Rook]) {
+        if check_threats_in_direction (i, j, board, square, &[Queen, Rook], color) {
             return true;
         }
     }
     for &(i, j) in &[(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-        if check_threats_in_direction (i, j, board, square, &[Queen, Bishop]) {
+        if check_threats_in_direction (i, j, board, square, &[Queen, Bishop], color) {
             return true;
         }
     }
-    
+
     for &(i, j) in &[(-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                     (1, -2), (1, 2), (2, -1), (2, 1)] {
+        (1, -2), (1, 2), (2, -1), (2, 1)] {
         if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 {
             continue;
         }
@@ -458,30 +455,37 @@ pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
 
         if board[new_pos].piece_type() == Knight
             && board[new_pos].color().unwrap() != color {
-                return true;
-            }
+            return true;
+        }
     }
     for i in -1..2 {
         for j in -1..2 {
             if file + i < 0 || file + i >= 8 || rank + j < 0 || rank + j >= 8 ||
                 (j == 0 && i == 0) {
-                    continue;
-                }
+                continue;
+            }
             let new_pos = Square(((rank + j) * 8 + file + i) as u8);
 
             // Check that there is no enemy king around
             if board[new_pos].piece_type() == King
                 && board[new_pos].color().unwrap() != color
-                {
-                    return true;
-                }
+            {
+                return true;
+            }
         }
     }
     false
 }
 
+/// Returns whether a square is under attack by the side not to move
+#[inline(never)]
+pub fn is_attacked(board : &ChessBoard, square : Square) -> bool {
+    is_attacked_by_color(board, square, board.side_to_move())
+}
+
+/// Checks if there are any threats in the direction to the given color.
 fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Square,
-                               threats : &[PieceType]) -> bool {
+                               threats : &[PieceType], color: Color) -> bool {
     let mut file = (square.0 & 0b0000_0111) as i8;
     let mut rank = (square.0 >> 3) as i8;
     loop {
@@ -494,7 +498,7 @@ fn check_threats_in_direction (i : i8, j : i8, board : &ChessBoard, square : Squ
         match piece.piece_type() {
             Empty => continue,
             piece_type => {
-                if piece.color().unwrap() == board.to_move { return false; }
+                if piece.color() == Some(color) { return false; }
                 
                 for threat in threats {
                     if piece_type == *threat {
