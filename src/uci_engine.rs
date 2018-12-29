@@ -7,15 +7,15 @@ use uci::EngineComm;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct UciOption {
-    name: String,
-    option_type: UciOptionType,
+    pub name: String,
+    pub option_type: UciOptionType,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum UciOptionType {
-    Check,
+    Check(bool),
     Spin(i64, i64, i64), // Contains current value, minimum value, maximum value
-    Combo(String, &'static [String]), // Contains current value, predefined values
+    Combo(String, Vec<String>), // Contains current value, predefined values
     Button,
     String(String), // Contains the current value
 }

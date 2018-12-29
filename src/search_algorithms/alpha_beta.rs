@@ -31,6 +31,8 @@ use search_algorithms::alpha_beta::Score::Loss;
 use search_algorithms::alpha_beta::Score::Win;
 use search_algorithms::alpha_beta::Score::Val;
 use uci::EngineComm;
+use uci_engine::UciOptionType;
+use uci::ChessVariant;
 
 type Depth = u16;
 
@@ -82,11 +84,39 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
     }
 
     fn uci_options(&mut self) -> Vec<UciOption> {
-        unimplemented!()
+        vec![
+            UciOption { name: "DebugInfo".to_string(), option_type: UciOptionType::Check(false) },
+            UciOption { name: "hash".to_string(), option_type: UciOptionType::Spin(256, 0, 65536) },
+            UciOption { name: "threads".to_string(), option_type: UciOptionType::Spin(1, 1, 1) },
+            UciOption { name: "multipv".to_string(), option_type: UciOptionType::Spin(1, 1, 65536) },
+            UciOption {
+                name: "UCI_Variant".to_string(),
+                option_type: UciOptionType::Combo(
+                    "standard".to_string(),
+                    vec!["standard".to_string(), "sjadam".to_string(), "crazyhouse".to_string()])
+            }
+        ]
     }
 
     fn set_uci_option(&mut self, uci_option: UciOption) {
-        unimplemented!()
+        match (uci_option.name.as_str(), uci_option.option_type) {
+            ("DebugInfo", UciOptionType::Check(val)) =>
+                self.options.debug_info = val,
+            ("hash", UciOptionType::Spin(hash, _, _)) =>
+                self.options.hash_memory = hash as u32,
+            ("threads", UciOptionType::Spin(threads, _, _)) =>
+                self.options.hash_memory = threads as u32,
+            ("multipv", UciOptionType::Spin(multipv, _, _)) =>
+                self.options.multipv = multipv as u32,
+            ("UCI_Variant", UciOptionType::Combo(variant, _)) =>
+                match variant.as_str() {
+                    "standard" => self.options.variant = ChessVariant::Standard,
+                    "sjadam" => self.options.variant = ChessVariant::Sjadam,
+                    "crazyhouse" => self.options.variant = ChessVariant::Crazyhouse,
+                    variant => panic!("Unknown game/chess variant {}", variant),
+                },
+            (name, option_type) => panic!("Unknown option {} of type {:?}", name, option_type),
+        }
     }
 
     fn search(&mut self, mut board: B, time_limit: uci::TimeRestriction,
