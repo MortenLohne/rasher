@@ -3,6 +3,7 @@ pub mod board;
 mod tests;
 pub mod search_algorithms;
 pub mod pgn;
+pub mod uci_engine;
 
 #[cfg(test)]
 #[macro_use]
