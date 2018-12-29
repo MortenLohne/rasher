@@ -256,11 +256,14 @@ pub struct NodeCount {
     hash_partial_hits: u64, // TT hit, hash move is used, but no cutoff
     hash_misses: u64, // No TT hit
     hash_move_cutoffs: u64, // Hash move causes a cutoff before other moves are tried
+    null_move_cutoffs: u64,
+    null_move_skips: u64,
 }
 
 impl NodeCount {
     fn new() -> Self {
-        NodeCount { intern: 0, leaf: 0, qsearch: 0, hash_full_hits: 0,
+        NodeCount { intern: 0, leaf: 0, qsearch: 0, null_move_cutoffs: 0,
+            null_move_skips: 0, hash_full_hits: 0,
             hash_partial_hits: 0, hash_misses: 0, hash_move_cutoffs: 0 }
     }
     fn total(&self) -> u64 {
@@ -274,6 +277,8 @@ impl std::ops::Add for NodeCount {
         NodeCount {
             intern: self.intern + other.intern, leaf: self.leaf + other.leaf,
             qsearch: self.qsearch + other.qsearch,
+            null_move_cutoffs: self.null_move_cutoffs + other.null_move_cutoffs,
+            null_move_skips: self.null_move_skips + other.null_move_skips,
             hash_full_hits: self.hash_full_hits + other.hash_full_hits,
             hash_partial_hits: self.hash_partial_hits + other.hash_partial_hits,
             hash_misses: self.hash_misses + other.hash_misses,

@@ -173,8 +173,9 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
             pvs: pvs, color: board.side_to_move() };
         channel.send(uci_info).unwrap();
         if options.debug_info {
-            println!("leaf nodes: {}, internal nodes: {}, qsearch nodes: {}, full hash hits:  {}, partial hash hits: {}, hash misses: {}, hash_move_cutoffs: {}",
+            println!("leaf nodes: {}, internal nodes: {}, qsearch nodes: {}, null move cutoffs: {}, null_move_skips: {}, full hash hits:  {}, partial hash hits: {}, hash misses: {}, hash_move_cutoffs: {}",
                     total_node_count.leaf, total_node_count.intern, total_node_count.qsearch,
+                total_node_count.null_move_cutoffs, total_node_count.null_move_skips,
                     total_node_count.hash_full_hits, total_node_count.hash_partial_hits,
                     total_node_count.hash_misses, total_node_count.hash_move_cutoffs)
         }
@@ -225,11 +226,12 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                                  node_counter: &mut NodeCount,
                                  mut move_list: Option<Vec<B::Move>>,
                                  killer_moves: &[Option<B::Move>; 2],
-                                 table: &mut Table<B::HashBoard, B::Move>)
+                                 table: &mut Table<B::HashBoard, B::Move>,
+                                 allow_null_moves: bool)
                                  -> Option<(Score, Option<B::Move>, Vec<B::Move>)>
         where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
     {
-        debug_assert!(alpha <= beta, "alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
+        debug_assert!(alpha <= beta, "alpha <= beta. alpha={:?}, beta={:?}, depth={}, board:\n{:?}",
                       alpha, beta, depth, board);
         let first_candidate =
             if let Some(&HashEntry{ref best_reply, score: (ordering, score), depth: entry_depth })
@@ -301,10 +303,33 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         debug_assert!(depth > 0);
 
         if let Some(result) = board.game_result() {
-            return Some((Score::from_game_result(result, board.side_to_move()),
+            return Some((Score::from_game_result(result, color),
                          None, Vec::new()))
         }
-        
+
+        const R : u16 = 2;
+
+        if alpha > Loss(u16::max_value()) && depth >= 2 && allow_null_moves && board.null_move_is_available() {
+            let reverse_null_move = board.do_null_move();
+            let (tried_score, _, _) =
+                find_best_move_ab_rec(board, (depth - 1).saturating_sub(R),
+                                      !decrement_score(beta),
+                                      !decrement_score(alpha),
+                                      engine_comm, time_restriction, options,
+                                      start_time, node_counter, None, &[None, None],
+                                      table, false)?;
+            board.reverse_null_move(reverse_null_move);
+            if !tried_score >= beta {
+                node_counter.null_move_cutoffs += 1;
+                // Return immediately for null move cutoffs.
+                // Do not store hash entries or killer moves.
+                return Some((increment_score(!tried_score), None, vec![]));
+            }
+            else {
+                node_counter.null_move_skips += 1;
+            }
+        }
+
         node_counter.intern += 1;
     
         let mut legal_moves = if move_list.is_some() {
@@ -366,12 +391,14 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                 }
                 _ => (),
             }
-            
+
+
             let (mut tried_score, child_killer_move, tried_line) =
                 find_best_move_ab_rec(board, depth - 1,
                                       !decrement_score(beta), !decrement_score(alpha),
                                       engine_comm, time_restriction, options,
-                                      start_time, node_counter, None, &child_killer_moves, table)?;
+                                      start_time, node_counter, None, &child_killer_moves,
+                                      table, true)?;
 
             if let Some(mv) = child_killer_move {
                 insert_killer_move(&mut child_killer_moves, mv);
@@ -437,13 +464,13 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         -> Option<(Score, Option<B::Move>, Option<B::Move>, Ordering)>
     where <B as Board>::Move: PartialEq + fmt::Debug {
 
+        let color = board.side_to_move();
+
         if let Some(result) = board.game_result() {
             node_counter.leaf += 1;
-            return Some((Score::from_game_result(result, board.side_to_move()),
+            return Some((Score::from_game_result(result, color),
                          None, None, Ordering::Equal))
         }
-
-        let color = board.side_to_move();
 
         // If searching for mate, don't do quiescence search
         if let Mate(_) = time_restriction {
@@ -528,7 +555,8 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     if let Some((score, _, mut moves)) =
         find_best_move_ab_rec(board, depth, Loss(0), Win(0), engine_comm,
                               time_restriction, options, start_time,
-                              &mut node_counter, move_list, &[None, None], table)
+                              &mut node_counter, move_list, &[None, None],
+                              table, true)
     {
         debug_assert!(!moves.is_empty(),
                       "Found empty pv at depth {}, score was {:?}",
