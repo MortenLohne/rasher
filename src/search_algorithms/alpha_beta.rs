@@ -25,6 +25,8 @@ use std::sync::{Arc, Mutex};
 use uci::TimeRestriction::{Nodes, Mate, GameTime};
 use search_algorithms::board::Board;
 
+type Depth = u16;
+
 /// Start a standard uci search, sending the results through a channel
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
@@ -56,7 +58,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
     where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
 {
     
-    let max_depth : u16 = match time_restriction {
+    let max_depth : Depth = match time_restriction {
         uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
         _ => 128,
     };
@@ -209,7 +211,7 @@ pub fn search_moves<B> (mut board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
 }
 
 /// Returns a score, and a list of moves representing the best line it found
-fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::EngineComm>,
+fn find_best_move_ab<B> (board : &mut B, depth : Depth, engine_comm : &Mutex<uci::EngineComm>,
                          time_restriction: uci::TimeRestriction, options: uci::EngineOptions,
                          start_time: time::Instant, move_list: Option<Vec<B::Move>>,
                          table: &mut Table<B::HashBoard, B::Move>)
@@ -217,7 +219,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
     where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq
 {
     
-    fn find_best_move_ab_rec<B> (board: &mut B, depth : u16,
+    fn find_best_move_ab_rec<B> (board: &mut B, depth : Depth,
                                  mut alpha: Score, beta : Score,
                                  engine_comm: &Mutex<uci::EngineComm>,
                                  time_restriction: uci::TimeRestriction,
@@ -307,9 +309,9 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
                          None, Vec::new()))
         }
 
-        const R : u16 = 2;
+        const R : Depth = 2;
 
-        if alpha > Loss(u16::max_value()) && depth >= 2 && allow_null_moves && board.null_move_is_available() {
+        if alpha > Loss(Depth::max_value()) && depth >= 2 && allow_null_moves && board.null_move_is_available() {
             let reverse_null_move = board.do_null_move();
             let (tried_score, _, _) =
                 find_best_move_ab_rec(board, (depth - 1).saturating_sub(R),
@@ -456,7 +458,7 @@ fn find_best_move_ab<B> (board : &mut B, depth : u16, engine_comm : &Mutex<uci::
         Some((score, killer_move, best_line))
     }
 
-    fn qsearch<B: ExtendedBoard>(board: &mut B, depth: u16, mut alpha: Score, beta: Score,
+    fn qsearch<B: ExtendedBoard>(board: &mut B, depth: Depth, mut alpha: Score, beta: Score,
                   hash_move: Option<<B as Board>:: Move>,
                   engine_comm: &Mutex<uci::EngineComm>, time_restriction: uci::TimeRestriction,
                   options: uci::EngineOptions, start_time: time::Instant, node_counter: &mut NodeCount,
@@ -630,9 +632,9 @@ fn increment_score(score: Score) -> Score {
 
 fn decrement_score(score: Score) -> Score {
     match score {
-        Loss(i) => Loss(u16::saturating_sub(i, 1)),
-        Win(i) => Win(u16::saturating_sub(i, 1)),
-        Draw(i) => Draw(u16::saturating_sub(i, 1)),
+        Loss(i) => Loss(Depth::saturating_sub(i, 1)),
+        Win(i) => Win(Depth::saturating_sub(i, 1)),
+        Draw(i) => Draw(Depth::saturating_sub(i, 1)),
         Val(n) => Val(n),
     }
 }
@@ -640,7 +642,7 @@ fn decrement_score(score: Score) -> Score {
 struct HashEntry<M> {
     best_reply: Option<M>,
     score: (Ordering, Score),
-    depth: u16,
+    depth: Depth,
 }
 
 /// A transposition table for storing known positions, which only grows to a certain
@@ -713,9 +715,9 @@ impl<B: Eq + Hash, M> Table<B, M> {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Score {
     Val(f32),
-    Draw(u16),
-    Win(u16),
-    Loss(u16),
+    Draw(Depth),
+    Win(Depth),
+    Loss(Depth),
 }
 
 impl Score {
