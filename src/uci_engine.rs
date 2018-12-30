@@ -31,10 +31,10 @@ pub trait UciEngine<B: Board> {
 
     fn search(&mut self, board: B, time_limit: uci::TimeRestriction,
               engine_comm: Arc<Mutex<EngineComm>>,
-              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo<B>>);
+              move_list: Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo<B>>);
 
     fn best_move(&mut self, board: B, time_limit: uci::TimeRestriction,
-                 move_list: &Option<Vec<B::Move>>)
+                 move_list: Option<Vec<B::Move>>)
         -> Result<(Score, B::Move), Box<dyn error::Error>> {
 
         let (tx, rx) = mpsc::channel();
