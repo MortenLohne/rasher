@@ -616,6 +616,7 @@ impl<B: PgnBoard> UciInfo<B> {
                 write!(string, "{} ", board.move_to_lan(mv)).unwrap();
                 reverse_moves.push(board.do_move(mv.clone()))
             }
+            reverse_moves.reverse();
             for reverse_move in reverse_moves {
                 board.reverse_move(reverse_move);
             }
