@@ -21,13 +21,11 @@ extern crate log4rs;
 #[cfg(feature = "profile")]
 extern crate cpuprofiler;
 
-use std::sync::{Arc, Mutex};
 use std::io;
 use std::fmt;
 use std::hash::Hash;
 use std::time;
 
-use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::mcts;
 use search_algorithms::board::GameResult;
@@ -46,6 +44,8 @@ use std::io::Write;
 use cpuprofiler::PROFILER;
 use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
+use search_algorithms::alpha_beta::AlphaBeta;
+use uci_engine::UciEngine;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -173,12 +173,12 @@ fn play_game<B> (mut board : B)
     println!("\n");
     match board.game_result() {
         None => {
-            let (handle, channel) = alpha_beta::start_uci_search(
-                board.clone(), uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
-                uci::EngineOptions::new(),
-                Arc::new(Mutex::new(uci::EngineComm::new())), None);
-            
-            let (score, mv) = uci::get_uci_move(handle, channel).unwrap();
+            let mut engine = AlphaBeta::init();
+            let (score, mv) =
+                engine.best_move(board.clone(),
+                                 uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
+                                 None).unwrap();
+
             println!("Found move {:?} with score {}.", mv, score.uci_string(board.side_to_move()));
             board.do_move(mv);
             play_game(board);
@@ -227,12 +227,13 @@ fn play_human<B>(mut board : B)
                 play_human(board);
             }
             else {
-                let (handle, channel) = alpha_beta::start_uci_search(
-                    board.clone(), uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
-                    uci::EngineOptions::new(),
-                    Arc::new(Mutex::new(uci::EngineComm::new())), None);
-                
-                let (score, best_move) = uci::get_uci_move(handle, channel).unwrap();
+
+                let mut engine = AlphaBeta::init();
+                let (score, best_move) =
+                    engine.best_move(board.clone(),
+                                     uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
+                                     None).unwrap();
+
                 println!("Computer played {:?} with score {}",
                          best_move, score.uci_string(board.side_to_move()));
                 board.do_move(best_move);

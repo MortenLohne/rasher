@@ -8,22 +8,25 @@ use search_algorithms::board::EvalBoard;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;
-
+use uci_engine::UciEngine;
 use uci;
 use pgn::PgnBoard;
 
 use std::sync;
+use search_algorithms::alpha_beta::AlphaBeta;
+use uci_engine::UciOption;
+use uci_engine::UciOptionType;
 
 #[allow(dead_code)]
 /// Checks that the expected move is indeed played in the position
 pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Depth(6),
-        uci::EngineOptions::new(),
-        sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
-    
-    let (score, game_move) = uci::get_uci_move(handle, channel).unwrap();
-    
+
+    let engine = AlphaBeta::init();
+    let (score, game_move) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(6),
+                         None).unwrap();
+
     assert_eq!(game_move, best_move,
                "Best move was {:?} with score {:?}, expected {:?}, board:\n{}",
                game_move, score,
@@ -74,14 +77,16 @@ fn mate_in_two_test() {
 #[test]
 fn multipv_mates_test() {
     let board = ChessBoard::from_fen("NrB5/pp1R4/kp5R/3P2p1/K7/8/1P6/8 w - - 0 1").unwrap();
-    let mut options = uci::EngineOptions::new();
-    options.multipv = 4;
-    options.null_move_pruning = false;
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Mate(5),
-        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
-    
-    let results = uci::get_uci_multipv(handle, channel).unwrap();
+
+    let mut engine = AlphaBeta::init();
+    engine.set_uci_option(UciOption {
+        name: "multipv".into(),
+        option_type: UciOptionType::Spin(4, 1, 65536)
+    });
+
+    let results =
+        engine.best_moves_multipv(board.clone(), uci::TimeRestriction::Mate(5), None).unwrap();
+
     assert_eq!(results[0].0.uci_string(White), "mate 1");
     assert_eq!(results[1].0.uci_string(White), "mate 2");
     assert_eq!(results[2].0.uci_string(White), "mate 3");
@@ -92,14 +97,16 @@ fn multipv_mates_test() {
 #[ignore]
 fn multipv_mates_test_long() {
     let board = ChessBoard::from_fen("NrB5/pp1R4/kp5R/3P2p1/K7/8/1P6/8 w - - 0 1").unwrap();
-    let mut options = uci::EngineOptions::new();
-    options.multipv = 6;
-    options.null_move_pruning = false;
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Mate(7),
-        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
-    
-    let results = uci::get_uci_multipv(handle, channel).unwrap();
+
+    let mut engine = AlphaBeta::init();
+    engine.set_uci_option(UciOption {
+        name: "multipv".into(),
+        option_type: UciOptionType::Spin(5, 1, 65536)
+    });
+
+    let results =
+        engine.best_moves_multipv(board.clone(), uci::TimeRestriction::Mate(7), None).unwrap();
+
     assert_eq!(results[0].0.uci_string(White), "mate 1");
     assert_eq!(results[1].0.uci_string(White), "mate 2");
     assert_eq!(results[2].0.uci_string(White), "mate 3");
@@ -110,14 +117,16 @@ fn multipv_mates_test_long() {
 #[test]
 fn multipv_mates_test2() {
     let board = ChessBoard::from_fen("8/8/8/8/4b3/7k/r4PNP/7K b - - 2 5").unwrap();
-    let mut options = uci::EngineOptions::new();
-    options.multipv = 4;
-    options.null_move_pruning = false;
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), uci::TimeRestriction::Mate(5),
-        options, sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
-    
-    let results = uci::get_uci_multipv(handle, channel).unwrap();
+
+    let mut engine = AlphaBeta::init();
+    engine.set_uci_option(UciOption {
+        name: "multipv".into(),
+        option_type: UciOptionType::Spin(4, 1, 65536)
+    });
+
+    let results =
+        engine.best_moves_multipv(board.clone(), uci::TimeRestriction::Mate(5), None).unwrap();
+
     assert_eq!(results[0].0.uci_string(Black), "mate -1");
     assert_eq!(results[1].0.uci_string(Black), "mate -2");
     assert_eq!(results[2].0.uci_string(Black), "mate -3");

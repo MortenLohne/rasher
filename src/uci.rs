@@ -7,6 +7,7 @@ use search_algorithms::alpha_beta;
 use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::board::EvalBoard;
+use uci_engine::UciEngine;
 
 use std::error;
 use std::fmt;
@@ -190,14 +191,17 @@ fn start_correct_engine<B>(board_string: &mut String, engine_string: &mut String
                            engine_comm: Arc<Mutex<EngineComm>>, engine_options: EngineOptions,
                            time_restriction: TimeRestriction,
                            searchmoves_input: Option<Vec<String>>) -> Result<thread::JoinHandle<()>, Box<error::Error>>
-where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'static, <B as Board>::Move: Send + Sync {
+where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'static,
+      <B as Board>::Move: Send + Sync,
+      <B as ExtendedBoard>::HashBoard: Send {
     let mut board = parse_position::<B>(&board_string)?;
     let (handle, rx) =
         match engine_string.as_str() {
-            "minimax" => alpha_beta::start_uci_search(
+            "minimax" => {
+                let mut engine = alpha_beta::AlphaBeta::init();
+                engine.search_async(
                 board.clone(),
                 time_restriction,
-                engine_options,
                 engine_comm.clone(), searchmoves_input
                     .clone()
                     .map(|moves|
@@ -205,7 +209,8 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'stat
                             .map(|move_string| board.move_from_lan(move_string))
                             .map(Result::unwrap)
                             .collect::<Vec<_>>()
-                    )),
+                    ))
+            },
             "mcts" => start_mcts_engine(
                 board.clone(),
                 time_restriction, engine_options,
@@ -244,67 +249,6 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'stat
     Ok(handle)
 }
 
-/// Given a receiving channel for uci info and an engine thread, wait until the transmitter closes the handle and the thread exits
-/// Then return the best score and move
-/// For the function to return ok, the engine must have terminated successfully
-/// If the engine crashes, the error value will contain the last move the engine
-/// sent, if any.
-pub fn get_uci_move<B: Board> (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo<B>>)
-                             -> Result<(Score, B::Move), (Option<(Score, B::Move)>, String)> {
-    let mut last_info = None;
-    loop { // The channel will return error when closed
-        match rx.recv() {
-            Ok(uci_info) => last_info = Some(uci_info),
-            Err(_) => {
-                if let Some(uci_info) = last_info {
-                    if uci_info.pvs.is_empty() {
-                        return Err((None, "Engine returned 0 moves".to_string()));
-                    }
-                    let (score, ref moves) = uci_info.pvs[0];
-
-                    if let Err(err) = handle.join() {
-                        return Err((Some((score, moves[0].clone())), format!("{:?}", err)))
-                    }
-                    return Ok((score, moves[0].clone()))
-                }
-                else {
-                    return Err((None, "Engine returned no output".to_string()));
-                }
-            },
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub fn get_uci_multipv<B: Board> (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo<B>>)
-                             -> Result<Vec<(Score, B::Move)>, (Option<Vec<(Score, B::Move)>>, String)> {
-    let mut last_info = None;
-    loop { // The channel will return error when closed
-        match rx.recv() {
-            Ok(uci_info) => last_info = Some(uci_info),
-            Err(_) => {
-                if let Some(uci_info) = last_info {
-                    if uci_info.pvs.is_empty() {
-                        return Err((None, "Engine returned 0 moves".to_string()));
-                    }
-                    let results = uci_info.pvs.iter()
-                        .map(|&(score, ref moves)| {
-                            (score, moves[0].clone())
-                        })
-                        .collect::<Vec<_>>();
-                    if let Err(err) = handle.join() {
-                        return Err((Some(results), format!("{:?}", err)))
-                    }
-                    return Ok(results)
-                }
-                else {
-                    return Err((None, "Engine returned no output".to_string()));
-                }
-            },
-        }
-    }
-}
-
 // Stores time information for the game, in milliseconds
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct TimeInfo {
@@ -339,6 +283,7 @@ impl EngineComm {
 use std::sync::mpsc;
 use pgn::PgnBoard;
 use search_algorithms::board::Board;
+use search_algorithms::alpha_beta::AlphaBeta;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
@@ -521,13 +466,12 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
 <Board as board::Board>::Move: Send + Sync
 {
 
-    let (handle, channel) = alpha_beta::start_uci_search(
-        board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
-        EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
-        None);
+    let mut engine = AlphaBeta::init();
+    let (eval, mut last_correct_move) =
+        engine.best_move(board.clone(),
+                         TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+                         None).unwrap();
 
-
-    let (eval, mut last_correct_move) = get_uci_move(handle, channel).unwrap();
     let mut last_eval = eval;
     
     for mv_str in moves {
@@ -538,13 +482,12 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             assert!(moves.contains(&mv));
         }
         board.do_move(mv.clone());
-        
-        let (handle, channel) = alpha_beta::start_uci_search(
-            board.clone(), TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
-            EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
-            None);
 
-        let (eval, best_move) = get_uci_move(handle, channel).unwrap();
+        engine = AlphaBeta::init();
+        let (eval, mut best_move) =
+            engine.best_move(board.clone(),
+                             TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
+                             None).unwrap();
 
         let delta_score = eval.to_cp(board.side_to_move()) - last_eval.to_cp(board.side_to_move());
         

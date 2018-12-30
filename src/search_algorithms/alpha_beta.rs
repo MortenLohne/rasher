@@ -1,6 +1,5 @@
 use ::NodeCount;
 
-use std::sync::mpsc;
 use uci;
 use std::fmt;
 use std::cmp;
@@ -18,7 +17,6 @@ use pgn::PgnBoard;
 use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use self::Score::*;
-use std::thread;
 use std::mem;
 use std::time;
 use std::sync::{Arc, Mutex};
@@ -26,7 +24,6 @@ use uci::TimeRestriction::{Nodes, Mate, GameTime};
 use search_algorithms::board::Board;
 use uci_engine;
 use uci_engine::UciOption;
-use uci_engine::UciEngine;
 use search_algorithms::alpha_beta::Score::Loss;
 use search_algorithms::alpha_beta::Score::Win;
 use search_algorithms::alpha_beta::Score::Val;
@@ -37,30 +34,7 @@ use uci::UciInfo;
 
 type Depth = u16;
 
-/// Start a standard uci search, sending the results through a channel
-pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
-                            options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
-                            move_list: Option<Vec<B::Move>>)
-                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo<B>>)
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq,
-<B as Board>::Move: Sync + Send
-{
-    let (sender, receiver) = mpsc::channel();
-    let thread = thread::spawn(move || uci_search(board, time_limit, options, sender, engine_comm, &move_list));
-    (thread, receiver)
-}
-
-
-pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
-                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo<B>>,
-                     engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
-<B as Board>::Move: Sync
-{
-    search_moves(board, engine_comm, time_limit, options, channel, move_list.clone());
-}
-
-struct AlphaBeta<B: ExtendedBoard> {
+pub struct AlphaBeta<B: ExtendedBoard> {
     time_limit: uci::TimeRestriction,
     options: uci::EngineOptions,
     start_time: time::Instant,
@@ -71,7 +45,7 @@ struct AlphaBeta<B: ExtendedBoard> {
 }
 
 impl<B> uci_engine::UciEngine<B> for AlphaBeta<B>
-where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
+where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq + 'static {
     fn init() -> Self {
         AlphaBeta {
             time_limit: uci::TimeRestriction::Infinite,
@@ -120,9 +94,9 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
         }
     }
 
-    fn search(&mut self, mut board: B, time_limit: uci::TimeRestriction,
-              engine_comm: Arc<Mutex<EngineComm>>,
-              move_list: Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo<B>>) {
+    fn search(self, mut board: B, time_limit: uci::TimeRestriction,
+              engine_comm: Arc<Mutex<EngineComm>>, move_list: Option<Vec<B::Move>>)
+        -> Box<Iterator<Item=UciInfo<B>>> {
         let max_depth: Depth = match time_limit {
             uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
             _ => 128,
@@ -131,23 +105,12 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
 
         // If the root position is drawn, instamove another drawing move
         if board.game_result() == Some(GameResult::Draw) {
-            self.preserve_draw(&mut board, &channel);
-            return;
+            return Box::new(self.preserve_draw(&mut board).into_iter());
         }
 
-        self.init_new_search(time_limit, engine_comm, move_list.clone());
-
-        'depth_loop: for depth in 1..=max_depth {
-            if let Some(uci_info) = self.search_depth(&mut board, depth) {
-                channel.send(uci_info).unwrap();
-            }
-            else {
-                break;
-            }
-        }
+        Box::new(DepthIterator::new(self, board, time_limit, engine_comm, move_list))
     }
 }
-
 
 impl<B> AlphaBeta<B>
     where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
@@ -592,7 +555,7 @@ impl<B> AlphaBeta<B>
 
     /// A bugged GUI may not correctly adjudicate draws
     /// Therefore, if the root position is in fact already a draw, make any move that preserve the draw
-    fn preserve_draw(&self, board: &mut B, channel: &mpsc::Sender<uci::UciInfo<B>>) {
+    fn preserve_draw(&self, board: &mut B) -> Option<uci::UciInfo<B>> {
         let mut moves = vec![];
         board.generate_moves(&mut moves);
         for mv in moves {
@@ -609,36 +572,12 @@ impl<B> AlphaBeta<B>
                     pvs: vec![(Score::Draw(0), vec![mv.clone()])],
                     color: board.side_to_move()
                 };
-                channel.send(uci_info).unwrap();
-                return;
+                return Some(uci_info);
             }
-
             board.reverse_move(reverse_move);
         }
-        let uci_info = uci::UciInfo {
-            depth: 1,
-            seldepth: 1,
-            time: 0,
-            nodes: 1,
-            hashfull: 0.0,
-            pvs: vec![(Score::Draw(0), vec![])],
-            color: board.side_to_move()
-        };
-        channel.send(uci_info).unwrap();
+        None
     }
-}
-
-pub fn search_moves<B> (board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
-                        time_restriction: uci::TimeRestriction,
-                        options: uci::EngineOptions,
-                        channel: mpsc::Sender<uci::UciInfo<B>>,
-                        move_list: Option<Vec<B::Move>>)
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
-{
-    let mut engine : AlphaBeta<B> = AlphaBeta::init();
-    engine.options = options;
-    engine.time_limit = time_restriction;
-    engine.search(board, time_restriction, engine_comm, move_list, channel);
 }
 
 fn insert_killer_move<T: Eq>(moves: &mut[Option<T>; 2], new_move: T) {
@@ -679,15 +618,16 @@ struct DepthIterator<B: ExtendedBoard> {
 }
 
 impl<B> DepthIterator<B>
-    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq {
-    fn new(board: B, time_limit: uci::TimeRestriction, engine_comm: Arc<Mutex<EngineComm>>,
+    where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + 'static {
+    fn new(engine: AlphaBeta<B>, board: B, time_limit: uci::TimeRestriction, engine_comm: Arc<Mutex<EngineComm>>,
            move_list: Option<Vec<B::Move>>) -> DepthIterator<B> {
         let mut iter = DepthIterator {
             depth: 0,
-            engine: AlphaBeta::init(),
+            engine: engine,
             board: board,
         };
         iter.engine.init_new_search(time_limit, engine_comm, move_list);
+
         iter
     }
 }
@@ -697,9 +637,12 @@ where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq {
     type Item = UciInfo<B>;
     fn next(&mut self) -> Option<Self::Item> {
 
+        self.depth += 1;
+
         // If we're playing a time control, don't start searching deeper
         // if we have little time left
         let time_taken = time::Instant::now() - self.engine.start_time;
+
         match self.engine.time_limit {
             uci::TimeRestriction::GameTime(info) => {
                 let time_taken = time::Instant::now() - self.engine.start_time;
@@ -712,16 +655,20 @@ where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq {
                     + time / (B::BRANCH_FACTOR as u32 * 5) {
                     return None;
                 }
-            }
-
+            },
             uci::TimeRestriction::MoveTime(time) =>
                 if time_taken > time / (B::BRANCH_FACTOR as u32 / 10) {
                     return None;
                 },
 
+            uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) =>
+                if self.depth > d {
+                    return None;
+                },
+
             _ => (),
         }
-        self.depth += 1;
+
         self.engine.search_depth(&mut self.board, self.depth)
     }
 }
