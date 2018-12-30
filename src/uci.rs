@@ -16,6 +16,7 @@ use std::io;
 use std::str::FromStr;
 use std::time;
 use std::hash::Hash;
+use search_algorithms::board::ExtendedBoard;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
@@ -139,106 +140,23 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                     engine_comm.engine_should_stop = false;
                 }
                 let (time_restriction, searchmoves_input) = parse_go(&input)?;
-                
-                let (handle, rx) = match engine_options.variant {
-                    ChessVariant::Standard => {
-                        let board = parse_position::<ChessBoard>(&board_string)?;
-                        match engine_string.as_str() {
-                            "minimax" => alpha_beta::start_uci_search(
-                                board.clone(),
-                                time_restriction,
-                                engine_options,
-                                engine_comm.clone(), searchmoves_input
-                                    .clone()
-                                    .map(|moves|
-                                         moves.iter()
-                                         .map(|move_string| board.move_from_lan(move_string))
-                                         .map(Result::unwrap)
-                                         .collect::<Vec<_>>()
-                                         )),
-                            "mcts" => start_mcts_engine(
-                                board,
-                                time_restriction, engine_options,
-                                engine_comm.clone()),
-                            _ => panic!("Unknown engine {}", engine_string),
-                        }
-                    },
-                    ChessVariant::Crazyhouse => {
-                        let board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        match engine_string.as_str() {
-                            "minimax" => alpha_beta::start_uci_search(
-                                board.clone(),
-                                time_restriction,
-                                engine_options,
-                                engine_comm.clone(), searchmoves_input
-                                    .clone()
-                                    .map(|moves|
-                                         moves.iter()
-                                         .map(|move_string| board.move_from_lan(move_string))
-                                         .map(Result::unwrap)
-                                         .collect::<Vec<_>>()
-                                         )),
-                            "mcts" => start_mcts_engine(
-                                board,
-                                time_restriction, engine_options,
-                                engine_comm.clone()),
-                            _ => panic!("Unknown engine {}", engine_string),
-                        }
-                    },
-                    ChessVariant::Sjadam => {
-                        let board = parse_position::<SjadamBoard>(&board_string)?;
-                        match engine_string.as_str() {
-                            "minimax" => alpha_beta::start_uci_search(
-                                board.clone(),
-                                time_restriction,
-                                engine_options,
-                                engine_comm.clone(), searchmoves_input
-                                    .clone()
-                                    .map(|moves|
-                                         moves.iter()
-                                         .map(|move_string| board.move_from_lan(move_string))
-                                         .map(Result::unwrap)
-                                         .collect::<Vec<_>>()
-                                         )),
-                            "mcts" => start_mcts_engine(
-                                board,
-                                time_restriction, engine_options,
-                                engine_comm.clone()),
-                            _ => panic!("Unknown engine {}", engine_string),
-                        }
-                    }
-                };
-                thread::spawn(move || {
-                    // Last info that has been received, if any
-                    let mut last_info = None;
-                    loop {
-                        match rx.recv() {
-                            Ok(uci_info) => {
-                                uci_send(&uci_info.to_info_string());
-                                last_info = Some(uci_info);
-                            },
-                            Err(_) => {
-                                // If the channel has hung up, send bestmove command
-                                match last_info {
-                                    None => uci_send("bestmove null"),
-                                    Some(ref uci_info) if uci_info.pvs.is_empty() => {
-                                        uci_send(&format!("UCI info {:?} was sent with no PVs",
-                                                         uci_info));
-                                        uci_send("bestmove null");
-                                    },
-                                    Some(uci_info) => {
-                                        let (_, ref moves_string) = uci_info.pvs[0];
-                                        uci_send(&format!("bestmove {}",
-                                                         moves_string
-                                                         .split_whitespace()
-                                                         .next().unwrap_or("null")));
-                                    },
-                                };
-                                return;
-                            },
-                        }
-                    }
-                });
+
+
+                let handle =
+                match engine_options.variant {
+                    ChessVariant::Standard =>
+                        start_correct_engine::<ChessBoard>(&mut board_string, &mut engine_string,
+                                                           engine_comm.clone(), engine_options,
+                                                           time_restriction, searchmoves_input)?,
+                    ChessVariant::Sjadam =>
+                        start_correct_engine::<SjadamBoard>(&mut board_string, &mut engine_string,
+                                                            engine_comm.clone(), engine_options,
+                                                            time_restriction, searchmoves_input)?,
+                    ChessVariant::Crazyhouse =>
+                        start_correct_engine::<CrazyhouseBoard>(&mut board_string, &mut engine_string,
+                                                                engine_comm.clone(), engine_options,
+                                                                time_restriction, searchmoves_input)?,
+            };
                 search_thread = Some(handle);
             }
             "eval_game" => {
@@ -268,13 +186,71 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
     }
 }
 
+fn start_correct_engine<B>(board_string: &mut String, engine_string: &mut String,
+                           engine_comm: Arc<Mutex<EngineComm>>, engine_options: EngineOptions,
+                           time_restriction: TimeRestriction,
+                           searchmoves_input: Option<Vec<String>>) -> Result<thread::JoinHandle<()>, Box<error::Error>>
+where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'static, <B as Board>::Move: Send + Sync {
+    let mut board = parse_position::<B>(&board_string)?;
+    let (handle, rx) =
+        match engine_string.as_str() {
+            "minimax" => alpha_beta::start_uci_search(
+                board.clone(),
+                time_restriction,
+                engine_options,
+                engine_comm.clone(), searchmoves_input
+                    .clone()
+                    .map(|moves|
+                        moves.iter()
+                            .map(|move_string| board.move_from_lan(move_string))
+                            .map(Result::unwrap)
+                            .collect::<Vec<_>>()
+                    )),
+            "mcts" => start_mcts_engine(
+                board.clone(),
+                time_restriction, engine_options,
+                engine_comm.clone()),
+            _ => panic!("Unknown engine {}", engine_string),
+        };
+    thread::spawn(move || {
+        // Last info that has been received, if any
+        let mut last_info = None;
+        loop {
+            match rx.recv() {
+                Ok(uci_info) => {
+                    uci_send(&uci_info.to_info_string(&mut board));
+                    last_info = Some(uci_info);
+                },
+                Err(_) => {
+                    // If the channel has hung up, send bestmove command
+                    match last_info {
+                        None => uci_send("bestmove null"),
+                        Some(ref uci_info) if uci_info.pvs.is_empty() || uci_info.pvs[0].1.is_empty() => {
+                            uci_send(&format!("UCI info {:?} was sent with no PVs",
+                                              uci_info));
+                            uci_send("bestmove null");
+                        },
+                        Some(uci_info) => {
+                            let mv = uci_info.pvs[0].1[0].clone();
+                            uci_send(
+                                &format!("bestmove {}", board.move_to_lan(&mv)));
+                        },
+                    };
+                    return;
+                },
+            }
+        }
+    });
+    Ok(handle)
+}
+
 /// Given a receiving channel for uci info and an engine thread, wait until the transmitter closes the handle and the thread exits
 /// Then return the best score and move
 /// For the function to return ok, the engine must have terminated successfully
 /// If the engine crashes, the error value will contain the last move the engine
 /// sent, if any.
-pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
-                             -> Result<(Score, String), (Option<(Score, String)>, String)> {
+pub fn get_uci_move<B: Board> (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo<B>>)
+                             -> Result<(Score, B::Move), (Option<(Score, B::Move)>, String)> {
     let mut last_info = None;
     loop { // The channel will return error when closed
         match rx.recv() {
@@ -284,14 +260,12 @@ pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>
                     if uci_info.pvs.is_empty() {
                         return Err((None, "Engine returned 0 moves".to_string()));
                     }
-                    let (score, ref moves_string) = uci_info.pvs[0];
-                    let pv_string = moves_string
-                        .split_whitespace()
-                        .next().unwrap().to_string();
+                    let (score, ref moves) = uci_info.pvs[0];
+
                     if let Err(err) = handle.join() {
-                        return Err((Some((score, pv_string)), format!("{:?}", err)))
+                        return Err((Some((score, moves[0].clone())), format!("{:?}", err)))
                     }
-                    return Ok((score, pv_string))
+                    return Ok((score, moves[0].clone()))
                 }
                 else {
                     return Err((None, "Engine returned no output".to_string()));
@@ -302,8 +276,8 @@ pub fn get_uci_move (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>
 }
 
 #[allow(dead_code)]
-pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo>)
-                             -> Result<Vec<(Score, String)>, (Option<Vec<(Score, String)>>, String)> {
+pub fn get_uci_multipv<B: Board> (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciInfo<B>>)
+                             -> Result<Vec<(Score, B::Move)>, (Option<Vec<(Score, B::Move)>>, String)> {
     let mut last_info = None;
     loop { // The channel will return error when closed
         match rx.recv() {
@@ -314,11 +288,8 @@ pub fn get_uci_multipv (handle: thread::JoinHandle<()>, rx: mpsc::Receiver<UciIn
                         return Err((None, "Engine returned 0 moves".to_string()));
                     }
                     let results = uci_info.pvs.iter()
-                        .map(|&(score, ref moves_string)| {
-                            let pv_string = moves_string
-                                .split_whitespace()
-                                .next().unwrap().to_string();
-                            (score, pv_string)
+                        .map(|&(score, ref moves)| {
+                            (score, moves[0].clone())
                         })
                         .collect::<Vec<_>>();
                     if let Err(err) = handle.join() {
@@ -366,14 +337,14 @@ impl EngineComm {
 }
 
 use std::sync::mpsc;
-use search_algorithms::board::ExtendedBoard;
 use pgn::PgnBoard;
+use search_algorithms::board::Board;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
-                        -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo>)
+                        -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo<B>>)
     where B: 'static + PgnBoard + fmt::Debug + Send + Clone + PartialEq,
-<B as board::Board>::Move: Sync
+<B as board::Board>::Move: Sync + Send
 {
     mcts::start_uci_search(board, time_limit, options, engine_comm)
 }
@@ -556,11 +527,8 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
         None);
 
 
-    let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
+    let (eval, mut last_correct_move) = get_uci_move(handle, channel).unwrap();
     let mut last_eval = eval;
-    let mut last_correct_move = pv_str.split_whitespace()
-        .next()
-        .map(|mv_str| board.move_from_lan(mv_str).unwrap()).unwrap();
     
     for mv_str in moves {
         let mv = board.move_from_lan(mv_str).unwrap();
@@ -576,11 +544,8 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
             EngineOptions::new(), Arc::new(Mutex::new(EngineComm::new())),
             None);
 
-        let (eval, pv_str) = get_uci_move(handle, channel).unwrap();
-                
-        let best_move = pv_str.split_whitespace()
-            .next()
-            .map(|mv_str| board.move_from_lan(mv_str).unwrap()).unwrap();
+        let (eval, best_move) = get_uci_move(handle, channel).unwrap();
+
         let delta_score = eval.to_cp(board.side_to_move()) - last_eval.to_cp(board.side_to_move());
         
         if best_move != mv && delta_score > 0 {
@@ -679,32 +644,40 @@ Expected words.len() to be {} if no moves are included, was {}", moves_pos, word
 
 /// Trait representing an algorithm returning uci-compatible output
 #[derive(Debug, PartialEq, Clone)]
-pub struct UciInfo {
+pub struct UciInfo<B: Board> {
     pub color: board::Color,
     pub depth: u16,
     pub seldepth: u16,
     pub time: i64,
     pub nodes: u64,
     pub hashfull: f64,
-    pub pvs: Vec<(Score, String)>, // One or more principal variations, sorted from best to worst
+    pub pvs: Vec<(Score, Vec<B::Move>)>, // One or more principal variations, sorted from best to worst
 }
     
-impl UciInfo {
-    pub fn to_info_string(&self) -> String {
+impl<B: PgnBoard> UciInfo<B> {
+    pub fn to_info_string(&self, board: &mut B) -> String {
         use fmt::Write;
         let mut string = String::new();
-        if self.pvs.len() == 1 {
-            write!(string, "info depth {} seldepth {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                   self.depth, self.seldepth, self.pvs[0].0.uci_string(self.color),
+        for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
+            write!(string, "info depth {} seldepth {} {}score {} nodes {} hashfull {} time {} nps {} pv ",
+                   self.depth, self.seldepth,
+                   if self.pvs.len() == 1 { "".to_string() } else { format!("multipv {} ", n + 1) },
+                   score.uci_string(self.color),
                    self.nodes, (self.hashfull * 1000.0) as i64,
-                   self.time, (1000 * self.nodes) as i64 / (self.time + 1), self.pvs[0].1).unwrap();
-        } // Add one to self.time to avoid division by zero
-        else {
-            for (n, &(ref score, ref moves)) in self.pvs.iter().enumerate() {
-                write!(string, "info depth {} seldepth {} multipv {} score {} nodes {} hashfull {} time {} nps {} pv {}\n",
-                       self.depth, self.seldepth, n + 1, score.uci_string(self.color),
-                       self.nodes, (self.hashfull * 1000.0) as i64,
-                       self.time, (1000 * self.nodes) as i64 / (self.time + 1), moves).unwrap();
+                   self.time, (1000 * self.nodes) as i64 / (self.time + 1))
+                .unwrap();
+
+            let mut reverse_moves = vec![];
+
+            for mv in moves.iter() {
+                write!(string, "{} ", board.move_to_lan(mv)).unwrap();
+                reverse_moves.push(board.do_move(mv.clone()))
+            }
+            for reverse_move in reverse_moves {
+                board.reverse_move(reverse_move);
+            }
+            if n < self.pvs.len() - 1 {
+                writeln!(string, "").unwrap()
             }
         }
         string

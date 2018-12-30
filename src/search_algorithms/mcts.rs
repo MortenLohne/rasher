@@ -93,8 +93,8 @@ use std::thread;
 
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>)
-                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
-    where B: PgnBoard + fmt::Debug + Send + Clone + PartialEq + 'static, <B as Board>::Move: Sync
+                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo<B>>)
+    where B: PgnBoard + fmt::Debug + Send + Clone + PartialEq + 'static, <B as Board>::Move: Sync + Send
 {
     let (sender, receiver) = mpsc::channel();
     
@@ -106,7 +106,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 /// Searches until time restriction is reached, continually sending results through a channel
 pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
                      options: uci::EngineOptions,  engine_comm: Arc<Mutex<uci::EngineComm>>,
-                     channel: mpsc::Sender<uci::UciInfo>)
+                     channel: mpsc::Sender<uci::UciInfo<B>>)
     where B: PgnBoard + fmt::Debug + Send + Clone + PartialEq, <B as Board>::Move: Sync
 {
     let mut mc_tree = MonteCarloTree::new_root(&mut board);
@@ -163,7 +163,7 @@ pub fn uci_search<B>(mut board: B, time_limit: uci::TimeRestriction,
 
 fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
                     board: &mut B, start_time: time::Instant,
-                    options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo>)
+                    options: &uci::EngineOptions, channel: &mpsc::Sender<uci::UciInfo<B>>)
     where B: PgnBoard + fmt::Debug + PartialEq + Clone
 {
     debug_assert_eq!(mc_tree.board, *board);
@@ -190,18 +190,15 @@ fn send_uci_info<B>(mc_tree: &MonteCarloTree<B>,
         
     {
         let reverse_move = board.do_move(go_move.clone());
-        let mut pv = board.move_to_lan(go_move);
-        pv.push(' ');
-        pv.push_str(&node.pv(board).iter()
-                    .map(|mv| board.move_to_lan(mv))
-                    .collect::<Vec<_>>()
-                    .join(" "));
+        let mut pv = vec![go_move.clone()];
+
+        pv.append(&mut node.pv(board));
         let score = alpha_beta::Score::Val((node.score().into_inner() as f32 - 0.5) * 20.0);
         pvs.push((score, pv));
         board.reverse_move(reverse_move);
     }
 
-    let depth = pvs[0].1.split_whitespace().count() as u16;
+    let depth = pvs[0].1.len() as u16;
     let uci_info = uci::UciInfo { depth: depth, seldepth: depth, time: ms_taken as i64,
                                   nodes: mc_tree.searches(), hashfull: 0.0, pvs: pvs,
                                   color: board.side_to_move() };

@@ -178,9 +178,8 @@ fn play_game<B> (mut board : B)
                 uci::EngineOptions::new(),
                 Arc::new(Mutex::new(uci::EngineComm::new())), None);
             
-            let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-            println!("Found move {} with score {}.", move_str, score.uci_string(board.side_to_move()));
-            let mv = board.move_from_lan(&move_str).unwrap();
+            let (score, mv) = uci::get_uci_move(handle, channel).unwrap();
+            println!("Found move {:?} with score {}.", mv, score.uci_string(board.side_to_move()));
             board.do_move(mv);
             play_game(board);
         }
@@ -233,11 +232,10 @@ fn play_human<B>(mut board : B)
                     uci::EngineOptions::new(),
                     Arc::new(Mutex::new(uci::EngineComm::new())), None);
                 
-                let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-                let best_move = board.move_from_lan(&move_str);
+                let (score, best_move) = uci::get_uci_move(handle, channel).unwrap();
                 println!("Computer played {:?} with score {}",
                          best_move, score.uci_string(board.side_to_move()));
-                board.do_move(best_move.unwrap());
+                board.do_move(best_move);
                 play_human(board);
             }
         }

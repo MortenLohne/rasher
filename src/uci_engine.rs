@@ -31,11 +31,11 @@ pub trait UciEngine<B: Board> {
 
     fn search(&mut self, board: B, time_limit: uci::TimeRestriction,
               engine_comm: Arc<Mutex<EngineComm>>,
-              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo>);
+              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo<B>>);
 
     fn best_move(&mut self, board: B, time_limit: uci::TimeRestriction,
                  move_list: &Option<Vec<B::Move>>)
-        -> Result<(Score, String), Box<dyn error::Error>> {
+        -> Result<(Score, B::Move), Box<dyn error::Error>> {
 
         let (tx, rx) = mpsc::channel();
 
@@ -49,14 +49,11 @@ pub trait UciEngine<B: Board> {
                 Ok(uci_info) => last_info = Some(uci_info),
                 Err(_) => {
                     if let Some(uci_info) = last_info {
-                        if uci_info.pvs.is_empty() {
+                        if uci_info.pvs.is_empty() || uci_info.pvs[0].1.is_empty() {
                             return Err("Engine returned 0 moves".into());
                         }
-                        let (score, ref moves_string) = uci_info.pvs[0];
-                        let pv_string = moves_string
-                            .split_whitespace()
-                            .next().unwrap().to_string();
-                        return Ok((score, pv_string))
+                        let (score, ref moves) = uci_info.pvs[0];
+                        return Ok((score, moves[0].clone()))
                     }
                     else {
                         return Err("Engine returned no output".into());

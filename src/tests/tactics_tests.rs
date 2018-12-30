@@ -22,9 +22,7 @@ pub fn basic_tactics_prop(board : &ChessBoard, best_move : ChessMove) {
         uci::EngineOptions::new(),
         sync::Arc::new(sync::Mutex::new(uci::EngineComm::new())), None);
     
-    let (score, move_str) = uci::get_uci_move(handle, channel).unwrap();
-    
-    let game_move = board.move_from_lan(&move_str).unwrap();
+    let (score, game_move) = uci::get_uci_move(handle, channel).unwrap();
     
     assert_eq!(game_move, best_move,
                "Best move was {:?} with score {:?}, expected {:?}, board:\n{}",

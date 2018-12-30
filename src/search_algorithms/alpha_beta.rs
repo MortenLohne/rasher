@@ -40,7 +40,7 @@ type Depth = u16;
 pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
                             options: uci::EngineOptions, engine_comm: Arc<Mutex<uci::EngineComm>>,
                             move_list: Option<Vec<B::Move>>)
-                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo>)
+                            -> (thread::JoinHandle<()>, mpsc::Receiver<uci::UciInfo<B>>)
     where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + 'static + Hash + Eq,
 <B as Board>::Move: Sync + Send
 {
@@ -51,7 +51,7 @@ pub fn start_uci_search<B> (board: B, time_limit: uci::TimeRestriction,
 
 
 pub fn uci_search<B>(board: B, time_limit: uci::TimeRestriction,
-                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo>,
+                     options: uci::EngineOptions, channel: mpsc::Sender<uci::UciInfo<B>>,
                      engine_comm: Arc<Mutex<uci::EngineComm>>, move_list: &Option<Vec<B::Move>>)
     where B: PgnBoard + ExtendedBoard + fmt::Debug + Send + Hash + Eq,
 <B as Board>::Move: Sync
@@ -121,7 +121,7 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
 
     fn search(&mut self, mut board: B, time_limit: uci::TimeRestriction,
               engine_comm: Arc<Mutex<EngineComm>>,
-              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo>) {
+              move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo<B>>) {
         let max_depth: Depth = match time_limit {
             uci::TimeRestriction::Depth(d) | uci::TimeRestriction::Mate(d) => d,
             _ => 128,
@@ -140,7 +140,7 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
         self.node_counter = NodeCount::new();
 
         'depth_loop: for depth in 1..=max_depth {
-            let mut pvs: Vec<(Score, String)> = vec![]; // Scores and pv strings of searched moves
+            let mut pvs: Vec<(Score, Vec<B::Move>)> = vec![]; // Scores and pv strings of searched moves
             let mut pv_moves: Vec<B::Move> = vec![]; // Moves that have been searched
             for _ in 0..self.options.multipv {
                 let mut moves_to_search = if move_list.is_some() {
@@ -174,22 +174,8 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
                     self.find_best_move_ab(&mut board, depth)
                 }
                 {
-                    let mut pv_str = String::new();
-
-                    let mut pv_board = board.clone();
-
-                    for mv in &moves {
-                        pv_str.push_str(&pv_board.move_to_lan(mv));
-                        pv_str.push(' ');
-                        let mut pv_board_moves = vec![];
-                        pv_board.generate_moves(&mut pv_board_moves);
-                        debug_assert!(pv_board_moves.contains(mv),
-                                      "Move {:?} from pv {:?} was illegal on \n{:?}\nStart board:\n{:?}",
-                                      mv, moves, pv_board, board);
-                        pv_board.do_move(mv.clone());
-                    }
                     pv_moves.push(moves[0].clone());
-                    pvs.push((score, pv_str));
+                    pvs.push((score, moves));
                 } else {
                     break 'depth_loop; // The search has been stopped. Do not send any more data.
                 }
@@ -615,7 +601,7 @@ impl<B> AlphaBeta<B>
 
     /// A bugged GUI may not correctly adjudicate draws
     /// Therefore, if the root position is in fact already a draw, make any move that preserve the draw
-    fn preserve_draw(&self, board: &mut B, channel: &mpsc::Sender<uci::UciInfo>) {
+    fn preserve_draw(&self, board: &mut B, channel: &mpsc::Sender<uci::UciInfo<B>>) {
         let mut moves = vec![];
         board.generate_moves(&mut moves);
         for mv in moves {
@@ -629,7 +615,7 @@ impl<B> AlphaBeta<B>
                     time: 0,
                     nodes: 1,
                     hashfull: 0.0,
-                    pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))],
+                    pvs: vec![(Score::Draw(0), vec![mv.clone()])],
                     color: board.side_to_move()
                 };
                 channel.send(uci_info).unwrap();
@@ -644,7 +630,7 @@ impl<B> AlphaBeta<B>
             time: 0,
             nodes: 1,
             hashfull: 0.0,
-            pvs: vec![(Score::Draw(0), "null".to_string())],
+            pvs: vec![(Score::Draw(0), vec![])],
             color: board.side_to_move()
         };
         channel.send(uci_info).unwrap();
@@ -654,7 +640,7 @@ impl<B> AlphaBeta<B>
 pub fn search_moves<B> (board: B, engine_comm: Arc<Mutex<uci::EngineComm>>,
                         time_restriction: uci::TimeRestriction,
                         options: uci::EngineOptions,
-                        channel: mpsc::Sender<uci::UciInfo>,
+                        channel: mpsc::Sender<uci::UciInfo<B>>,
                         move_list: &Option<Vec<B::Move>>) 
     where B: PgnBoard + ExtendedBoard + fmt::Debug + Hash + Eq + Clone
 {
