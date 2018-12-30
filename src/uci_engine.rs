@@ -4,6 +4,8 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use uci::EngineComm;
+use search_algorithms::alpha_beta::Score;
+use std::error;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct UciOption {
@@ -30,5 +32,38 @@ pub trait UciEngine<B: Board> {
     fn search(&mut self, board: B, time_limit: uci::TimeRestriction,
               engine_comm: Arc<Mutex<EngineComm>>,
               move_list: &Option<Vec<B::Move>>, channel: mpsc::Sender<uci::UciInfo>);
+
+    fn best_move(&mut self, board: B, time_limit: uci::TimeRestriction,
+                 move_list: &Option<Vec<B::Move>>)
+        -> Result<(Score, String), Box<dyn error::Error>> {
+
+        let (tx, rx) = mpsc::channel();
+
+        self.search(board,
+                    time_limit, Arc::new(Mutex::new(EngineComm::new())),
+                    move_list, tx);
+
+        let mut last_info = None;
+        loop { // The channel will return error when closed
+            match rx.recv() {
+                Ok(uci_info) => last_info = Some(uci_info),
+                Err(_) => {
+                    if let Some(uci_info) = last_info {
+                        if uci_info.pvs.is_empty() {
+                            return Err("Engine returned 0 moves".into());
+                        }
+                        let (score, ref moves_string) = uci_info.pvs[0];
+                        let pv_string = moves_string
+                            .split_whitespace()
+                            .next().unwrap().to_string();
+                        return Ok((score, pv_string))
+                    }
+                    else {
+                        return Err("Engine returned no output".into());
+                    }
+                },
+            }
+        }
+    }
 }
 
