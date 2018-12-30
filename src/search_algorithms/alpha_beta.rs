@@ -128,48 +128,10 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
         };
         debug_assert!(max_depth > 1);
 
-        // Normally, the root position should never already be decided
-        // If the root position is drawn *anyway*, try to make a move that preserves the draw
-        // If no move is found, return null move
-        match board.game_result() {
-            Some(GameResult::Draw) => {
-                let mut moves = vec![];
-                board.generate_moves(&mut moves);
-                for mv in moves {
-                    let reverse_move = board.do_move(mv.clone());
-
-                    if board.game_result() == Some(GameResult::Draw) {
-                        board.reverse_move(reverse_move);
-                        let uci_info = uci::UciInfo {
-                            depth: 1,
-                            seldepth: 1,
-                            time: 0,
-                            nodes: 1,
-                            hashfull: 0.0,
-                            pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))],
-                            color: board.side_to_move()
-                        };
-                        channel.send(uci_info).unwrap();
-                        return;
-                    }
-
-                    board.reverse_move(reverse_move);
-                }
-
-                let uci_info = uci::UciInfo {
-                    depth: 1,
-                    seldepth: 1,
-                    time: 0,
-                    nodes: 1,
-                    hashfull: 0.0,
-                    pvs: vec![(Score::Draw(0), "null".to_string())],
-                    color: board.side_to_move()
-                };
-                channel.send(uci_info).unwrap();
-
-                return;
-            },
-            _ => (),
+        // If the root position is drawn, instamove another drawing move
+        if board.game_result() == Some(GameResult::Draw) {
+            self.preserve_draw(&mut board, &channel);
+            return;
         }
 
         self.engine_comm = engine_comm;
@@ -279,6 +241,7 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
         }
     }
 }
+
 
 impl<B> AlphaBeta<B>
     where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq {
@@ -614,6 +577,7 @@ impl<B> AlphaBeta<B>
         return Some((score, killer_move, best_move, node_type));
 
     }
+
     fn abort_search_check(&mut self, to_move: Color) -> Option<()> {
         {
             let engine_comm = self.engine_comm.lock().unwrap();
@@ -647,6 +611,43 @@ impl<B> AlphaBeta<B>
             },
             _ => Some(()),
         }
+    }
+
+    /// A bugged GUI may not correctly adjudicate draws
+    /// Therefore, if the root position is in fact already a draw, make any move that preserve the draw
+    fn preserve_draw(&self, board: &mut B, channel: &mpsc::Sender<uci::UciInfo>) {
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        for mv in moves {
+            let reverse_move = board.do_move(mv.clone());
+
+            if board.game_result() == Some(GameResult::Draw) {
+                board.reverse_move(reverse_move);
+                let uci_info = uci::UciInfo {
+                    depth: 1,
+                    seldepth: 1,
+                    time: 0,
+                    nodes: 1,
+                    hashfull: 0.0,
+                    pvs: vec![(Score::Draw(0), board.move_to_lan(&mv))],
+                    color: board.side_to_move()
+                };
+                channel.send(uci_info).unwrap();
+                return;
+            }
+
+            board.reverse_move(reverse_move);
+        }
+        let uci_info = uci::UciInfo {
+            depth: 1,
+            seldepth: 1,
+            time: 0,
+            nodes: 1,
+            hashfull: 0.0,
+            pvs: vec![(Score::Draw(0), "null".to_string())],
+            color: board.side_to_move()
+        };
+        channel.send(uci_info).unwrap();
     }
 }
 
