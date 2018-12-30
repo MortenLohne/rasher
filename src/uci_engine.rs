@@ -47,7 +47,7 @@ pub trait UciEngine<B: Board>
                 uci_info.pvs.get(0)
                     .and_then(|(score, pv)|
                         pv.get(0).map(|mv| (*score, mv.clone()))))
-            .ok_or("Engine returned 0 moves".into())
+            .ok_or_else(|| "Engine returned 0 moves".into())
     }
 
     fn best_moves_multipv(self, board: B, time_limit: uci::TimeRestriction,
@@ -55,12 +55,12 @@ pub trait UciEngine<B: Board>
         -> Result<Vec<(Score, B::Move)>, Box<dyn error::Error>> {
 
         self.search(board, time_limit,
-        Arc::new(Mutex::new(EngineComm::new())), move_list)
+                    Arc::new(Mutex::new(EngineComm::new())), move_list)
             .last()
             .map(|uci_info| uci_info.pvs.iter()
                 .filter_map(|(score, moves)| moves.get(0).map(|mv| (*score, mv.clone())))
                 .collect())
-            .ok_or("Engine returned 0 moves".into())
+            .ok_or_else(|| "Engine returned 0 moves".into())
     }
 
     fn search_async(self, board: B, time_limit: uci::TimeRestriction, engine_comm: Arc<Mutex<EngineComm>>,
