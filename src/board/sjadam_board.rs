@@ -793,22 +793,22 @@ impl PgnBoard for SjadamBoard {
                         .map(|cand_mv| cand_mv.from())
                         .collect::<Vec<_>>();
 
-                    if alternative_from_squares.is_empty()
-                        && (piece_type != Pawn || mv.from().file() == mv.to().file()) {
-                        ();
-                    }
+                    if !(alternative_from_squares.is_empty()
+                        && (piece_type != Pawn || mv.from().file() == mv.to().file()))
+                    {
                         // Disambiguate with departure file
-                        else if alternative_from_squares.iter().all(|square| square.file() != mv.from().file()) {
+                        if alternative_from_squares.iter().all(|square| square.file() != mv.from().file()) {
                             output.push(mv.from().to_string().chars().next().unwrap());
                         }
-                            // Disambiguate with departure rank
-                            else if alternative_from_squares.iter().all(|square| square.rank() != mv.from().rank()) {
-                                output.push(mv.from().to_string().chars().last().unwrap());
-                            }
-                                // Disambiguate with full square
-                                else {
-                                    output.push_str(&mv.from().to_string());
-                                };
+                        // Disambiguate with departure rank
+                        else if alternative_from_squares.iter().all(|square| square.rank() != mv.from().rank()) {
+                            output.push(mv.from().to_string().chars().last().unwrap());
+                        }
+                        // Disambiguate with full square
+                        else {
+                            output.push_str(&mv.from().to_string());
+                        };
+                    }
 
                     if self.get_square(mv.to()) != Piece::Empty {
                         output.push('x');
@@ -885,14 +885,14 @@ impl PgnBoard for SjadamBoard {
         disambig_string = disambig_string.chars().rev().collect();
 
         let move_filter : Box<Fn(&Self::Move) -> bool> =
-            match (disambig_string.chars().count(), disambig_string.chars().next().clone()) {
+            match (disambig_string.chars().count(), disambig_string.chars().next()) {
                 (0, None) => Box::new(|_| true),
 
                 (1, Some(rank)) if rank >= '1' && rank <= '8' =>
-                    Box::new(move |mv: &Self::Move| mv.from().rank() == 7 - (rank as u8 - '1' as u8)),
+                    Box::new(move |mv: &Self::Move| mv.from().rank() == 7 - (rank as u8 - b'1')),
 
                 (1, Some(file)) if file >= 'a' && file <= 'h' =>
-                    Box::new(move |mv: &Self::Move| mv.from().file() == (file as u8 - 'a' as u8)),
+                    Box::new(move |mv: &Self::Move| mv.from().file() == (file as u8 - b'a')),
 
                 (2, _) if Square::from_alg(&disambig_string).is_ok() =>
                     Box::new(move |mv: &Self::Move| mv.from() == Square::from_alg(&disambig_string).unwrap()),
@@ -915,7 +915,7 @@ impl PgnBoard for SjadamBoard {
         if filtered_moves.len() > 1 {
             Err(pgn::Error::new(pgn::ErrorKind::AmbiguousMove, format!("{} could be any of {:?}", input, filtered_moves)))
         }
-            else if filtered_moves.len() == 0 {
+            else if filtered_moves.is_empty() {
                 Err(pgn::Error::new(pgn::ErrorKind::IllegalMove,
                                     format!("{} ({} to {}) {:?} {:?} is not a legal move in the position",
                                             input, piece_type, dest_square, moves.iter().filter(|mv| move_filter(mv)).collect::<Vec<_>>(),
@@ -949,16 +949,12 @@ impl Board for SjadamBoard {
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
             (true, true) => {
-                if self.half_move_clock >= 100 {
+                if self.half_move_clock >= 100 || self.repetitions >= 3 {
                     Some(GameResult::Draw)
                 }
-                    else if self.repetitions >= 3 {
-                        Some(GameResult::Draw)
-                    }
-                        else {
-                            None
-                        }
-
+                else {
+                    None
+                }
             },
         }
     }
