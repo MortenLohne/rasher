@@ -46,6 +46,9 @@ use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
+use search_algorithms::monte_carlo::MonteCarlo;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -69,6 +72,16 @@ fn main() {
 
     let mut stdin = io::BufReader::new(io::stdin());
     info!("Opened log");
+
+    let monte_carlo: MonteCarlo<ChessBoard> = MonteCarlo::init();
+    let mut board = ChessBoard::start_board();
+    for uci_info in monte_carlo.search(board.clone(),
+                                       uci::TimeRestriction::Infinite,
+                                       Arc::new(Mutex::new(uci::EngineComm::new())),
+                                       None) {
+        println!("{}", uci_info.to_info_string(&mut board));
+    }
+
     loop {
         if let Ok(input) = uci::get_engine_input(&mut stdin) {
             

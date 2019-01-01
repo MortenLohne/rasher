@@ -661,18 +661,18 @@ pub struct SearchData {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Score {
-    white_wins : u64,
-    black_wins : u64,
-    draws : u64,
+    pub white_wins : u64,
+    pub black_wins : u64,
+    pub draws : u64,
 }
 
 impl Score {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Score {white_wins: 0, black_wins: 0, draws: 0 }
     }
 
     /// Creates a score object containing a single result
-    fn from_game_result(result: &GameResult) -> Self {
+    pub fn from_game_result(result: &GameResult) -> Self {
         let mut score = Score::new();
         match *result {
             WhiteWin => score.white_wins += 1,
