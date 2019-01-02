@@ -157,7 +157,12 @@ impl<B> AlphaBeta<B>
                 self.find_best_move_ab(board, depth, Some(moves_to_search))
             }
             {
-                pv_moves.push(moves[0].clone());
+                if moves.is_empty() {
+                    error!("No moves returned when searching at depth {}. Board:\n{:?}", depth, board);
+                }
+                else {
+                    pv_moves.push(moves[0].clone());
+                }
                 pvs.push((score, moves));
             } else {
                 return None; // The search has been stopped. Do not send any more data.
