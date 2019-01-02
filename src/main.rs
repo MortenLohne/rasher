@@ -46,10 +46,6 @@ use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
-use search_algorithms::monte_carlo::MonteCarlo;
-use std::sync::Arc;
-use std::sync::Mutex;
-use search_algorithms::monte_carlo;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -73,21 +69,6 @@ fn main() {
 
     let mut stdin = io::BufReader::new(io::stdin());
     info!("Opened log");
-
-    for &cp in [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0].iter() {
-        let win_pct = monte_carlo::eval_to_win_pct(cp);
-        println!("{} eval: {}", cp, win_pct);
-        println!("{} win percentage: {} eval", win_pct, monte_carlo::win_pct_to_eval(win_pct))
-    }
-
-    let monte_carlo = MonteCarlo::init();
-    let mut board = SjadamBoard::start_board();
-    for uci_info in monte_carlo.search(board.clone(),
-                                       uci::TimeRestriction::Infinite,
-                                       Arc::new(Mutex::new(uci::EngineComm::new())),
-                                       None) {
-        println!("{}", uci_info.to_info_string(&mut board));
-    }
 
     loop {
         if let Ok(input) = uci::get_engine_input(&mut stdin) {

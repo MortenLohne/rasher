@@ -176,6 +176,43 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                     }
                 };
             }
+            "mcts" => {
+                match engine_options.variant {
+                    ChessVariant::Standard => {
+                        let mut board = parse_position::<ChessBoard>(&board_string)?;
+                        let monte_carlo = MonteCarlo::init();
+
+                        for uci_info in monte_carlo.search(board.clone(),
+                                                           TimeRestriction::Infinite,
+                                                           Arc::new(Mutex::new(EngineComm::new())),
+                                                           None) {
+                            println!("{}", uci_info.to_info_string(&mut board));
+                        }
+                    }
+                    ChessVariant::Sjadam => {
+                        let mut board = parse_position::<SjadamBoard>(&board_string)?;
+                        let monte_carlo = MonteCarlo::init();
+
+                        for uci_info in monte_carlo.search(board.clone(),
+                                                           TimeRestriction::Infinite,
+                                                           Arc::new(Mutex::new(EngineComm::new())),
+                                                           None) {
+                            println!("{}", uci_info.to_info_string(&mut board));
+                        }
+                    }
+                    ChessVariant::Crazyhouse => {
+                        let mut board = parse_position::<CrazyhouseBoard>(&board_string)?;
+                        let monte_carlo = MonteCarlo::init();
+
+                        for uci_info in monte_carlo.search(board.clone(),
+                                                           TimeRestriction::Infinite,
+                                                           Arc::new(Mutex::new(EngineComm::new())),
+                                                           None) {
+                            println!("{}", uci_info.to_info_string(&mut board));
+                        }
+                    }
+                };
+            }
             "sjadam" => engine_options.variant = ChessVariant::Sjadam,
             "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
             "hash1G" => engine_options.hash_memory = 1024,
@@ -284,6 +321,7 @@ use std::sync::mpsc;
 use pgn::PgnBoard;
 use search_algorithms::board::Board;
 use search_algorithms::alpha_beta::AlphaBeta;
+use search_algorithms::monte_carlo::MonteCarlo;
 
 fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
                         options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
