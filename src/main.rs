@@ -80,8 +80,8 @@ fn main() {
         println!("{} win percentage: {} eval", win_pct, monte_carlo::win_pct_to_eval(win_pct))
     }
 
-    let monte_carlo: MonteCarlo<ChessBoard> = MonteCarlo::init();
-    let mut board = ChessBoard::start_board();
+    let monte_carlo = MonteCarlo::init();
+    let mut board = SjadamBoard::start_board();
     for uci_info in monte_carlo.search(board.clone(),
                                        uci::TimeRestriction::Infinite,
                                        Arc::new(Mutex::new(uci::EngineComm::new())),
