@@ -219,7 +219,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
                 let child = MonteCarloTree {
                     children: None,
                     score: Score::new(),
-                    static_eval: board.side_to_move().multiplier() as f32 * score.to_value(board.side_to_move()),
+                    static_eval: board.side_to_move().multiplier() as f32 * score.to_value(White), // Always get the score from white's perspective, then correct it
                     side_to_move: board.side_to_move(),
                 };
                 board.reverse_move(reverse_move);
