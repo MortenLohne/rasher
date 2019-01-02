@@ -7,7 +7,6 @@ use uci::TimeRestriction;
 use uci::EngineComm;
 use search_algorithms::board::Board;
 use uci::UciInfo;
-use search_algorithms::board::Color;
 use search_algorithms::board::Color::*;
 use search_algorithms::board::GameResult::*;
 use search_algorithms::board::GameResult;
@@ -57,13 +56,12 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
     fn set_uci_option(&mut self, _: UciOption) {}
 
     fn search(mut self, mut board: B, time_limit: TimeRestriction, engine_comm: Arc<Mutex<EngineComm>>,
-              move_list: Option<Vec<<B as Board>::Move>>) -> Box<Iterator<Item=UciInfo<B>>> {
+              _: Option<Vec<<B as Board>::Move>>) -> Box<Iterator<Item=UciInfo<B>>> {
 
         self.root = MonteCarloTree::new_root(&mut board);
         self.time_limit = time_limit;
         self.engine_comm = engine_comm;
         self.start_time = Instant::now();
-
 
         Box::new(DepthIterator { monte_carlo: self, root_board: board })
     }
@@ -85,8 +83,11 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
 
             let mut board = self.root_board.clone();
             for (i, mv) in game.into_iter().enumerate() {
-                if i % 2 == 0 {
-                    print!("{}. {} ", i / 2 + 1, board.move_to_san(&mv));
+                if i == 0 && board.side_to_move() == Black {
+                    print!("{}... {} ", 1, board.move_to_san(&mv));
+                }
+                else if board.side_to_move() == White {
+                    print!("{}. {} ", (i + 1) / 2 + 1, board.move_to_san(&mv));
                 }
                 else {
                     print!("{} ", board.move_to_san(&mv));
@@ -132,7 +133,6 @@ struct MonteCarloTree<B: Board> {
     children: Option<Vec<(B::Move, MonteCarloTree<B>)>>,
     score: Score,
     static_eval: f32,
-    side_to_move: Color,
 }
 
 impl<B> MonteCarloTree<B>
@@ -142,7 +142,6 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
             children: None,
             score: Score::new(),
             static_eval: board.static_eval(),
-            side_to_move: board.side_to_move(),
         }
     }
 
@@ -215,14 +214,16 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
 
         let children = results.into_iter()
             .map(|(score, mv)| {
-                let reverse_move = board.do_move(mv.clone());
                 let child = MonteCarloTree {
                     children: None,
                     score: Score::new(),
-                    static_eval: board.side_to_move().multiplier() as f32 * score.to_value(White), // Always get the score from white's perspective, then correct it
-                    side_to_move: board.side_to_move(),
+                    static_eval: match score {
+                        alpha_beta::Score::Val(val) => - val,
+                        alpha_beta::Score::Draw(_) => 0.0,
+                        alpha_beta::Score::Win(_) => -100.0,
+                        alpha_beta::Score::Loss(_) => 100.0,
+                    }
                 };
-                board.reverse_move(reverse_move);
                 (mv, child)
             })
             .collect::<Vec<_>>();
@@ -243,6 +244,8 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
 fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
     where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
 
+    let start_color = board.side_to_move();
+
     let mut white_time = GAME_TIME;
     let mut black_time = GAME_TIME;
 
@@ -254,7 +257,8 @@ fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
                 (WhiteWin, Black) | (BlackWin, White) => score.losses += 1,
                 (Draw, _) => score.draws += 1,
             }
-            return score;
+            println!("{:?} ({} to move) on the board", result, board.side_to_move());
+            return if board.side_to_move() == start_color { score } else { !score };
         }
 
         let turn_start = Instant::now();
@@ -283,10 +287,14 @@ fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
         let time_elapsed = Instant::now() - turn_start;
 
         match board.side_to_move() {
-            White if white_time < time_elapsed =>
-                return Score::from_game_result(&BlackWin),
-            Black if black_time < time_elapsed =>
-                return Score::from_game_result(&WhiteWin),
+            White if white_time < time_elapsed => {
+                println!("White wins on time");
+                return Score::from_game_result(&BlackWin)
+            },
+            Black if black_time < time_elapsed => {
+                println!("Black wins on time");
+                return Score::from_game_result(&WhiteWin)
+            },
             White => {
                 white_time -= time_elapsed;
                 white_time += INC_MS;
