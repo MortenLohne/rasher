@@ -816,8 +816,8 @@ impl PgnBoard for SjadamBoard {
 
                     output.push_str(&mv.to().to_string());
 
-                    match (color, mv.to().file()) {
-                        (White, 7) | (Black, 0) => output.push_str("=Q"),
+                    match (color, mv.to().rank()) {
+                        (White, 0) | (Black, 7) => output.push_str("=Q"),
                         _ => (),
                     };
                 }
