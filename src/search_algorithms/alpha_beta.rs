@@ -769,6 +769,15 @@ impl Score {
         }
     }
 
+    pub fn to_value(self, to_move: Color) -> f32 {
+        match self {
+            Val(val) => val,
+            Draw(_) => 0.0,
+            Win(_) => 100.0 * to_move.multiplier() as f32,
+            Loss(_) => -100.0 * to_move.multiplier() as f32,
+        }
+    }
+
     pub fn uci_string(mut self, to_move: Color) -> String {
         if to_move == Black {
             self = !self;
