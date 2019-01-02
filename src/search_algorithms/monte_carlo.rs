@@ -227,15 +227,15 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
                 (mv, child)
             })
             .collect::<Vec<_>>();
-        {
-            let (mv, _) = children.get(0).unwrap();
-            board.do_move(mv.clone());
-            game.push(mv.clone());
-        }
 
         self.children = Some(children);
+
+        let (mv, child) = self.children.as_mut().unwrap().get_mut(0).unwrap();
+        board.do_move(mv.clone());
+        game.push(mv.clone());
         let result = !simulate(board, game);
         self.score = self.score + result;
+        child.score = child.score + !result;
 
         result
     }
