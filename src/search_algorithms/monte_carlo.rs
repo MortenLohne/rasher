@@ -26,10 +26,10 @@ use uci_engine::UciOptionType;
 use uci::TimeInfo;
 use std::time::Instant;
 
-const GAME_TIME: Duration = Duration::from_millis(60000);
-const INC_MS: Duration = Duration::from_millis(600);
+const GAME_TIME: Duration = Duration::from_millis(30000);
+const INC_MS: Duration = Duration::from_millis(300);
 
-const EVAL_DEPENDENCE : f32 = 20.0;
+const EVAL_DEPENDENCE : f32 = 10.0;
 
 pub struct MonteCarlo<B: Board> {
     root: MonteCarloTree<B>,
