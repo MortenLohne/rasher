@@ -28,7 +28,7 @@ version = "0.0.3"
 optional = true
 
 [dev-dependencies]
-quickcheck = "0.5"
+quickcheck = "0.7"
 
 [profile.release]
 debug = true
