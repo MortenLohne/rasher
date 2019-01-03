@@ -13,7 +13,6 @@ use std::fmt;
 use std::thread;
 use std::sync::{Mutex, Arc};
 use std::io;
-use std::str::FromStr;
 use std::time;
 use std::hash::Hash;
 use search_algorithms::board::ExtendedBoard;
@@ -37,8 +36,12 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
     
     let mut board_string : String = "position startpos".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
-    let mut engine_options = EngineOptions::new();
     let mut search_thread : Option<thread::JoinHandle<()>> = None;
+    let mut variant = ChessVariant::Standard;
+    let mut uci_options = {
+        let mut engine: AlphaBeta<ChessBoard> = AlphaBeta::init();
+        engine.uci_options()
+    };
     
     // Listen to commands from GUI forever
     loop {
@@ -53,11 +56,11 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
             "quit" => { info!("Quitting..."); return Ok(()); },
             "ucinewgame" => (), // Ignore this for now
             "position" => board_string = input.to_string(),
-            "setoption" => parse_setoption(&input, &mut engine_options)?,
+            "setoption" => parse_setoption(&input, &mut uci_options)?,
             "perft" => {
                 if let Some(depth) = tokens.get(1)
                     .and_then(|depth| depth.parse::<u16>().ok()) {
-                    let result = match engine_options.variant {
+                    let result = match variant {
                         ChessVariant::Standard => {
                             let mut board = parse_position::<ChessBoard>(&board_string)?;
                             tools::perft(&mut board, depth)
@@ -75,7 +78,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                 }
             },
             "eval" => {
-                match engine_options.variant {
+                match variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
                         uci_send(&format!("Eval: {}", board.static_eval()));
@@ -91,7 +94,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                 };
             }
             "fen" => {
-                match engine_options.variant {
+                match variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
                         uci_send(&format!("Fen: {}", board.to_fen()));
@@ -138,24 +141,24 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
 
 
                 let handle =
-                match engine_options.variant {
+                match variant {
                     ChessVariant::Standard =>
                         start_correct_engine::<ChessBoard>(&mut board_string,
-                                                           engine_comm.clone(), engine_options,
+                                                           engine_comm.clone(), uci_options.clone(),
                                                            time_restriction, searchmoves_input)?,
                     ChessVariant::Sjadam =>
                         start_correct_engine::<SjadamBoard>(&mut board_string,
-                                                            engine_comm.clone(), engine_options,
+                                                            engine_comm.clone(), uci_options.clone(),
                                                             time_restriction, searchmoves_input)?,
                     ChessVariant::Crazyhouse =>
                         start_correct_engine::<CrazyhouseBoard>(&mut board_string,
-                                                                engine_comm.clone(), engine_options,
+                                                                engine_comm.clone(), uci_options.clone(),
                                                                 time_restriction, searchmoves_input)?,
             };
                 search_thread = Some(handle);
             }
             "eval_game" => {
-                match engine_options.variant {
+                match variant {
                     ChessVariant::Standard => {
                         let board = parse_position::<ChessBoard>(&board_string)?;
                         eval_game(board, &tokens[1..]);
@@ -171,7 +174,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                 };
             }
             "mcts" => {
-                match engine_options.variant {
+                match variant {
                     ChessVariant::Standard => {
                         let mut board = parse_position::<ChessBoard>(&board_string)?;
                         let monte_carlo = MonteCarlo::init();
@@ -207,10 +210,8 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                     }
                 };
             }
-            "sjadam" => engine_options.variant = ChessVariant::Sjadam,
-            "crazyhouse" => engine_options.variant = ChessVariant::Crazyhouse,
-            "hash1G" => engine_options.hash_memory = 1024,
-            "multipv5" => engine_options.multipv = 5,
+            "sjadam" => variant = ChessVariant::Sjadam,
+            "crazyhouse" => variant = ChessVariant::Crazyhouse,
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
                 warn!("Unrecognized input \"{}\". Ignoring.", input);
             },
@@ -219,7 +220,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
 }
 
 fn start_correct_engine<B>(board_string: &mut String,
-                           engine_comm: Arc<Mutex<EngineComm>>, engine_options: EngineOptions,
+                           engine_comm: Arc<Mutex<EngineComm>>, uci_options: Vec<UciOption>,
                            time_restriction: TimeRestriction,
                            searchmoves_input: Option<Vec<String>>) -> Result<thread::JoinHandle<()>, Box<error::Error>>
 where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'static,
@@ -228,6 +229,9 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'stat
     let mut board = parse_position::<B>(&board_string)?;
     let (handle, rx) = {
         let mut engine = alpha_beta::AlphaBeta::init();
+        for uci_option in uci_options {
+            engine.set_uci_option(uci_option);
+        }
         engine.search_async(
             board.clone(),
             time_restriction,
@@ -307,6 +311,8 @@ use pgn::PgnBoard;
 use search_algorithms::board::Board;
 use search_algorithms::alpha_beta::AlphaBeta;
 use search_algorithms::monte_carlo::MonteCarlo;
+use uci_engine::UciOption;
+use uci_engine::UciOptionType;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ChessVariant {
@@ -334,56 +340,25 @@ impl EngineOptions {
 }
 
 // Parse "setoption" strings from the GUI. 
-fn parse_setoption (input: &str, options: &mut EngineOptions) -> Result<(), String> {
+fn parse_setoption (input: &str, options: &mut Vec<UciOption>) -> Result<(), Box<error::Error>> {
 
-    let (option_name, value) = try!(parse_setoption_data(input));
+    let (option_name, value) = parse_setoption_data(input)?;
 
-    match &option_name.to_lowercase()[..] {
-        "variant" | "uci_variant" => match value.to_lowercase().as_str() {
-            "standard" => options.variant = ChessVariant::Standard,
-            "crazyhouse" => options.variant = ChessVariant::Crazyhouse,
-            "sjadam" => options.variant = ChessVariant::Sjadam,
-            _ => return Err(format!("Error: Unknown chess variant \"{}\"", value)),
-        },
-
-        "debuginfo" => match value.to_lowercase().as_str() {
-            "true" => options.debug_info = true,
-            "false" => options.debug_info = false,
-            _ => return Err(format!("Invalid DebugInfo value {}", value)),
+    if let Some(option) = options
+        .iter_mut()
+        .find(|option| option.name.to_lowercase() == option_name) {
+        match option.option_type {
+            UciOptionType::Check(ref mut val) => *val = value.to_lowercase() == "true",
+            UciOptionType::Spin(ref mut val, _, _) => *val = str::parse(&value)?,
+            UciOptionType::Combo(ref mut val, ref values) => if values.contains(&value) { *val = value },
+            UciOptionType::Button => (), // TODO: Implement
+            UciOptionType::String(ref mut val) => *val = value,
         }
-
-        "uci_standard" => options.variant = ChessVariant::Standard,
-        
-        "uci_crazyhouse" => options.variant = ChessVariant::Crazyhouse,
-        
-        "uci_sjadam" => options.variant = ChessVariant::Sjadam,
-        
-        "threads" => {
-            let threads = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
-            options.threads = threads;
-        }
-
-        "hash" => {
-            let hash = try!(u32::from_str(&value).map_err(|e|format!("{}", e)));
-            options.hash_memory = hash;
-        }
-        
-        "multipv" => {
-            let multipv = u32::from_str(&value).map_err(|e|format!("{:?}", e))?;
-            options.multipv = multipv;
-        }
-        
-        "write debug log" => {
-            match &value.to_lowercase()[..] {
-                "true" | "false" => (),
-                _ => warn!("Unrecognized value {} in option {}, ignoring...", 
-                                     value, option_name),
-            }
-        },
-        _ => warn!("Unrecognized option {} with value {}, ignoring...", 
-                             option_name, value),
+        Ok(())
     }
-    Ok(())
+    else {
+        return Err(format!("Option \"{}\" not supported", option_name).into());
+    }
 }
 
 ///Helper method for parsing a setoption string into the option's name and value

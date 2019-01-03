@@ -80,7 +80,7 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq + 'static {
             ("hash", UciOptionType::Spin(hash, _, _)) =>
                 self.options.hash_memory = hash as u32,
             ("threads", UciOptionType::Spin(threads, _, _)) =>
-                self.options.hash_memory = threads as u32,
+                self.options.threads = threads as u32,
             ("multipv", UciOptionType::Spin(multipv, _, _)) =>
                 self.options.multipv = multipv as u32,
             ("UCI_Variant", UciOptionType::Combo(variant, _)) =>
