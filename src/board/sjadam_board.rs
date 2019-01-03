@@ -132,9 +132,9 @@ lazy_static! {
     // 1 for side to move, 16 for castling rights, 5 for repetitions
     static ref ZOBRIST_KEYS : [u64; 798] = {
         let mut table = [0; 798];
-        let mut rng = rand::StdRng::from_seed(&[42]);
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
         for entry in table.iter_mut() {
-            *entry = rng.next_u64();
+            *entry = rng.gen();
         }
         table
     };
