@@ -12,7 +12,6 @@ extern crate quickcheck;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
-extern crate itertools;
 extern crate rand;
 extern crate ordered_float;
 extern crate rayon;
