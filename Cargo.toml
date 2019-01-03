@@ -13,7 +13,7 @@ legacy_sjadam_move_format = []
 [dependencies]
 rand = "0.6.*"
 ordered-float = "1.0.*"
-rayon = "0.9.*"
+rayon = "1.0.*"
 log = "0.3.*"
 lazy_static = "1.0.*"
 
