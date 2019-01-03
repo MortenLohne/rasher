@@ -14,11 +14,11 @@ legacy_sjadam_move_format = []
 rand = "0.6.*"
 ordered-float = "1.0.*"
 rayon = "1.0.*"
-log = "0.3.*"
+log = "0.4.*"
 lazy_static = "1.0.*"
 
 [dependencies.log4rs]
-version = "0.7.*"
+version = "0.8.*"
 optional = true
 default-features = false # do not include the default features
 features = ["file_appender"]

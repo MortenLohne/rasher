@@ -51,7 +51,7 @@ fn init_log() -> Result<(), Box<std::error::Error>> {
     
     let config = Config::builder()
         .appender(Appender::builder().build("uci", Box::new(appender)))
-        .build(Root::builder().appender("uci").build(log::LogLevelFilter::Debug))?;
+        .build(Root::builder().appender("uci").build(log::LevelFilter::Debug))?;
     log4rs::init_config(config)?;
     Ok(())
 }
