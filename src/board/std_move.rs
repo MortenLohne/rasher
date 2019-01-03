@@ -48,11 +48,11 @@ impl fmt::Debug for ChessMove {
 
 impl ChessMove {
     pub fn new(from : Square, to : Square) -> ChessMove {
-        ChessMove { from: from, to: to, prom: None }
+        ChessMove { from, to, prom: None }
     }
     
     pub fn new_prom(from : Square, to : Square, prom : PieceType) -> ChessMove {
-        ChessMove { from: from, to: to, prom: Some(prom) }
+        ChessMove { from, to, prom: Some(prom) }
     }
 }
 

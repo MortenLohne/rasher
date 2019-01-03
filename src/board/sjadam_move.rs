@@ -45,7 +45,7 @@ pub struct SjadamMove {
 
 impl SjadamMove {
     pub fn new(from: Square, to: Square, castling: bool, piece_moved: PieceType) -> Self {
-        Self { from: from, to: to, castling: castling, piece_moved: piece_moved }
+        Self { from, to, castling, piece_moved }
     }
     
     pub fn from_to_squares(&self) -> (Square, Square) {

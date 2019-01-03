@@ -325,7 +325,7 @@ impl BitBoard {
 impl fmt::Debug for BitBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for n in 0..8 {
-            write!(f, "{:08b}\n", (self.board >> (n * 8)) as u8).unwrap();
+            writeln!(f, "{:08b}", (self.board >> (n * 8)) as u8).unwrap();
         }
         Ok(())
     }
@@ -356,7 +356,7 @@ pub struct BitBoardIterator {
 
 impl BitBoardIterator {
     fn new(board: BitBoard) -> Self {
-        Self { board: board }
+        Self { board }
     }
 }
 
@@ -616,7 +616,7 @@ impl SjadamBoard {
 impl fmt::Debug for SjadamBoard {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmt::Debug::fmt(&self.to_chess_board(), fmt)?;
-        write!(fmt, "Hash: {}, repetitions: {}\n", self.hash, self.repetitions)?;
+        writeln!(fmt, "Hash: {}, repetitions: {}", self.hash, self.repetitions)?;
         write!(fmt, "Move history: {:?}, last move: {:?}", self.move_history, self.last_move)
     }
 }
@@ -970,7 +970,7 @@ impl Board for SjadamBoard {
         let en_passant = mv.en_passant_bitboard(self);
         let reverse_move = SjadamReverseMove {
             from: mv.from(), to: mv.to(),
-            castling: mv.castling(), en_passant: en_passant,
+            castling: mv.castling(), en_passant,
             capture: self.get_square(mv.to()).piece_type(),
             old_last_move: self.last_move.clone(),
             piece_moved: mv.piece_moved(),

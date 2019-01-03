@@ -702,10 +702,10 @@ impl PgnBoard for ChessBoard {
             let from = Square::from_alg(&alg[0..2]).unwrap_or(Square(0));
             let to = Square::from_alg(&alg[2..4]).unwrap_or(Square(0));
             if alg.len() == 4 {
-                Ok(ChessMove { from: from, to: to, prom: None })
+                Ok(ChessMove { from, to, prom: None })
             }
             else {
-                Ok(ChessMove { from: from, to: to, prom: Some(
+                Ok(ChessMove { from, to, prom: Some(
                     match alg.chars().nth(4) {
                         Some('Q') => Queen,
                         Some('q') => Queen,
@@ -1105,9 +1105,9 @@ impl fmt::Display for ChessBoard {
             for piece in rank.iter() {
                 write!(fmt, "[{}]", piece).unwrap();
             }
-            write!(fmt, "\n").unwrap();
+            writeln!(fmt).unwrap();
         }
-        write!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}\n",
+        writeln!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}",
                self.to_move, self.move_num, self.castling_en_passant, self.half_move_clock)
             .unwrap();
         Ok(())   
