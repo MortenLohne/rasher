@@ -15,7 +15,7 @@ rand = "0.6.*"
 ordered-float = "1.0.*"
 rayon = "1.0.*"
 log = "0.4.*"
-lazy_static = "1.0.*"
+lazy_static = "1.2.*"
 
 [dependencies.log4rs]
 version = "0.8.*"
