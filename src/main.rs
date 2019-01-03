@@ -27,7 +27,6 @@ use std::hash::Hash;
 use std::time;
 
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::mcts;
 use search_algorithms::board::GameResult;
 use pgn::PgnBoard;
 
@@ -93,8 +92,6 @@ fn main() {
                     println!("Sjadam board: {}", mem::size_of::<SjadamBoard>());
                     println!("Sjadam move: {}", mem::size_of::<board::sjadam_move::SjadamMove>());
                     println!("Board score: {}", mem::size_of::<Score>());
-                    println!("Size of chess mcts node: {}",
-                             mem::size_of::<mcts::MonteCarloTree<ChessBoard>>());
                     
                 },
                 //"play_self" => play_game(&board::START_BOARD.clone()),
@@ -136,28 +133,7 @@ fn main() {
                         }
                     }
                 },
-                "mcts" => {
-                    
-                    if tokens.len() == 1 || tokens[1] == "standard" {
-                        let mut board = ChessBoard::start_board().clone();
-                        search_algorithms::mcts::search_position(&mut board);
-                    }
-                    else {
-                        match tokens[1] {
-                            "crazyhouse" => {
-                                let mut board = CrazyhouseBoard::start_board().clone();
-                                search_algorithms::mcts::search_position(&mut board);
-                            },
-                            "sjadam" => {
-                                let mut board = SjadamBoard::start_board().clone();
-                                search_algorithms::mcts::search_position(&mut board);
-                            }
-                            s => println!("Unrecognized variant {}.", s),
-                        }
-                    }
-                }
-                "mcts_debug" => mcts::play_human(ChessBoard::start_board()),
-                s => warn!("Unrecognized command \"{}\".", s),
+                _ => (),
             }
         }
         else {

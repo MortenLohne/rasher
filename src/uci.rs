@@ -4,7 +4,6 @@ use board::crazyhouse_board::CrazyhouseBoard;
 use tests::tools;
 use search_algorithms::board;
 use search_algorithms::alpha_beta;
-use search_algorithms::mcts;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::board::EvalBoard;
 use uci_engine::UciEngine;
@@ -37,7 +36,6 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
     uci_send("uciok");
     
     let mut board_string : String = "position startpos".to_string();
-    let mut engine_string = "minimax".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
     let mut engine_options = EngineOptions::new();
     let mut search_thread : Option<thread::JoinHandle<()>> = None;
@@ -108,10 +106,6 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                     }
                 };
             }
-            "engine" =>
-                if tokens.len() >= 2 {
-                    engine_string = tokens[1].to_string();
-                },
             "stop" => {
                 {
                     let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
@@ -146,15 +140,15 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
                 let handle =
                 match engine_options.variant {
                     ChessVariant::Standard =>
-                        start_correct_engine::<ChessBoard>(&mut board_string, &mut engine_string,
+                        start_correct_engine::<ChessBoard>(&mut board_string,
                                                            engine_comm.clone(), engine_options,
                                                            time_restriction, searchmoves_input)?,
                     ChessVariant::Sjadam =>
-                        start_correct_engine::<SjadamBoard>(&mut board_string, &mut engine_string,
+                        start_correct_engine::<SjadamBoard>(&mut board_string,
                                                             engine_comm.clone(), engine_options,
                                                             time_restriction, searchmoves_input)?,
                     ChessVariant::Crazyhouse =>
-                        start_correct_engine::<CrazyhouseBoard>(&mut board_string, &mut engine_string,
+                        start_correct_engine::<CrazyhouseBoard>(&mut board_string,
                                                                 engine_comm.clone(), engine_options,
                                                                 time_restriction, searchmoves_input)?,
             };
@@ -224,7 +218,7 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
     }
 }
 
-fn start_correct_engine<B>(board_string: &mut String, engine_string: &mut String,
+fn start_correct_engine<B>(board_string: &mut String,
                            engine_comm: Arc<Mutex<EngineComm>>, engine_options: EngineOptions,
                            time_restriction: TimeRestriction,
                            searchmoves_input: Option<Vec<String>>) -> Result<thread::JoinHandle<()>, Box<error::Error>>
@@ -232,28 +226,20 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Send + Sync + Hash + Eq + 'stat
       <B as Board>::Move: Send + Sync,
       <B as ExtendedBoard>::HashBoard: Send {
     let mut board = parse_position::<B>(&board_string)?;
-    let (handle, rx) =
-        match engine_string.as_str() {
-            "minimax" => {
-                let mut engine = alpha_beta::AlphaBeta::init();
-                engine.search_async(
-                board.clone(),
-                time_restriction,
-                engine_comm.clone(), searchmoves_input
-                    .clone()
-                    .map(|moves|
-                        moves.iter()
-                            .map(|move_string| board.move_from_lan(move_string))
-                            .map(Result::unwrap)
-                            .collect::<Vec<_>>()
-                    ))
-            },
-            "mcts" => start_mcts_engine(
-                board.clone(),
-                time_restriction, engine_options,
-                engine_comm.clone()),
-            _ => panic!("Unknown engine {}", engine_string),
-        };
+    let (handle, rx) = {
+        let mut engine = alpha_beta::AlphaBeta::init();
+        engine.search_async(
+            board.clone(),
+            time_restriction,
+            engine_comm.clone(), searchmoves_input
+                .clone()
+                .map(|moves|
+                    moves.iter()
+                        .map(|move_string| board.move_from_lan(move_string))
+                        .map(Result::unwrap)
+                        .collect::<Vec<_>>()
+                ))
+    };
     thread::spawn(move || {
         // Last info that has been received, if any
         let mut last_info = None;
@@ -317,20 +303,10 @@ impl EngineComm {
     }
 }
 
-use std::sync::mpsc;
 use pgn::PgnBoard;
 use search_algorithms::board::Board;
 use search_algorithms::alpha_beta::AlphaBeta;
 use search_algorithms::monte_carlo::MonteCarlo;
-
-fn start_mcts_engine<B>(board: B, time_limit: TimeRestriction,
-                        options: EngineOptions, engine_comm: Arc<Mutex<EngineComm>>)
-                        -> (thread::JoinHandle<()>, mpsc::Receiver<UciInfo<B>>)
-    where B: 'static + PgnBoard + fmt::Debug + Send + Clone + PartialEq,
-<B as board::Board>::Move: Sync + Send
-{
-    mcts::start_uci_search(board, time_limit, options, engine_comm)
-}
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ChessVariant {
