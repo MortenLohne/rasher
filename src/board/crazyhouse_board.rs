@@ -10,8 +10,6 @@ use board::std_move_gen::move_gen;
 use search_algorithms::board;
 use pgn;
 
-use itertools::Itertools;
-
 use std::hash::{Hash, Hasher};
 use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
 
@@ -283,7 +281,10 @@ impl PgnBoard for CrazyhouseBoard {
 
         let mut std_fen_string : String = ranks.join("/");
         std_fen_string.push(' ');
-        std_fen_string.push_str(&fen_split[1..].iter().join(" "));
+        std_fen_string.push_str(&fen_split[1..].iter()
+            .map(|&rank| rank.to_string())
+            .collect::<Vec<String>>()
+            .join(" "));
         
         let std_board = try!(ChessBoard::from_fen(&std_fen_string));
 
