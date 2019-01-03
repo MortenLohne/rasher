@@ -1061,11 +1061,12 @@ impl Board for SjadamBoard {
                         // Promote to queen
                         debug_assert!(!self.is_empty(mv.to()));
 
-                        if !self.piece_at_square(Piece::new(King, start_color), mv.to()) {
+                        if !(self.piece_at_square(Piece::new(King, start_color), mv.to())
+                        || self.piece_at_square(Piece::new(Queen, start_color), mv.to())) {
                             self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
                             self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
+                            self.half_move_clock = 0;
                         }
-                        self.half_move_clock = 0;
                     }
 
         self.to_move = !self.side_to_move();

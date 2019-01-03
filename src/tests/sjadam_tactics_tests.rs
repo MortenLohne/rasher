@@ -191,6 +191,23 @@ fn can_move_in_draw_position() {
     assert_eq!(board.game_result(), Some(GameResult::Draw), "Wrong game result for board:\n{:?}", board);
 }
 
+#[test]
+fn draw_50_moves_test() {
+    let board = SjadamBoard::from_fen("8/Q6K/8/8/8/8/3k4/8 w - - 96 100").unwrap();
+
+    let engine = AlphaBeta::init();
+    let (score, _) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(6),
+                         None).unwrap();
+
+    match score {
+        Score::Draw(_) => (),
+        _ => assert!(false, "Expected draw score due to 50-move rule, got {:?}. Board:\n{:?}",
+                     score, board),
+    }
+}
+
 fn is_mate_in_one(board: &SjadamBoard, best_move: SjadamMove) {
 
     let engine = AlphaBeta::init();
