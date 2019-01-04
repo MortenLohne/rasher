@@ -175,41 +175,11 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
             }
             "mcts" => {
                 match variant {
-                    ChessVariant::Standard => {
-                        let mut board = parse_position::<ChessBoard>(&board_string)?;
-                        let monte_carlo = MonteCarlo::init();
-
-                        for uci_info in monte_carlo.search(board.clone(),
-                                                           TimeRestriction::Infinite,
-                                                           Arc::new(Mutex::new(EngineComm::new())),
-                                                           None) {
-                            println!("{}", uci_info.to_info_string(&mut board));
-                        }
-                    }
-                    ChessVariant::Sjadam => {
-                        let mut board = parse_position::<SjadamBoard>(&board_string)?;
-                        let monte_carlo = MonteCarlo::init();
-
-                        for uci_info in monte_carlo.search(board.clone(),
-                                                           TimeRestriction::Infinite,
-                                                           Arc::new(Mutex::new(EngineComm::new())),
-                                                           None) {
-                            println!("{}", uci_info.to_info_string(&mut board));
-                        }
-                    }
-                    ChessVariant::Crazyhouse => {
-                        let mut board = parse_position::<CrazyhouseBoard>(&board_string)?;
-                        let monte_carlo = MonteCarlo::init();
-
-                        for uci_info in monte_carlo.search(board.clone(),
-                                                           TimeRestriction::Infinite,
-                                                           Arc::new(Mutex::new(EngineComm::new())),
-                                                           None) {
-                            println!("{}", uci_info.to_info_string(&mut board));
-                        }
-                    }
-                };
-            }
+                    ChessVariant::Standard => start_mcts::<ChessBoard>(&mut board_string, engine_comm.clone()),
+                    ChessVariant::Crazyhouse => start_mcts::<CrazyhouseBoard>(&mut board_string, engine_comm.clone()),
+                    ChessVariant::Sjadam => start_mcts::<SjadamBoard>(&mut board_string, engine_comm.clone()),
+                }?;
+            },
             "sjadam" => variant = ChessVariant::Sjadam,
             "crazyhouse" => variant = ChessVariant::Crazyhouse,
             _ => { // TODO: If receiving unrecognied token, parse the next one as usual
@@ -217,6 +187,21 @@ pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
             },
         }
     }
+}
+
+fn start_mcts<B>(board_string: &mut String, engine_comm: Arc<Mutex<EngineComm>>)
+    -> Result<thread::JoinHandle<()>, Box<dyn error::Error>>
+    where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Send,
+          B::Move: Send + Sync {
+    let mut board = parse_position::<B>(&board_string)?;
+    let monte_carlo = MonteCarlo::init();
+    Ok(thread::spawn(move | |
+        for uci_info in monte_carlo.search(board.clone(),
+                                           TimeRestriction::Infinite,
+                                           engine_comm.clone(),
+                                           None) {
+            println!("{}", uci_info.to_info_string(&mut board));
+        }))
 }
 
 fn start_correct_engine<B>(board_string: &mut String,
@@ -313,6 +298,7 @@ use search_algorithms::alpha_beta::AlphaBeta;
 use search_algorithms::monte_carlo::MonteCarlo;
 use uci_engine::UciOption;
 use uci_engine::UciOptionType;
+use std::fmt::Debug;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ChessVariant {

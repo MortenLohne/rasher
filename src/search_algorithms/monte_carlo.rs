@@ -84,6 +84,13 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move:
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
 
+        {
+            let engine_comm = self.monte_carlo.engine_comm.lock().unwrap();
+            if engine_comm.engine_should_stop {
+                return None // "Engine was told to stop"
+            }
+        }
+
         let mut open_options = OpenOptions::new();
         open_options.append(true).create(true);
         let pgn_file = open_options.open("book.pgn").unwrap();
