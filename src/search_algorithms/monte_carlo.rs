@@ -93,10 +93,10 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move:
 
         let mut open_options = OpenOptions::new();
         open_options.append(true).create(true);
-        let pgn_file = open_options.open("book.pgn").unwrap();
+        let pgn_file = open_options.open("sjadam_book.pgn").unwrap();
         let pgn_writer = Mutex::new(BufWriter::new(pgn_file));
 
-        (0..10).into_par_iter().for_each(|i: i32| {
+        (0..50).into_par_iter().for_each(|i: i32| {
             let mut game = vec![];
             let score = self.monte_carlo.root.select(self.root_board.clone(), &mut game);
 

@@ -146,7 +146,7 @@ pub trait PgnBoard: Sized + board::Board + PartialEq {
         }
 
         for (i, mv) in moves.into_iter().enumerate() {
-            if i % 20 == 0 {
+            if i % 12 == 0 {
                 writeln!(f)?;
             }
             if i == 0 && self.side_to_move() == Color::Black {
