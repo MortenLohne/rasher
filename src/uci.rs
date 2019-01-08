@@ -206,7 +206,7 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
 fn start_mcts<B>(board_string: &mut String, engine_comm: Arc<Mutex<EngineComm>>,
                  uci_options: Vec<UciOption>)
     -> Result<thread::JoinHandle<()>, Box<dyn error::Error>>
-    where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Send + Serialize,
+    where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Send,
           B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
 
     let mut board = parse_position::<B>(&board_string)?;

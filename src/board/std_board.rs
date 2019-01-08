@@ -238,7 +238,7 @@ impl Square {
     pub const A8 : Square = Square(0);
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct ChessBoard {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,

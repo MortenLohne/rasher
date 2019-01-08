@@ -62,7 +62,7 @@ pub struct MonteCarlo<B: Board>
 }
 
 impl<B> UciEngine<B> for MonteCarlo<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Serialize,
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
       B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
     fn init() -> Self {
         MonteCarlo {
@@ -115,12 +115,11 @@ struct DepthIterator<B: Board>
 }
 
 impl<B> Iterator for DepthIterator<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Serialize,
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
       B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned{
     type Item = UciInfo<B>;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-
         {
             let engine_comm = self.monte_carlo.engine_comm.lock().unwrap();
             if engine_comm.engine_should_stop {

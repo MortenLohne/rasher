@@ -10,7 +10,7 @@ use std::hash;
 
 
 /// Represents a player's color
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Color {
     White = 0,
     Black = 1,
