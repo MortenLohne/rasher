@@ -35,7 +35,7 @@ impl SjadamReverseMove {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct SjadamMove {
     from: Square,
     to: Square,

@@ -7,7 +7,7 @@ pub enum CrazyhouseReverseMove {
     CrazyMove(PieceType, Square, u8),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CrazyhouseMove {
     NormalMove(ChessMove),
     CrazyMove(PieceType, Square, u8),

@@ -18,7 +18,7 @@ use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
 use board::std_move::ChessReverseNullMove;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq, Serialize, Deserialize)]
 pub enum PieceType {
     Empty = 0,
     Pawn = 1,
@@ -178,7 +178,7 @@ impl Piece {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Square(pub u8);
 
 impl fmt::Display for Square {

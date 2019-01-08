@@ -20,6 +20,11 @@ extern crate log4rs;
 #[cfg(feature = "profile")]
 extern crate cpuprofiler;
 
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
+
 use std::io;
 use std::fmt;
 use std::hash::Hash;

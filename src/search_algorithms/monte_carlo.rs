@@ -15,6 +15,7 @@ use time::Duration;
 
 extern crate ordered_float;
 use ordered_float::OrderedFloat;
+
 use std::ops::Not;
 use search_algorithms::alpha_beta;
 use std::fmt::Debug;
@@ -31,13 +32,16 @@ use rayon::iter::ParallelIterator;
 use std::io::BufWriter;
 use std::fs::OpenOptions;
 use std::io::Write;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 const GAME_TIME: Duration = Duration::from_millis(30000);
 const INC_MS: Duration = Duration::from_millis(300);
 
 const EVAL_DEPENDENCE : f32 = 16.0;
 
-pub struct MonteCarlo<B: Board> {
+pub struct MonteCarlo<B: Board>
+    where B::Move: Serialize, B::Move: DeserializeOwned {
     root: MonteCarloTree<B>,
     time_limit: uci::TimeRestriction,
     start_time: Instant,
@@ -45,7 +49,8 @@ pub struct MonteCarlo<B: Board> {
 }
 
 impl<B> UciEngine<B> for MonteCarlo<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move: Send + Sync {
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
+      B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
     fn init() -> Self {
         MonteCarlo {
             root: MonteCarloTree::new_root(&mut B::start_board()),
@@ -73,13 +78,15 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move:
     }
 }
 
-struct DepthIterator<B: Board> {
+struct DepthIterator<B: Board>
+    where B::Move: Serialize, B::Move: DeserializeOwned{
     monte_carlo: MonteCarlo<B>,
     root_board: B,
 }
 
 impl<B> Iterator for DepthIterator<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move: Send + Sync {
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
+      B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned{
     type Item = UciInfo<B>;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
@@ -170,15 +177,17 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync, B::Move:
 
 type MonteCarloChild<B> = (<B as Board>::Move, MonteCarloTree<B>);
 
-#[derive(Debug)]
-struct MonteCarloTree<B: Board> {
+#[derive(Debug, Serialize, Deserialize)]
+struct MonteCarloTree<B>
+where B: Board, B::Move: Serialize, B::Move: DeserializeOwned {
     children: RwLock<Option<Vec<MonteCarloChild<B>>>>,
     score: Mutex<Score>,
     static_eval: f32,
 }
 
 impl<B> MonteCarloTree<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
+      B::Move: Serialize, B::Move: DeserializeOwned {
     fn new_root(board: &mut B) -> MonteCarloTree<B> {
         MonteCarloTree {
             children: RwLock::new(None),
@@ -394,7 +403,7 @@ pub fn eval_to_win_pct(cp: f32) -> f32 {
     (f32::atan(cp / 2.90680623072) / 3.096181612 + 0.5)
 }
 
-#[derive(PartialEq, Clone, Debug, Copy)]
+#[derive(PartialEq, Clone, Debug, Copy, Serialize, Deserialize)]
 pub struct Score {
     pub wins: u64,
     pub losses: u64,

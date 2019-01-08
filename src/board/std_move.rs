@@ -26,7 +26,7 @@ impl ChessReverseMove {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ChessMove {
     pub from : Square,
     pub to : Square,

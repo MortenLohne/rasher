@@ -206,7 +206,7 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
 fn start_mcts<B>(board_string: &mut String, engine_comm: Arc<Mutex<EngineComm>>)
     -> Result<thread::JoinHandle<()>, Box<dyn error::Error>>
     where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Send,
-          B::Move: Send + Sync {
+          B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
     let mut board = parse_position::<B>(&board_string)?;
     let monte_carlo = MonteCarlo::init();
     Ok(thread::spawn(move | |
@@ -313,6 +313,8 @@ use search_algorithms::monte_carlo::MonteCarlo;
 use uci_engine::UciOption;
 use uci_engine::UciOptionType;
 use std::fmt::Debug;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum ChessVariant {
