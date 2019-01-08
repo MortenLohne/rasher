@@ -13,7 +13,7 @@ use pgn;
 use std::hash::{Hash, Hasher};
 use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Serialize, Deserialize)]
 pub struct CrazyhouseBoard {
     base_board : ChessBoard,
     white_available_pieces : Vec<PieceType>,

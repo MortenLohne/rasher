@@ -140,7 +140,7 @@ lazy_static! {
     };
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct BitBoard {
     pub board: u64,
 }
@@ -373,7 +373,7 @@ impl Iterator for BitBoardIterator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SjadamBoard {
     white_pieces: BitBoard,
     black_pieces: BitBoard,

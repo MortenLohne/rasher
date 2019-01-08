@@ -49,7 +49,7 @@ pub struct MonteCarlo<B: Board>
 }
 
 impl<B> UciEngine<B> for MonteCarlo<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Serialize,
       B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
     fn init() -> Self {
         MonteCarlo {
@@ -61,7 +61,8 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
     }
 
     fn uci_options(&mut self) -> Vec<UciOption> {
-        vec![]
+        vec![UciOption { name: "opening_tree".to_string(),
+            option_type: UciOptionType::String("".to_string()) } ]
     }
 
     fn set_uci_option(&mut self, _: UciOption) {}
@@ -85,7 +86,7 @@ struct DepthIterator<B: Board>
 }
 
 impl<B> Iterator for DepthIterator<B>
-where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
+where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Serialize,
       B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned{
     type Item = UciInfo<B>;
 
@@ -103,7 +104,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
         let pgn_file = open_options.open("sjadam_book.pgn").unwrap();
         let pgn_writer = Mutex::new(BufWriter::new(pgn_file));
 
-        (0..50).into_par_iter().for_each(|i: i32| {
+        (0..10).into_par_iter().for_each(|i: i32| {
             let mut game = vec![];
             let score = self.monte_carlo.root.select(self.root_board.clone(), &mut game);
 
@@ -140,6 +141,9 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
             }
             println!(" {:?}", score);
         });
+
+        let serialized = serde_json::to_string(&self.monte_carlo.root).unwrap();
+        println!("{}", serialized);
 
         let root = &self.monte_carlo.root;
         let root_score = root.score.lock().unwrap();
@@ -180,7 +184,7 @@ type MonteCarloChild<B> = (<B as Board>::Move, MonteCarloTree<B>);
 #[derive(Debug, Serialize, Deserialize)]
 struct MonteCarloTree<B>
 where B: Board, B::Move: Serialize, B::Move: DeserializeOwned {
-    children: RwLock<Option<Vec<MonteCarloChild<B>>>>,
+    children: RwLock<Option<Vec<(MonteCarloChild<B>)>>>,
     score: Mutex<Score>,
     static_eval: f32,
 }

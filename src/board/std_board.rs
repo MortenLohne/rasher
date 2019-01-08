@@ -88,7 +88,7 @@ impl fmt::Display for PieceType {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum Piece {
     Empty = 0,
@@ -238,7 +238,7 @@ impl Square {
     pub const A8 : Square = Square(0);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ChessBoard {
     pub board : [[Piece; 8]; 8],
     pub to_move : Color,
