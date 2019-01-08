@@ -19,29 +19,43 @@ use search_algorithms::board::ExtendedBoard;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
-pub fn connect_engine(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>> {
+pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Error>>
+    where E: UciEngine<ChessBoard> {
 
     // Do the standard handshake with the GUI
     info!("Received uci command from GUI");
     uci_send("id name rasher");
-
-    //uci_send("option name Write Debug Log type check default true");
-    uci_send("option name Hash type spin default 256 min 0 max 32768");
-    uci_send("option name Threads type spin default 1 min 1 max 128");
-    uci_send("option name MultiPV type spin default 1 min 1 max 128");
-    uci_send("option name DebugInfo type check default false");
-    uci_send("option name UCI_Variant type combo default Chess var Chess var Sjadam var Crazyhouse");
-    
-    uci_send("uciok");
     
     let mut board_string : String = "position startpos".to_string();
     let engine_comm = Arc::new(Mutex::new(EngineComm::new()));
     let mut search_thread : Option<thread::JoinHandle<()>> = None;
     let mut variant = ChessVariant::Standard;
     let mut uci_options = {
-        let mut engine: AlphaBeta<ChessBoard> = AlphaBeta::init();
+        let mut engine: E = E::init();
         engine.uci_options()
     };
+
+    for UciOption{ ref name, ref option_type } in uci_options.iter() {
+        match option_type {
+            UciOptionType::Check(def) =>
+                println!("option name {} type check default {}", name, def),
+            UciOptionType::Spin(def, min, max) =>
+                println!("option name {} type spin default {} min {} max {}", name, def, min, max),
+            UciOptionType::Combo(def, values) => {
+                print!("option name {} type combo default {} ", name, def);
+                for value in values.iter() {
+                    print!("var {} ", value);
+                }
+                println!();
+            },
+            UciOptionType::Button =>
+                println!("option name {} type button", name),
+            UciOptionType::String(def) =>
+                println!("option name {} type string default {}", name, def),
+        }
+    }
+
+    uci_send("uciok");
     
     // Listen to commands from GUI forever
     loop {

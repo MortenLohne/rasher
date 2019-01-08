@@ -44,6 +44,7 @@ use search_algorithms::board::Board;
 use search_algorithms::board::ExtendedBoard;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
+use search_algorithms::monte_carlo::MonteCarlo;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -75,7 +76,11 @@ fn main() {
 
             match tokens[0] {
                 "uci" => {
-                    uci::connect_engine(&mut stdin).unwrap();
+                    uci::connect_engine::<AlphaBeta<_>>(&mut stdin).unwrap();
+                    return;
+                },
+                "ucimcts" => {
+                    uci::connect_engine::<MonteCarlo<_>>(&mut stdin).unwrap();
                     return;
                 },
                 "isready" => {
