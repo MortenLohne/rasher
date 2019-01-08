@@ -189,9 +189,9 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
             }
             "mcts" => {
                 match variant {
-                    ChessVariant::Standard => start_mcts::<ChessBoard>(&mut board_string, engine_comm.clone()),
-                    ChessVariant::Crazyhouse => start_mcts::<CrazyhouseBoard>(&mut board_string, engine_comm.clone()),
-                    ChessVariant::Sjadam => start_mcts::<SjadamBoard>(&mut board_string, engine_comm.clone()),
+                    ChessVariant::Standard => start_mcts::<ChessBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
+                    ChessVariant::Crazyhouse => start_mcts::<CrazyhouseBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
+                    ChessVariant::Sjadam => start_mcts::<SjadamBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
                 }?;
             },
             "sjadam" => variant = ChessVariant::Sjadam,
@@ -203,12 +203,19 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
     }
 }
 
-fn start_mcts<B>(board_string: &mut String, engine_comm: Arc<Mutex<EngineComm>>)
+fn start_mcts<B>(board_string: &mut String, engine_comm: Arc<Mutex<EngineComm>>,
+                 uci_options: Vec<UciOption>)
     -> Result<thread::JoinHandle<()>, Box<dyn error::Error>>
     where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Send + Serialize,
           B::Move: Send + Sync + Serialize, B::Move: DeserializeOwned {
+
     let mut board = parse_position::<B>(&board_string)?;
-    let monte_carlo = MonteCarlo::init();
+    let mut monte_carlo = MonteCarlo::init();
+
+    for uci_option in uci_options {
+        monte_carlo.set_uci_option(uci_option);
+    }
+
     Ok(thread::spawn(move | |
         for uci_info in monte_carlo.search(board.clone(),
                                            TimeRestriction::Infinite,
@@ -348,7 +355,7 @@ fn parse_setoption (input: &str, options: &mut Vec<UciOption>) -> Result<(), Box
 
     if let Some(option) = options
         .iter_mut()
-        .find(|option| option.name.to_lowercase() == option_name) {
+        .find(|option| option.name.to_lowercase() == option_name.to_lowercase()) {
         match option.option_type {
             UciOptionType::Check(ref mut val) => *val = value.to_lowercase() == "true",
             UciOptionType::Spin(ref mut val, _, _) => *val = str::parse(&value)?,

@@ -34,16 +34,29 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use std::fs::File;
+use std::io;
 
 const GAME_TIME: Duration = Duration::from_millis(30000);
 const INC_MS: Duration = Duration::from_millis(300);
 
 const EVAL_DEPENDENCE : f32 = 16.0;
 
+struct Settings {
+    opening_file_name: String,
+}
+
+impl Settings {
+    fn new() -> Self {
+        Settings { opening_file_name: "".to_string() }
+    }
+}
+
 pub struct MonteCarlo<B: Board>
     where B::Move: Serialize, B::Move: DeserializeOwned {
     root: MonteCarloTree<B>,
     time_limit: uci::TimeRestriction,
+    settings: Settings,
     start_time: Instant,
     engine_comm : Arc<Mutex<EngineComm>>,
 }
@@ -55,22 +68,38 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Seriali
         MonteCarlo {
             root: MonteCarloTree::new_root(&mut B::start_board()),
             time_limit: TimeRestriction::Infinite,
+            settings: Settings::new(),
             engine_comm: Arc::new(Mutex::new(EngineComm::new())),
             start_time: Instant::now(),
         }
     }
 
     fn uci_options(&mut self) -> Vec<UciOption> {
-        vec![UciOption { name: "opening_tree".to_string(),
+        vec![UciOption { name: "OpeningTreeFileName".to_string(),
             option_type: UciOptionType::String("".to_string()) } ]
     }
 
-    fn set_uci_option(&mut self, _: UciOption) {}
+    fn set_uci_option(&mut self, UciOption { ref name, ref option_type }: UciOption) {
+        match (name.as_ref(), option_type) {
+            ("OpeningTreeFileName", UciOptionType::String(file_name)) =>
+                self.settings.opening_file_name = file_name.clone(),
+            _ => panic!("Unknown option {} of type {:?}", name, option_type),
+        }
+    }
 
     fn search(mut self, mut board: B, time_limit: TimeRestriction, engine_comm: Arc<Mutex<EngineComm>>,
               _: Option<Vec<<B as Board>::Move>>) -> Box<Iterator<Item=UciInfo<B>>> {
-
-        self.root = MonteCarloTree::new_root(&mut board);
+        if self.settings.opening_file_name.is_empty() {
+            self.root = MonteCarloTree::new_root(&mut board);
+        }
+        else {
+            match File::open(&self.settings.opening_file_name) {
+                Ok(mut file) => self.root = serde_json::from_reader(&mut file).unwrap(),
+                Err(ref err) if err.kind() == io::ErrorKind::NotFound =>
+                    (), // If file does not exist, it will be created during search
+                Err(err) => panic!(err),
+            }
+        }
         self.time_limit = time_limit;
         self.engine_comm = engine_comm;
         self.start_time = Instant::now();
@@ -103,6 +132,13 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Seriali
         open_options.append(true).create(true);
         let pgn_file = open_options.open("sjadam_book.pgn").unwrap();
         let pgn_writer = Mutex::new(BufWriter::new(pgn_file));
+
+        let tree_file = if !self.monte_carlo.settings.opening_file_name.is_empty() {
+            Some(File::create(&self.monte_carlo.settings.opening_file_name).unwrap())
+        }
+        else {
+            None
+        };
 
         (0..10).into_par_iter().for_each(|i: i32| {
             let mut game = vec![];
@@ -142,8 +178,9 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Seriali
             println!(" {:?}", score);
         });
 
-        let serialized = serde_json::to_string(&self.monte_carlo.root).unwrap();
-        println!("{}", serialized);
+        if let Some(mut tree_file) = tree_file {
+            serde_json::to_writer(&mut tree_file, &self.monte_carlo.root).unwrap();
+        }
 
         let root = &self.monte_carlo.root;
         let root_score = root.score.lock().unwrap();
@@ -182,8 +219,10 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync + Seriali
 type MonteCarloChild<B> = (<B as Board>::Move, MonteCarloTree<B>);
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(bound(serialize = "B::Move: Serialize"))]
+#[serde(bound(deserialize = "B::Move: DeserializeOwned"))]
 struct MonteCarloTree<B>
-where B: Board, B::Move: Serialize, B::Move: DeserializeOwned {
+where B: Board {
     children: RwLock<Option<Vec<(MonteCarloChild<B>)>>>,
     score: Mutex<Score>,
     static_eval: f32,
