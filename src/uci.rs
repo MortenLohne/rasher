@@ -67,7 +67,22 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
         }
         match tokens[0] { // Parse the first word of the input
             "isready" => uci_send("readyok"),
-            "quit" => { info!("Quitting..."); return Ok(()); },
+            "quit" => {
+                // If engine is running, block until engine has shut down
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = true;
+                }
+
+                if let Some(handle) = search_thread.take() {
+                    if let Err(err) = handle.join() {
+                        error!("Search thread crashed.\n{:?}", err);
+                    };
+                };
+
+                info!("Quitting...");
+                return Ok(());
+            },
             "ucinewgame" => (), // Ignore this for now
             "position" => board_string = input.to_string(),
             "setoption" => parse_setoption(&input, &mut uci_options)?,
@@ -188,11 +203,29 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
                 };
             }
             "mcts" => {
+                // If engine is running, block until engine has shut down
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = true;
+                }
+
+                if let Some(handle) = search_thread.take() {
+                    if let Err(err) = handle.join() {
+                        error!("Search thread crashed.\n{:?}", err);
+                    };
+                };
+                {
+                    let mut engine_comm = engine_comm.lock().map_err(|err| err.to_string())?;
+                    engine_comm.engine_should_stop = false;
+                }
+
+                let handle =
                 match variant {
                     ChessVariant::Standard => start_mcts::<ChessBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
                     ChessVariant::Crazyhouse => start_mcts::<CrazyhouseBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
                     ChessVariant::Sjadam => start_mcts::<SjadamBoard>(&mut board_string, engine_comm.clone(), uci_options.clone()),
                 }?;
+                search_thread = Some(handle);
             },
             "sjadam" => variant = ChessVariant::Sjadam,
             "crazyhouse" => variant = ChessVariant::Crazyhouse,
