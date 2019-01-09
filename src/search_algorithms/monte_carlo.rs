@@ -123,7 +123,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
         {
             let engine_comm = self.monte_carlo.engine_comm.lock().unwrap();
             if engine_comm.engine_should_stop {
-                return None // "Engine was told to stop"
+                return None // Engine was told to stop
             }
         }
 
@@ -133,13 +133,23 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
         let pgn_writer = Mutex::new(BufWriter::new(pgn_file));
 
         let tree_file = if !self.monte_carlo.settings.opening_file_name.is_empty() {
-            Some(File::create(&self.monte_carlo.settings.opening_file_name).unwrap())
+            let file = File::create(&self.monte_carlo.settings.opening_file_name).unwrap();
+            info!("Created monte carlo tree file \"{}\".", self.monte_carlo.settings.opening_file_name);
+            Some(file)
         }
         else {
+            info!("Did not create monte carlo tree file.");
             None
         };
 
-        (0..10).into_par_iter().for_each(|i: i32| {
+        (0..100).into_par_iter().for_each(|i: i32| {
+            {
+                let engine_comm = self.monte_carlo.engine_comm.lock().unwrap();
+                if engine_comm.engine_should_stop {
+                    return // Engine was told to stop
+                }
+            }
+
             let mut game = vec![];
             let score = self.monte_carlo.root.select(self.root_board.clone(), &mut game);
 
