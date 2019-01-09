@@ -124,7 +124,7 @@ pub trait PgnBoard: Sized + board::Board + PartialEq {
     /// [1]: https://en.wikipedia.org/wiki/Algebraic_notation_(chess)#Long_algebraic_notation
     fn move_to_lan(&self, mv: &Self::Move) -> String;
 
-    fn game_to_pgn<W: Write>(mut self, moves: &[Self::Move], event: &str, site: &str, date: &str,
+    fn game_to_pgn<W: Write>(mut self, moves: &[(Self::Move, String)], event: &str, site: &str, date: &str,
                    round: &str, white: &str, black: &str, result: Option<GameResult>,
                    tags_pairs: &[(&str, &str)], f: &mut W) -> Result<(), io::Error> {
         writeln!(f, "[Event \"{}\"]", event)?;
@@ -145,18 +145,18 @@ pub trait PgnBoard: Sized + board::Board + PartialEq {
             writeln!(f, "[FEN \"{}\"", self.to_fen())?;
         }
 
-        for (i, mv) in moves.into_iter().enumerate() {
+        for (i, (mv, comment)) in moves.into_iter().enumerate() {
             if i % 12 == 0 {
                 writeln!(f)?;
             }
             if i == 0 && self.side_to_move() == Color::Black {
-                write!(f, "{}... {} ", 1, self.move_to_san(&mv))?;
+                write!(f, "{}... {} {{{}}} ", 1, self.move_to_san(&mv), comment)?;
             }
             else if self.side_to_move() == Color::White {
-                write!(f, "{}. {} ", (i + 1) / 2 + 1, self.move_to_san(&mv))?;
+                write!(f, "{}. {} {{{}}} ", (i + 1) / 2 + 1, self.move_to_san(&mv), comment)?;
             }
             else {
-                write!(f, "{} ", self.move_to_san(&mv))?;
+                write!(f, "{} {{{}}} ", self.move_to_san(&mv), comment)?;
             }
             self.do_move(mv.clone());
         }

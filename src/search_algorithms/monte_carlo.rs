@@ -154,15 +154,33 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
                 _ => None
             };
             {
+                let commented_game: Vec<(B::Move, String)> = game.iter().cloned()
+                    .map(|(mv, eval, depth, time)| {
+                        let seconds = time.as_secs() as f64 + time.subsec_millis() as f64 / 1000.0;
+                        match eval {
+                            Some(alpha_beta::Score::Win(n)) =>
+                                (mv, format!("M{}/{} {:.2}s", n, depth, seconds)),
+                            Some(alpha_beta::Score::Loss(n)) =>
+                                (mv, format!("-M{}/{} {:.2}s", n, depth, seconds)),
+                            Some(alpha_beta::Score::Draw(_)) =>
+                                (mv, format!("0.00/{} {:.2}s", depth, seconds)),
+                            Some(alpha_beta::Score::Val(val)) =>
+                                (mv, format!("{:.2}/{} {:.2}s", val, depth, seconds)),
+                            None =>
+                                (mv, format!("Book/0 0.00s")),
+                        }
+                    })
+                    .collect();
+
                 let mut writer = pgn_writer.lock().unwrap();
-                board.clone().game_to_pgn(&game, "", "", "????.??.??", &i.to_string(),
+                board.clone().game_to_pgn(&commented_game, "", "", "????.??.??", &i.to_string(),
                                   "rasher", "rasher", result, &[],
                                   &mut *writer).unwrap();
                 (*writer).flush().unwrap();
             }
 
 
-            for (i, mv) in game.into_iter().enumerate() {
+            for (i, (mv, _, _, _)) in game.into_iter().enumerate() {
                 if i == 0 && board.side_to_move() == Black {
                     print!("{}... {} ", 1, board.move_to_san(&mv));
                 }
@@ -217,6 +235,8 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
 
 type MonteCarloChild<B> = (<B as Board>::Move, MonteCarloTree<B>);
 
+type Game<B> = Vec<(<B as Board>::Move, Option<alpha_beta::Score>, u16, Duration)>;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound(serialize = "B::Move: Serialize"))]
 #[serde(bound(deserialize = "B::Move: DeserializeOwned"))]
@@ -252,7 +272,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
         exploitation + exploration
     }
 
-    fn select(&self, mut board: B, game: &mut Vec<B::Move>) -> Score {
+    fn select(&self, mut board: B, game: &mut Game<B>) -> Score {
 
         if let Some(result) = board.game_result() {
             let mut score = Score::new();
@@ -280,7 +300,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
 
             let (ref mv, ref child) = children.get(child_index).unwrap();
             board.do_move(mv.clone());
-            game.push(mv.clone());
+            game.push((mv.clone(), None, 0, Duration::from_millis(0)));
 
             let result = !child.select(board, game);
 
@@ -298,7 +318,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
         result
     }
 
-    fn expand(&self, mut board: B, game: &mut Vec<B::Move>) -> Score {
+    fn expand(&self, mut board: B, game: &mut Game<B>) -> Score {
         let mut moves = vec![];
         board.generate_moves(&mut moves);
         {
@@ -342,7 +362,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
                 let (ref mv, ref child) = self_children.as_ref().unwrap()[0];
 
                 board.do_move(mv.clone());
-                game.push(mv.clone());
+                game.push((mv.clone(), None, 0, Duration::from_millis(0)));
 
                 // Immediately give the position an extra win, so that it is less likely to be simultaneously selected by other threads
                 (*child.score.lock().unwrap()).wins += 1;
@@ -368,7 +388,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static,
     }
 }
 
-fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
+fn simulate<B>(mut board: B, game: &mut Game<B>) -> Score
     where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static {
 
     let start_color = board.side_to_move();
@@ -405,7 +425,7 @@ fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
             moves_to_go: None
         };
 
-        let (_, mv) = engine.best_move(
+        let (eval, mv) = engine.best_move(
             board.clone(),
             TimeRestriction::GameTime(time_info),
             None)
@@ -431,8 +451,11 @@ fn simulate<B>(mut board: B, game: &mut Vec<B::Move>) -> Score
                 black_time += INC_MS;
             },
         }
+        match board.side_to_move() {
+            White => game.push((mv.clone(), Some(eval), 0, time_elapsed)),
+            Black => game.push((mv.clone(), Some(!eval), 0, time_elapsed)),
+        };
 
-        game.push(mv.clone());
         board.do_move(mv);
     }
 }
