@@ -31,6 +31,8 @@ use uci::EngineComm;
 use uci_engine::UciOptionType;
 use uci::ChessVariant;
 use uci::UciInfo;
+use std::io;
+use std::io::Write;
 
 type Depth = u16;
 
@@ -90,7 +92,12 @@ where B: ExtendedBoard + PgnBoard + fmt::Debug + Hash + Eq + 'static {
                     "crazyhouse" => self.options.variant = ChessVariant::Crazyhouse,
                     variant => panic!("Unknown game/chess variant {}", variant),
                 },
-            (name, option_type) => panic!("Unknown option {} of type {:?}", name, option_type),
+            (name, option_type) => {
+                let message = format!("Unknown option {} of type {:?}", name, option_type);
+                warn!("{}", message);
+                io::stderr().write( message.as_bytes()).unwrap();
+                io::stderr().write( b"\n").unwrap();
+            },
         }
     }
 

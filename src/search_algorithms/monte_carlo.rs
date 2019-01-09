@@ -83,7 +83,12 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
         match (name.as_ref(), option_type) {
             ("OpeningTreeFileName", UciOptionType::String(file_name)) =>
                 self.settings.opening_file_name = file_name.clone(),
-            _ => panic!("Unknown option {} of type {:?}", name, option_type),
+            (name, option_type) => {
+                let message = format!("Unknown option {} of type {:?}", name, option_type);
+                warn!("{}", message);
+                io::stderr().write( message.as_bytes()).unwrap();
+                io::stderr().write( b"\n").unwrap();
+            },
         }
     }
 
