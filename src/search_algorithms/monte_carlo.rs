@@ -137,16 +137,6 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
         let pgn_file = open_options.open("sjadam_book.pgn").unwrap();
         let pgn_writer = Mutex::new(BufWriter::new(pgn_file));
 
-        let tree_file = if !self.monte_carlo.settings.opening_file_name.is_empty() {
-            let file = File::create(&self.monte_carlo.settings.opening_file_name).unwrap();
-            info!("Created monte carlo tree file \"{}\".", self.monte_carlo.settings.opening_file_name);
-            Some(file)
-        }
-        else {
-            info!("Did not create monte carlo tree file.");
-            None
-        };
-
         (0..100).into_par_iter().for_each(|i: i32| {
             {
                 let engine_comm = self.monte_carlo.engine_comm.lock().unwrap();
@@ -210,8 +200,15 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
             println!(" {:?}", score);
         });
 
-        if let Some(mut tree_file) = tree_file {
-            serde_json::to_writer(&mut tree_file, &self.monte_carlo.root).unwrap();
+        if !self.monte_carlo.settings.opening_file_name.is_empty() {
+            let mut file = File::create(&self.monte_carlo.settings.opening_file_name).unwrap();
+            info!("Created monte carlo tree file \"{}\".", self.monte_carlo.settings.opening_file_name);
+            serde_json::to_writer(&mut file, &self.monte_carlo.root).unwrap();
+            info!("Wrote monte carlo game tree to {}",
+                  self.monte_carlo.settings.opening_file_name);
+        }
+        else {
+            info!("Did not create monte carlo tree file.");
         }
 
         let root = &self.monte_carlo.root;
