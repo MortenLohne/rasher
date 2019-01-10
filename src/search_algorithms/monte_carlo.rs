@@ -36,6 +36,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::fs::File;
 use std::io;
+use pgn_parse;
 
 const GAME_TIME: Duration = Duration::from_millis(30000);
 const INC_MS: Duration = Duration::from_millis(300);
@@ -178,7 +179,7 @@ where B: ExtendedBoard + PgnBoard + Debug + Hash + Eq + 'static + Sync,
                     .collect();
 
                 let mut writer = pgn_writer.lock().unwrap();
-                board.clone().game_to_pgn(&commented_game, "", "", "????.??.??", &i.to_string(),
+                pgn_parse::game_to_pgn(&mut board, &commented_game, "", "", "????.??.??", &i.to_string(),
                                   "rasher", "rasher", result, &[],
                                   &mut *writer).unwrap();
                 (*writer).flush().unwrap();

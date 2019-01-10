@@ -3,6 +3,7 @@ pub mod board;
 mod tests;
 pub mod search_algorithms;
 pub mod pgn;
+pub mod pgn_parse;
 pub mod uci_engine;
 
 #[cfg(test)]
@@ -24,6 +25,9 @@ extern crate cpuprofiler;
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
+
+#[macro_use]
+extern crate nom;
 
 use std::io;
 use std::fmt;
@@ -50,6 +54,8 @@ use search_algorithms::board::ExtendedBoard;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
 use search_algorithms::monte_carlo::MonteCarlo;
+use std::fs::File;
+use std::io::Read;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -88,6 +94,37 @@ fn main() {
                     uci::connect_engine::<MonteCarlo<_>>(&mut stdin).unwrap();
                     return;
                 },
+                "pgn2fen" => {
+                    let mut file = File::open(&tokens[1]).unwrap();
+                    let mut input = String::new();
+                    file.read_to_string(&mut input).unwrap();
+                    let games = pgn_parse::parse_pgn::<SjadamBoard>(&input);
+
+                    for ref game in games.as_ref().unwrap() {
+                        for (mv, comment) in game.moves.iter() {
+                            println!("{:?}: {}", mv, comment);
+                        }
+                    }
+
+                    let max_length = games.as_ref().unwrap().iter()
+                        .map(|ref game| game.moves.len())
+                        .max().unwrap();
+
+                    let min_length = games.as_ref().unwrap().iter()
+                        .map(|ref game| game.moves.len())
+                        .min().unwrap();
+
+                    let lengths = (min_length..=max_length)
+                        .map(|length| games.as_ref().unwrap().iter()
+                            .filter(|ref game| game.moves.len() == length)
+                            .count())
+                        .enumerate()
+                        .collect::<Vec<_>>();
+
+                    println!("Max length: {}", max_length);
+                    println!("Min length: {}", min_length);
+                    println!("Lengths: {:?}", lengths);
+                }
                 "isready" => {
                     info!("received isready from GUI");
                     uci::uci_send("readyok");
