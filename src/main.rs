@@ -56,6 +56,7 @@ use uci_engine::UciEngine;
 use search_algorithms::monte_carlo::MonteCarlo;
 use std::fs::File;
 use std::io::Read;
+use std::io::BufWriter;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -95,13 +96,22 @@ fn main() {
                     return;
                 },
                 "pgn2fen" => {
-                    let mut file = File::open(&tokens[1]).unwrap();
+                    let mut infile = File::open(&tokens[1]).unwrap();
+                    let outfile = File::create(&tokens[2]).unwrap();
+                    let mut writer = BufWriter::new(outfile);
+
                     let mut input = String::new();
-                    file.read_to_string(&mut input).unwrap();
+                    infile.read_to_string(&mut input).unwrap();
                     let games = pgn_parse::parse_pgn::<SjadamBoard>(&input);
 
                     for ref game in games.as_ref().unwrap() {
+                        let mut board = game.start_board.clone();
                         for (mv, comment) in game.moves.iter() {
+                            let eval = comment.chars()
+                                .take_while(|&ch| ch != '/')
+                                .collect::<String>();
+                            writeln!(writer, "{} ce {}", board.to_fen(), eval).unwrap();
+                            board.do_move(mv.clone());
                             println!("{:?}: {}", mv, comment);
                         }
                     }
