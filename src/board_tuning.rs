@@ -6,6 +6,8 @@ use pgn::PgnBoard;
 use rayon::prelude::*;
 
 pub trait TunableBoard {
+    const PARAMS: &'static [f32];
+
     fn static_eval_with_params(&self, params: &[f32]) -> f32;
 }
 

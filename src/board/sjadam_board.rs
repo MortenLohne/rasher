@@ -414,7 +414,6 @@ impl Hash for SjadamBoard {
 }
 
 impl SjadamBoard {
-
     fn hash_from_scratch(&self) -> u64 {
         let mut hash = 0;
         for (i, bitboard) in self.bitboards.iter().enumerate() {
@@ -1170,7 +1169,96 @@ impl Board for SjadamBoard {
 
 impl EvalBoard for SjadamBoard {
     #[inline(never)]
-    fn static_eval (&self) -> f32 {
+    fn static_eval(&self) -> f32 {
+        self.static_eval_with_params(Self::PARAMS)
+    }
+}
+
+impl ExtendedBoard for SjadamBoard {
+    type ReverseNullMove = SjadamReverseNullMove;
+    type HashBoard = u64;
+
+    fn hash_board(&self) -> Self::HashBoard {
+        self.hash
+    }
+
+    #[inline(never)]
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        let piece_moved = self.get_square(mv.from());
+
+        if piece_moved.color() != Some(self.side_to_move()) {
+            return false;
+        }
+
+        let mut moves1 = vec![];
+        let mut moves2 = vec![];
+        let mut moves3 = vec![];
+
+        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
+                                                &mut moves1, &mut moves2, &mut moves3);
+
+        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            debug_assert!(moves.contains(&mv),
+                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
+        }
+        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
+    }
+
+    #[inline(never)]
+    fn active_moves (&self, moves: &mut Vec<Self::Move>) {
+        let (mut active_moves, _) = sjadam_move_gen::all_legal_moves(self);
+        moves.append(&mut active_moves);
+    }
+
+    fn null_move_is_available(&self) -> bool {
+        true
+    }
+
+    fn do_null_move(&mut self) -> Self::ReverseNullMove {
+        let reverse_move = Self::ReverseNullMove {
+            old_last_move: self.last_move.clone(),
+            old_castling_en_passant: self.castling_en_passant,
+            old_hash: self.hash
+        };
+
+        self.move_history.push(self.hash);
+
+        self.hash ^= self.castling_en_passant_key();
+
+        self.set_en_passant_square(None);
+
+        self.hash ^= self.castling_en_passant_key();
+
+        self.to_move = !self.side_to_move();
+        self.hash ^= ZOBRIST_KEYS[768];
+
+        reverse_move
+    }
+
+    fn reverse_null_move(&mut self, mv: Self::ReverseNullMove) {
+        let old_hash = self.move_history.pop();
+        debug_assert!(old_hash.is_some());
+
+        self.castling_en_passant = mv.old_castling_en_passant;
+        self.hash = mv.old_hash;
+        self.last_move = mv.old_last_move.clone();
+
+        self.to_move = !self.side_to_move();
+        debug_assert_eq!(self.hash, self.hash_from_scratch(),
+                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
+        debug_assert_eq!(old_hash, Some(self.hash));
+    }
+
+    const BRANCH_FACTOR : u64 = 30;
+}
+
+impl TunableBoard for SjadamBoard {
+
+    const PARAMS: &'static [f32] = &[1.65, 0.0, 3.0, 0.3, 3.0, 0.15, 5.0, 0.1, 9.0, 0.3, 0.0, 0.0];
+
+    fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
         let centre1 = 0b00000000_00000000_00000000_00011000_00011000_00000000_00000000_00000000;
         let centre2 = 0b00000000_00000000_00111100_00111100_00111100_00111100_00000000_00000000;
@@ -1179,18 +1267,12 @@ impl EvalBoard for SjadamBoard {
         let centre_value = |bits: u64| (bits & centre1).count_ones() + (bits & centre2).count_ones()
             + (bits & centre3).count_ones();
 
-        // Array of (piece value, centrality value) for each piece
-        let value_modifiers = [(1.65, 0.0), // Pawn
-                               (3.0, 0.3), // Knight
-                               (3.0, 0.15), // Bishop
-                               (5.0, 0.1), // Rook
-                               (9.0, 0.3), // Queen
-                               (0.0, 0.0)]; // King
-        
+        const PIECE_VALS: usize = 0;
+
         let pieces_value = |piece_ids: [usize; 6]| piece_ids.iter()
             .map(|i| {
-                
-                let (piece_val, piece_center_val) = value_modifiers[i / 2];
+                let piece_val = params[PIECE_VALS + (i / 2) * 2];
+                let piece_center_val = params[PIECE_VALS + (i / 2) * 2 + 1];
                 let piece_bitboard = self.bitboards[*i];
                 piece_center_val * centre_value(piece_bitboard.board) as f32 +
                     piece_val * piece_bitboard.popcount() as f32
@@ -1227,7 +1309,7 @@ impl EvalBoard for SjadamBoard {
             // Penalty for king being on same colored diagonal as enemy queens/bishops
             {
                 let mut dia_penalty = 0.0;
-                
+
                 let colored_squares = if (kings & WHITE_SQUARES).is_empty() {
                     BLACK_SQUARES
                 }
@@ -1236,12 +1318,12 @@ impl EvalBoard for SjadamBoard {
                 };
 
                 let diagonal_neighbours = BitBoard::diagonal_neighbours(king_pos);
-                
+
                 let friendly_dia_neighbours = diagonal_neighbours & friendly_pieces;
                 let open_dia_neighbours = diagonal_neighbours.popcount() - friendly_dia_neighbours.popcount();
                 let bishops = self.bitboards[4 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
-                
+
                 dia_penalty -= BISHOP_VAL * (bishops & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
                 dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
@@ -1330,92 +1412,6 @@ impl EvalBoard for SjadamBoard {
         let pawn_val = match self.board[rank][file].piece_type() {
         Pawn => (rank as f32 - 3.5) * -0.1,
         _ => 0.0,
-         */    
-    }
-}
-
-impl ExtendedBoard for SjadamBoard {
-    type ReverseNullMove = SjadamReverseNullMove;
-    type HashBoard = u64;
-
-    fn hash_board(&self) -> Self::HashBoard {
-        self.hash
-    }
-
-    #[inline(never)]
-    fn move_is_legal(&self, mv: Self::Move) -> bool {
-        let piece_moved = self.get_square(mv.from());
-
-        if piece_moved.color() != Some(self.side_to_move()) {
-            return false;
-        }
-
-        let mut moves1 = vec![];
-        let mut moves2 = vec![];
-        let mut moves3 = vec![];
-
-        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
-                                                &mut moves1, &mut moves2, &mut moves3);
-
-        if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
-            let mut moves = vec![];
-            self.generate_moves(&mut moves);
-            debug_assert!(moves.contains(&mv),
-                          "Illegal move {:?} marked as legal on \n{:?}True legal moves: {:?}\nPiece moves: {:?}, {:?}, {:?}", mv, self, moves, moves1, moves2, moves3);
-        }
-        moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv)
-    }
-
-    #[inline(never)]
-    fn active_moves (&self, moves: &mut Vec<Self::Move>) {
-        let (mut active_moves, _) = sjadam_move_gen::all_legal_moves(self);
-        moves.append(&mut active_moves);
-    }
-
-    fn null_move_is_available(&self) -> bool {
-        true
-    }
-
-    fn do_null_move(&mut self) -> Self::ReverseNullMove {
-        let reverse_move = Self::ReverseNullMove {
-            old_last_move: self.last_move.clone(),
-            old_castling_en_passant: self.castling_en_passant,
-            old_hash: self.hash
-        };
-
-        self.move_history.push(self.hash);
-
-        self.hash ^= self.castling_en_passant_key();
-
-        self.set_en_passant_square(None);
-
-        self.hash ^= self.castling_en_passant_key();
-
-        self.to_move = !self.side_to_move();
-        self.hash ^= ZOBRIST_KEYS[768];
-
-        reverse_move
-    }
-
-    fn reverse_null_move(&mut self, mv: Self::ReverseNullMove) {
-        let old_hash = self.move_history.pop();
-        debug_assert!(old_hash.is_some());
-
-        self.castling_en_passant = mv.old_castling_en_passant;
-        self.hash = mv.old_hash;
-        self.last_move = mv.old_last_move.clone();
-
-        self.to_move = !self.side_to_move();
-        debug_assert_eq!(self.hash, self.hash_from_scratch(),
-                         "Failed to restore old hash after {:?} on board\n{:?}", mv, self);
-        debug_assert_eq!(old_hash, Some(self.hash));
-    }
-
-    const BRANCH_FACTOR : u64 = 30;
-}
-
-impl TunableBoard for SjadamBoard {
-    fn static_eval_with_params(&self, _params: &[f32]) -> f32 {
-        self.static_eval()
+         */
     }
 }
