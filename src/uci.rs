@@ -85,7 +85,7 @@ pub fn connect_engine<E>(stdin : &mut io::BufRead) -> Result<(), Box<error::Erro
             },
             "ucinewgame" => (), // Ignore this for now
             "position" => board_string = input.to_string(),
-            "setoption" => parse_setoption(&input, &mut uci_options)?,
+            "setoption" => parse_setoption(&input, &mut uci_options, &mut variant)?,
             "perft" => {
                 if let Some(depth) = tokens.get(1)
                     .and_then(|depth| depth.parse::<u16>().ok()) {
@@ -382,9 +382,21 @@ impl EngineOptions {
 }
 
 // Parse "setoption" strings from the GUI. 
-fn parse_setoption (input: &str, options: &mut Vec<UciOption>) -> Result<(), Box<error::Error>> {
+fn parse_setoption (input: &str, options: &mut Vec<UciOption>, variant: &mut ChessVariant)
+    -> Result<(), Box<error::Error>> {
 
     let (option_name, value) = parse_setoption_data(input)?;
+
+    // The UCI_Variant option is special:
+    // uci needs it to initialize the engine with the correct variant
+    if option_name.to_lowercase() == "uci_variant" {
+        match value.to_lowercase().as_ref() {
+            "standard" | "chess" =>  *variant = ChessVariant::Standard,
+            "sjadam" => *variant = ChessVariant::Sjadam,
+            "crazyhouse" => *variant = ChessVariant::Crazyhouse,
+            _ => panic!("Unknown variant \"{}\"", value)
+        }
+    }
 
     if let Some(option) = options
         .iter_mut()
