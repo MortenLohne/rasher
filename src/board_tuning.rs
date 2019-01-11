@@ -14,7 +14,7 @@ pub fn error<B>(positions: &mut [(B, GameResult)], params: &[f32]) -> f32
     positions.into_par_iter()
         .map(|(board, game_result)| {
             let color = board.side_to_move();
-            if let Score::Val(qsearc_eval) = qsearch(&mut board.clone(), Score::Loss(0),
+            if let (Score::Val(qsearc_eval), _) = qsearch(&mut board.clone(), Score::Loss(0),
                                                      Score::Win(0), params) {
                 let eval = qsearc_eval * color.multiplier() as f32;
 
@@ -36,43 +36,46 @@ pub fn error<B>(positions: &mut [(B, GameResult)], params: &[f32]) -> f32
         .sum()
 }
 
-fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, params: &[f32]) -> Score
+fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, params: &[f32])
+    -> (Score, Vec<B::Move>)
     where B: TunableBoard + ExtendedBoard {
     let color = board.side_to_move();
 
     if let Some(result) = board.game_result() {
-        return Score::from_game_result(result, color)
+        return (Score::from_game_result(result, color), vec![])
     }
 
     let stand_pat = Score::Val(board.static_eval_with_params(params) * color.multiplier() as f32);
 
     if stand_pat >= beta {
-        return beta;
+        return (beta, vec![]);
     }
 
     alpha = alpha.max(stand_pat);
+    let mut best_pv = vec![];
+    let mut best_move = None;
 
     let mut active_moves = vec![];
     board.active_moves(&mut active_moves);
 
-
     for mv in active_moves {
-        let reverse_move = board.do_move(mv);
+        let reverse_move = board.do_move(mv.clone());
 
-        let mut score = qsearch(board, beta, alpha, params);
+        let (mut score, mut pv) = qsearch(board, beta, alpha, params);
 
         score = !score;
         board.reverse_move(reverse_move);
 
         if score >= beta {
-            alpha = score; // TODO: Could be beta as well. Test.
-            break;
+            return (score, vec![mv]);
         }
         if score > alpha {
             alpha = score;
+            best_pv = pv;
+            best_move = Some(mv);
         }
     }
-
-    return alpha;
+    best_pv.extend(best_move);
+    return (alpha, best_pv);
 
 }
