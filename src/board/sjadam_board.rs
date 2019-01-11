@@ -9,6 +9,7 @@ use search_algorithms::board::Color::*;
 use search_algorithms::board::GameResult;
 
 use pgn;
+use board_tuning::TunableBoard;
 
 use std::ops;
 use std::fmt;
@@ -1179,7 +1180,7 @@ impl EvalBoard for SjadamBoard {
             + (bits & centre3).count_ones();
 
         // Array of (piece value, centrality value) for each piece
-        let value_modifiers = [(1.0, 0.0), // Pawn
+        let value_modifiers = [(1.65, 0.0), // Pawn
                                (3.0, 0.3), // Knight
                                (3.0, 0.15), // Bishop
                                (5.0, 0.1), // Rook
@@ -1411,4 +1412,10 @@ impl ExtendedBoard for SjadamBoard {
     }
 
     const BRANCH_FACTOR : u64 = 30;
+}
+
+impl TunableBoard for SjadamBoard {
+    fn static_eval_with_params(&self, _params: &[f32]) -> f32 {
+        self.static_eval()
+    }
 }

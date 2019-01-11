@@ -5,6 +5,7 @@ pub mod search_algorithms;
 pub mod pgn;
 pub mod pgn_parse;
 pub mod uci_engine;
+pub mod board_tuning;
 
 #[cfg(test)]
 #[macro_use]
@@ -102,38 +103,62 @@ fn main() {
 
                     let mut input = String::new();
                     infile.read_to_string(&mut input).unwrap();
-                    let games = pgn_parse::parse_pgn::<SjadamBoard>(&input);
+                    let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
 
-                    for ref game in games.as_ref().unwrap() {
+                    let mut tuning = vec![];
+
+                    for ref game in games.iter() {
                         let mut board = game.start_board.clone();
                         for (mv, comment) in game.moves.iter() {
                             let eval = comment.chars()
                                 .take_while(|&ch| ch != '/')
                                 .collect::<String>();
-                            writeln!(writer, "{} ce {}", board.to_fen(), eval).unwrap();
+
+                            let result = game.tags.iter()
+                                .find(|(name, _)| name == "Result")
+                                .map(|(_, val)| val).unwrap();
+
+                            let game_result = match result.as_ref() {
+                                "1-0" => GameResult::WhiteWin,
+                                "1/2-1/2" => GameResult::Draw,
+                                "0-1" => GameResult::BlackWin,
+                                _ => panic!("No result for game."),
+                            };
+
+                            if !eval.contains("Book") && !eval.contains("M") {
+                                tuning.push((board.clone(), game_result));
+                            }
+
+                            writeln!(writer, "{} ce {}; res {}",
+                                     board.to_fen(), eval, result).unwrap();
                             board.do_move(mv.clone());
-                            println!("{:?}: {}", mv, comment);
                         }
                     }
 
-                    let max_length = games.as_ref().unwrap().iter()
+                    println!("Computing error for {}/{} positions...",
+                             tuning.len(),
+                             games.iter().flat_map(|game| game.moves.iter()).count());
+                    println!("Error: {}", board_tuning::error(&mut tuning, &[]));
+
+                    let max_length = games.iter()
                         .map(|ref game| game.moves.len())
                         .max().unwrap();
 
-                    let min_length = games.as_ref().unwrap().iter()
+                    let min_length = games.iter()
                         .map(|ref game| game.moves.len())
                         .min().unwrap();
 
                     let lengths = (min_length..=max_length)
-                        .map(|length| games.as_ref().unwrap().iter()
+                        .map(|length| games.iter()
                             .filter(|ref game| game.moves.len() == length)
                             .count())
                         .enumerate()
                         .collect::<Vec<_>>();
 
-                    println!("Max length: {}", max_length);
-                    println!("Min length: {}", min_length);
-                    println!("Lengths: {:?}", lengths);
+                    // println!("Max length: {}", max_length);
+                    // println!("Min length: {}", min_length);
+                    // println!("Lengths: {:?}", lengths);
+                    break;
                 }
                 "isready" => {
                     info!("received isready from GUI");

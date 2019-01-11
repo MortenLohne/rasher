@@ -169,6 +169,7 @@ named!(parse_tag_pair<&str, (&str, &str)>,
     do_parse!(
         char!('[') >>
         name: take_until_and_consume!(" ") >>
+        char!('"') >>
         value: take_until_and_consume!("\"]") >>
         ((name, value))
     )
