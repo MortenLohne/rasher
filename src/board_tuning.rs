@@ -53,7 +53,7 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
             .collect();
         println!("New parameters: {:?}", new_params);
 
-        let error = error_sum(test_positions, test_results, &new_params);
+        let error = average_error(test_positions, test_results, &new_params);
         println!("Error now {}\n", error);
 
         if !errors.len() > 1 && error > errors[errors.len() - 1] && error > errors[errors.len() - 2] {
@@ -94,7 +94,7 @@ pub fn gradients<B>(positions: &mut [B], results: &[GameResult], params: &[f32])
         .collect()
 }
 
-pub fn error_sum<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> f32
+pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> f32
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
     positions.into_par_iter().zip(results)
         .map(|(board, game_result)| {
@@ -110,7 +110,8 @@ pub fn error_sum<B>(positions: &mut [B], results: &[GameResult], params: &[f32])
                 0.0
             }
         })
-        .sum()
+        .sum::<f32>() / (positions.len() as f32)
+
 }
 
 pub fn error(eval: f32, game_result: GameResult) -> f32 {
