@@ -11,6 +11,7 @@ use std::fmt::Debug;
 pub struct Game<B: Board> {
     pub start_board: B,
     pub moves: Vec<(B::Move, String)>,
+    pub game_result: Option<GameResult>,
     pub tags: Vec<(String, String)>,
 }
 
@@ -89,12 +90,25 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(mut input: &str) -> Result<Vec<Gam
 
                 input = rem_input;
 
+                let tags: Vec<(String, String)> = tag_pairs.iter()
+                    .map(|(a, b)| (a.to_string(), b.to_string())).collect();
+
+                let game_result = tags.iter()
+                    .find(|(name, _)| name == "Result")
+                    .map(|(_, result)|
+                             match result.as_ref() {
+                                 "1-0" => GameResult::WhiteWin,
+                                 "1/2-1/2" => GameResult::Draw,
+                                 "0-1" => GameResult::BlackWin,
+                                 _ => panic!("No result for game."), // TODO: Failure to read a single game should be recoverable
+                             });
+
                 let game = Game {
                     start_board: B::start_board(),
-                    moves: moves,
-                    tags: tag_pairs.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect(),
+                    moves,
+                    game_result,
+                    tags,
                 };
-                // println!("{:?}", game.clone());
 
                 games.push(game);
             },

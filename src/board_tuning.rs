@@ -33,7 +33,9 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
         .collect()
 }
 
-pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> Vec<f32>
+pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
+                           test_positions: &mut[B], test_results: &[GameResult],
+                           params: &[f32]) -> Vec<f32>
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
     const ETA: f32 = 0.1;
 
@@ -51,7 +53,7 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult], params: 
             .collect();
         println!("New parameters: {:?}", new_params);
 
-        let error = error_sum(positions, results, &new_params);
+        let error = error_sum(test_positions, test_results, &new_params);
         println!("Error now {}\n", error);
 
         if !errors.len() > 1 && error > errors[errors.len() - 1] && error > errors[errors.len() - 2] {
