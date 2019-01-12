@@ -1256,8 +1256,15 @@ impl ExtendedBoard for SjadamBoard {
 
 impl TunableBoard for SjadamBoard {
 
-    const PARAMS: &'static [f32] = &[1.80, 0.0, 3.0, 0.3, 3.0, 0.15, 5.0, 0.1, 9.0, 0.3, 0.0, 0.0,
-        200.0, 0.2, 0.5, 0.5, 0.5, 0.5, 0.3];
+    const PARAMS: &'static [f32] = &[1.5672646, 0.9112864,
+        4.102062, 0.24199909,
+        4.1257033, -0.05355155,
+        5.008077, -0.06508859,
+        7.1763263, -0.7212659,
+        0.12823333, -0.20742673,
+        1.9997874,
+        0.08916965, -0.09440847, 0.7773482, 0.8084167, 0.2789547,
+        0.3];
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
@@ -1286,8 +1293,8 @@ impl TunableBoard for SjadamBoard {
         const I_TEMPO_BONUS: usize = 12;
 
         let tempo_bonus = match self.side_to_move() {
-            White => (white_val + black_val.abs()) / params[I_TEMPO_BONUS],
-            Black => -(white_val + black_val.abs()) / params[I_TEMPO_BONUS],
+            White => (white_val + black_val.abs()) / (100.0 * params[I_TEMPO_BONUS]),
+            Black => -(white_val + black_val.abs()) / (100.0 * params[I_TEMPO_BONUS]),
         };
 
         const I_KING_SAFETY: usize = 13;
