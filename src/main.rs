@@ -38,6 +38,7 @@ use std::time;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::board::GameResult;
 use pgn::PgnBoard;
+use board_tuning::TunableBoard;
 
 use board::std_board::ChessBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
@@ -105,7 +106,8 @@ fn main() {
                     infile.read_to_string(&mut input).unwrap();
                     let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
 
-                    let mut tuning = vec![];
+                    let mut boards = vec![];
+                    let mut game_results = vec![];
 
                     for ref game in games.iter() {
                         let mut board = game.start_board.clone();
@@ -126,7 +128,8 @@ fn main() {
                             };
 
                             if !eval.contains("Book") && !eval.contains("M") {
-                                tuning.push((board.clone(), game_result));
+                                boards.push(board.clone());
+                                game_results.push(game_result);
                             }
 
                             writeln!(writer, "{} ce {}; res {}",
@@ -135,10 +138,19 @@ fn main() {
                         }
                     }
 
-                    println!("Computing error for {}/{} positions...",
-                             tuning.len(),
+                    board_tuning::gradient_descent(&mut boards, &game_results, SjadamBoard::PARAMS);
+
+                    println!("Computing gradient for {}/{} positions...",
+                             boards.len(),
                              games.iter().flat_map(|game| game.moves.iter()).count());
-                    println!("Error: {}", board_tuning::error(&mut tuning, &[]));
+
+                    println!("{:?}",
+                             board_tuning::gradients(&mut boards, &game_results, SjadamBoard::PARAMS));
+
+                    println!("Computing error for {}/{} positions...",
+                             boards.len(),
+                             games.iter().flat_map(|game| game.moves.iter()).count());
+                    println!("Error: {}", board_tuning::error_sum(&mut boards, &game_results, SjadamBoard::PARAMS));
 
                     let max_length = games.iter()
                         .map(|ref game| game.moves.len())
@@ -148,7 +160,7 @@ fn main() {
                         .map(|ref game| game.moves.len())
                         .min().unwrap();
 
-                    let lengths = (min_length..=max_length)
+                    let _lengths = (min_length..=max_length)
                         .map(|length| games.iter()
                             .filter(|ref game| game.moves.len() == length)
                             .count())
@@ -157,7 +169,7 @@ fn main() {
 
                     // println!("Max length: {}", max_length);
                     // println!("Min length: {}", min_length);
-                    // println!("Lengths: {:?}", lengths);
+                    // println!("Lengths: {:?}", _lengths);
                     break;
                 }
                 "isready" => {

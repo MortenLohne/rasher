@@ -1256,7 +1256,8 @@ impl ExtendedBoard for SjadamBoard {
 
 impl TunableBoard for SjadamBoard {
 
-    const PARAMS: &'static [f32] = &[1.65, 0.0, 3.0, 0.3, 3.0, 0.15, 5.0, 0.1, 9.0, 0.3, 0.0, 0.0];
+    const PARAMS: &'static [f32] = &[1.80, 0.0, 3.0, 0.3, 3.0, 0.15, 5.0, 0.1, 9.0, 0.3, 0.0, 0.0,
+        200.0, 0.2, 0.5, 0.5, 0.5, 0.5, 0.3];
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
@@ -1267,12 +1268,12 @@ impl TunableBoard for SjadamBoard {
         let centre_value = |bits: u64| (bits & centre1).count_ones() + (bits & centre2).count_ones()
             + (bits & centre3).count_ones();
 
-        const PIECE_VALS: usize = 0;
+        const I_PIECE_VALS: usize = 0;
 
         let pieces_value = |piece_ids: [usize; 6]| piece_ids.iter()
             .map(|i| {
-                let piece_val = params[PIECE_VALS + (i / 2) * 2];
-                let piece_center_val = params[PIECE_VALS + (i / 2) * 2 + 1];
+                let piece_val = params[I_PIECE_VALS + (i / 2) * 2];
+                let piece_center_val = params[I_PIECE_VALS + (i / 2) * 2 + 1];
                 let piece_bitboard = self.bitboards[*i];
                 piece_center_val * centre_value(piece_bitboard.board) as f32 +
                     piece_val * piece_bitboard.popcount() as f32
@@ -1282,16 +1283,21 @@ impl TunableBoard for SjadamBoard {
         let white_val: f32 = pieces_value([0, 2, 4, 6, 8, 10]);
         let black_val: f32 = pieces_value([1, 3, 5, 7, 9, 11]);
 
+        const I_TEMPO_BONUS: usize = 12;
+
         let tempo_bonus = match self.side_to_move() {
-            White => (white_val + black_val.abs()) / 200.0,
-            Black => -(white_val + black_val.abs()) / 200.0,
+            White => (white_val + black_val.abs()) / params[I_TEMPO_BONUS],
+            Black => -(white_val + black_val.abs()) / params[I_TEMPO_BONUS],
         };
 
-        const QUEEN_VAL : f32 = 0.5;
-        const ROOK_VAL : f32 = 0.5;
-        const BISHOP_VAL : f32 = 0.5;
-        const KNIGHT_VAL : f32 = 0.5;
-        const PAWN_VAL : f32 = 0.2;
+        const I_KING_SAFETY: usize = 13;
+
+        let pawn_val: f32 = params[I_KING_SAFETY];
+        let knight_val: f32 = params[I_KING_SAFETY + 1];
+        let bishop_val: f32 = params[I_KING_SAFETY + 2];
+        let rook_val: f32 = params[I_KING_SAFETY + 3];
+        let queen_val: f32 = params[I_KING_SAFETY + 4];
+
 
         let king_safety_penalties = [White, Black].iter().map(|&color| {
 
@@ -1324,9 +1330,9 @@ impl TunableBoard for SjadamBoard {
                 let bishops = self.bitboards[4 + (!color).disc()];
                 let queens = self.bitboards[8 + (!color).disc()];
 
-                dia_penalty -= BISHOP_VAL * (bishops & colored_squares).popcount() as f32;
-                dia_penalty -= QUEEN_VAL * (queens & colored_squares).popcount() as f32;
-                dia_penalty -= QUEEN_VAL * (queens & !colored_squares).popcount() as f32 * 0.4;
+                dia_penalty -= bishop_val * (bishops & colored_squares).popcount() as f32;
+                dia_penalty -= queen_val * (queens & colored_squares).popcount() as f32;
+                dia_penalty -= queen_val * (queens & !colored_squares).popcount() as f32 * 0.4;
 
                 dia_penalty *= open_dia_neighbours as f32;
                 penalty += dia_penalty
@@ -1343,10 +1349,10 @@ impl TunableBoard for SjadamBoard {
                 let queens = self.bitboards[8 + (!color).disc()];
 
                 for square in open_neighbours_squares {
-                    orthogonal_penalty -= ROOK_VAL * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= ROOK_VAL * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
-                    orthogonal_penalty -= QUEEN_VAL * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= QUEEN_VAL * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.4;
+                    orthogonal_penalty -= rook_val * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= rook_val * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                    orthogonal_penalty -= queen_val * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= queen_val * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.4;
                 }
 
                 penalty += orthogonal_penalty;
@@ -1365,8 +1371,8 @@ impl TunableBoard for SjadamBoard {
 
                 for square in open_neighbours_squares {
                     let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
-                    knight_penalty -= KNIGHT_VAL * (knights & sjadam_squares).popcount() as f32;
-                    knight_penalty -= KNIGHT_VAL * (knights & !sjadam_squares).popcount() as f32 * 0.3;
+                    knight_penalty -= knight_val * (knights & sjadam_squares).popcount() as f32;
+                    knight_penalty -= knight_val * (knights & !sjadam_squares).popcount() as f32 * 0.3;
                 }
 
                 penalty += knight_penalty;
@@ -1385,8 +1391,8 @@ impl TunableBoard for SjadamBoard {
 
                 for square in open_neighbours_squares {
                     let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
-                    pawn_penalty -= PAWN_VAL * (pawns & sjadam_squares).popcount() as f32;
-                    pawn_penalty -= PAWN_VAL * (pawns & !sjadam_squares).popcount() as f32 * 0.2;
+                    pawn_penalty -= pawn_val * (pawns & sjadam_squares).popcount() as f32;
+                    pawn_penalty -= pawn_val * (pawns & !sjadam_squares).popcount() as f32 * 0.2;
                 }
 
                 penalty += pawn_penalty;
@@ -1395,15 +1401,17 @@ impl TunableBoard for SjadamBoard {
         })
             .collect::<Vec<_>>();
 
-        const SPREAD: f32 = 0.3;
+        const I_SPREAD: usize = 18;
+
+        let spread = params[I_SPREAD];
 
         let white_spread_bonus = SQUARE_SQUARES.iter()
             .filter(|&&bitboard| !(bitboard & self.white_pieces).is_empty())
-            .count() as f32 * SPREAD;
+            .count() as f32 * spread;
 
         let black_spread_bonus = SQUARE_SQUARES.iter()
             .filter(|&&bitboard| !(bitboard & self.black_pieces).is_empty())
-            .count() as f32 * SPREAD;
+            .count() as f32 * spread;
 
         white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
             + king_safety_penalties[0] - king_safety_penalties[1]
