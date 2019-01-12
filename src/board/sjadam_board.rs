@@ -1293,8 +1293,8 @@ impl TunableBoard for SjadamBoard {
         const I_TEMPO_BONUS: usize = 12;
 
         let tempo_bonus = match self.side_to_move() {
-            White => (white_val + black_val.abs()) / (100.0 * params[I_TEMPO_BONUS]),
-            Black => -(white_val + black_val.abs()) / (100.0 * params[I_TEMPO_BONUS]),
+            White => (0.01 * (white_val + black_val.abs())) / params[I_TEMPO_BONUS],
+            Black => -(0.01 * (white_val + black_val.abs())) / params[I_TEMPO_BONUS],
         };
 
         const I_KING_SAFETY: usize = 13;
