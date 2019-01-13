@@ -56,13 +56,12 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
         let error = average_error(test_positions, test_results, &new_params);
         println!("Error now {}\n", error);
 
-        if !errors.len() > 1 && error > errors[errors.len() - 1] && error > errors[errors.len() - 2] {
-            if paramss[paramss.len() - 1] < paramss[paramss.len() - 2] {
-                return paramss[paramss.len() - 1].clone()
-            }
-            else {
-                return paramss[paramss.len() - 2].clone()
-            }
+        if !errors.len() > 2
+            && error > errors[errors.len() - 1]
+            && errors[errors.len() - 1] > errors[errors.len() - 2]
+            && errors[errors.len() - 2] > errors[errors.len() - 3]
+        {
+            return paramss[paramss.len() - 3].clone()
         }
         else {
             errors.push(error);
