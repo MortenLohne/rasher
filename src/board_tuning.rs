@@ -1,7 +1,6 @@
 use search_algorithms::board::ExtendedBoard;
 use search_algorithms::board::GameResult;
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::monte_carlo;
 use pgn::PgnBoard;
 use rayon::prelude::*;
 
@@ -120,8 +119,13 @@ pub fn error(eval: f32, game_result: GameResult) -> f32 {
         GameResult::BlackWin => 0.0,
     };
 
-    let error = f32::powf(answer - monte_carlo::eval_to_win_pct(eval), 2.0);
+    let error = f32::powf(answer - sigmoid(eval), 2.0);
     error
+}
+
+pub fn sigmoid(eval: f32) -> f32 {
+    const K: f32 = 1.13;
+    1.0 + 10.0_f32.powf(K * eval / 400.0)
 }
 
 fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, params: &[f32])

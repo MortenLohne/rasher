@@ -148,7 +148,7 @@ fn main() {
                         }
                     }
 
-                    board_tuning::gradient_descent(&mut training_positions, &test_game_results,
+                    board_tuning::gradient_descent(&mut training_positions, &training_game_results,
                                                    &mut test_positions, &test_game_results,
                                                    SjadamBoard::PARAMS);
                     break;
