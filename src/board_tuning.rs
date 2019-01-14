@@ -34,8 +34,11 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
 
 pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
                            test_positions: &mut[B], test_results: &[GameResult],
-                           params: &[f32]) -> Vec<f32>
+                           params: &[f32], k: f32) -> Vec<f32>
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+    assert_eq!(positions.len(), results.len());
+    assert_eq!(test_positions.len(), test_results.len());
+
     const ETA: f32 = 0.1;
 
     let mut errors = vec![std::f32::MAX];
@@ -94,6 +97,7 @@ pub fn gradients<B>(positions: &mut [B], results: &[GameResult], params: &[f32])
 
 pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> f32
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+    assert_eq!(positions.len(), results.len());
     positions.into_par_iter().zip(results)
         .map(|(board, game_result)| {
             let color = board.side_to_move();
@@ -113,19 +117,19 @@ pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f
 }
 
 pub fn error(eval: f32, game_result: GameResult) -> f32 {
+    const K: f32 = 1.6;
     let answer = match game_result {
         GameResult::WhiteWin => 1.0,
         GameResult::Draw => 0.5,
         GameResult::BlackWin => 0.0,
     };
 
-    let error = f32::powf(answer - sigmoid(eval), 2.0);
+    let error = f32::powf(answer - sigmoid(eval, K), 2.0);
     error
 }
 
-pub fn sigmoid(eval: f32) -> f32 {
-    const K: f32 = 1.13;
-    1.0 + 10.0_f32.powf(K * eval / 400.0)
+pub fn sigmoid(eval: f32, k: f32) -> f32 {
+    1.0 + 10.0_f32.powf(k * eval / 400.0)
 }
 
 fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, params: &[f32])

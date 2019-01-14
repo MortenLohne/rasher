@@ -97,56 +97,64 @@ fn main() {
                     return;
                 },
                 "pgn2fen" => {
-                    let mut training_file = File::open(&tokens[1]).unwrap();
-
-                    let mut input = String::new();
-                    training_file.read_to_string(&mut input).unwrap();
-                    let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
-
                     let mut training_positions = vec![];
                     let mut training_game_results = vec![];
 
-                    for ref game in games.iter() {
-                        let mut board = game.start_board.clone();
-                        for (mv, comment) in game.moves.iter() {
-                            let eval = comment.chars()
-                                .take_while(|&ch| ch != '/')
-                                .collect::<String>();
+                    {
+                        let mut training_file = File::open(&tokens[1]).unwrap();
 
-                            if !eval.contains("Book") && !eval.contains("M") {
-                                training_positions.push(board.clone());
-                                training_game_results.push(game.game_result.unwrap());
+                        let mut input = String::new();
+                        training_file.read_to_string(&mut input).unwrap();
+                        let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
+
+
+                        for ref game in games.iter() {
+                            let mut board = game.start_board.clone();
+                            for (mv, comment) in game.moves.iter() {
+                                let eval = comment.chars()
+                                    .take_while(|&ch| ch != '/')
+                                    .collect::<String>();
+
+                                if !eval.contains("Book") && !eval.contains("M") {
+                                    training_positions.push(board.clone());
+                                    training_game_results.push(game.game_result.unwrap());
+                                }
+
+                                board.do_move(mv.clone());
                             }
-
-                            board.do_move(mv.clone());
                         }
                     }
-
-                    input.clear();
-
-                    let mut test_data_file = File::open(&tokens[2]).unwrap();
-                    test_data_file.read_to_string(&mut input).unwrap();
-
-                    let test_games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
 
                     let mut test_positions = vec![];
                     let mut test_game_results = vec![];
 
-                    for ref game in test_games.iter() {
-                        let mut board = game.start_board.clone();
-                        for (mv, comment) in game.moves.iter() {
-                            let eval = comment.chars()
-                                .take_while(|&ch| ch != '/')
-                                .collect::<String>();
+                    {
+                        let mut test_data_file = File::open(&tokens[2]).unwrap();
+                        let mut input = String::new();
+                        test_data_file.read_to_string(&mut input).unwrap();
 
-                            if !eval.contains("Book") && !eval.contains("M") {
-                                test_positions.push(board.clone());
-                                test_game_results.push(game.game_result.unwrap());
+                        let test_games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
+
+
+                        for ref game in test_games.iter() {
+                            let mut board = game.start_board.clone();
+                            for (mv, comment) in game.moves.iter() {
+                                let eval = comment.chars()
+                                    .take_while(|&ch| ch != '/')
+                                    .collect::<String>();
+
+                                if !eval.contains("Book") && !eval.contains("M") {
+                                    test_positions.push(board.clone());
+                                    test_game_results.push(game.game_result.unwrap());
+                                }
+
+                                board.do_move(mv.clone());
                             }
-
-                            board.do_move(mv.clone());
                         }
                     }
+
+                    println!("Read {} training positions and {} test positions.",
+                             training_positions.len(), test_positions.len());
 
                     board_tuning::gradient_descent(&mut training_positions, &training_game_results,
                                                    &mut test_positions, &test_game_results,
