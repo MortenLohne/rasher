@@ -68,10 +68,11 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
             lowest_error = error;
             best_paramss = new_params.to_vec();
         }
-        else if !errors.len() > 2
+        else if errors.len() > 2
             && error > lowest_error
             && errors[errors.len() - 1] > lowest_error
             && errors[errors.len() - 2] > lowest_error
+            && errors[errors.len() - 3] > lowest_error
         {
             if eta < 0.005 {
                 return best_paramss
