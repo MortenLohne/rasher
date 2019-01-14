@@ -34,7 +34,7 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
 
 pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
                            test_positions: &mut[B], test_results: &[GameResult],
-                           params: &[f32], k: f32) -> Vec<f32>
+                           params: &[f32]) -> Vec<f32>
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());

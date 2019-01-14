@@ -97,61 +97,42 @@ fn main() {
                     return;
                 },
                 "pgn2fen" => {
-                    let mut training_positions = vec![];
-                    let mut training_game_results = vec![];
 
-                    {
-                        let mut training_file = File::open(&tokens[1]).unwrap();
+                    fn read_positions(file_name: &str) -> (Vec<SjadamBoard>, Vec<GameResult>) {
+                        let mut positions = vec![];
+                        let mut game_results = vec![];
 
-                        let mut input = String::new();
-                        training_file.read_to_string(&mut input).unwrap();
-                        let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
+                        {
+                            let mut file = File::open(file_name).unwrap();
 
+                            let mut input = String::new();
+                            file.read_to_string(&mut input).unwrap();
+                            let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
+                            
+                            for ref game in games.iter() {
+                                let mut board = game.start_board.clone();
+                                for (mv, comment) in game.moves.iter() {
+                                    let eval = comment.chars()
+                                        .take_while(|&ch| ch != '/')
+                                        .collect::<String>();
 
-                        for ref game in games.iter() {
-                            let mut board = game.start_board.clone();
-                            for (mv, comment) in game.moves.iter() {
-                                let eval = comment.chars()
-                                    .take_while(|&ch| ch != '/')
-                                    .collect::<String>();
+                                    if !eval.contains("Book") && !eval.contains("M") {
+                                        positions.push(board.clone());
+                                        game_results.push(game.game_result.unwrap());
+                                    }
 
-                                if !eval.contains("Book") && !eval.contains("M") {
-                                    training_positions.push(board.clone());
-                                    training_game_results.push(game.game_result.unwrap());
+                                    board.do_move(mv.clone());
                                 }
-
-                                board.do_move(mv.clone());
                             }
                         }
+                        (positions, game_results)
                     }
 
-                    let mut test_positions = vec![];
-                    let mut test_game_results = vec![];
+                    let (mut training_positions, training_game_results) =
+                        read_positions(&tokens[1]);
 
-                    {
-                        let mut test_data_file = File::open(&tokens[2]).unwrap();
-                        let mut input = String::new();
-                        test_data_file.read_to_string(&mut input).unwrap();
-
-                        let test_games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
-
-
-                        for ref game in test_games.iter() {
-                            let mut board = game.start_board.clone();
-                            for (mv, comment) in game.moves.iter() {
-                                let eval = comment.chars()
-                                    .take_while(|&ch| ch != '/')
-                                    .collect::<String>();
-
-                                if !eval.contains("Book") && !eval.contains("M") {
-                                    test_positions.push(board.clone());
-                                    test_game_results.push(game.game_result.unwrap());
-                                }
-
-                                board.do_move(mv.clone());
-                            }
-                        }
-                    }
+                    let (mut test_positions, test_game_results) =
+                        read_positions(&tokens[2]);
 
                     println!("Read {} training positions and {} test positions.",
                              training_positions.len(), test_positions.len());
