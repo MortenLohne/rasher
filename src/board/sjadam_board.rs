@@ -1265,6 +1265,7 @@ impl TunableBoard for SjadamBoard {
             0.08182539, -0.0520456,
             0.36050707,
             0.08988158, 0.08063762, 0.46551457, 0.42531133, 0.3385901,
+            0.02, 0.02, 0.15, 0.15, 0.1,
             0.1325845];
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
@@ -1298,6 +1299,8 @@ impl TunableBoard for SjadamBoard {
             Black => -params[I_TEMPO_BONUS],
         };
 
+        // Bonuses for king weaknesses which the opponents's pieces are
+        // correctly positioned to take advantage of
         const I_KING_SAFETY: usize = 13;
 
         let pawn_val: f32 = params[I_KING_SAFETY];
@@ -1305,6 +1308,16 @@ impl TunableBoard for SjadamBoard {
         let bishop_val: f32 = params[I_KING_SAFETY + 2];
         let rook_val: f32 = params[I_KING_SAFETY + 3];
         let queen_val: f32 = params[I_KING_SAFETY + 4];
+
+        // Bonuses for king weaknesses which the opponents's pieces are not
+        // correctly positioned to take advantage of
+        const I_WRONG_KING_SAFETY: usize = 18;
+
+        let pawn_wrong_val: f32 = params[I_WRONG_KING_SAFETY];
+        let knight_wrong_val: f32 = params[I_WRONG_KING_SAFETY + 1];
+        let bishop_wrong_val: f32 = params[I_WRONG_KING_SAFETY + 2];
+        let rook_wrong_val: f32 = params[I_WRONG_KING_SAFETY + 3];
+        let queen_wrong_val: f32 = params[I_WRONG_KING_SAFETY + 4];
 
 
         let king_safety_penalties = [White, Black].iter().map(|&color| {
@@ -1339,8 +1352,9 @@ impl TunableBoard for SjadamBoard {
                 let queens = self.bitboards[8 + (!color).disc()];
 
                 dia_penalty -= bishop_val * (bishops & colored_squares).popcount() as f32;
+                dia_penalty -= bishop_wrong_val * (bishops & !colored_squares).popcount() as f32;
                 dia_penalty -= queen_val * (queens & colored_squares).popcount() as f32;
-                dia_penalty -= queen_val * (queens & !colored_squares).popcount() as f32 * 0.4;
+                dia_penalty -= queen_wrong_val * (queens & !colored_squares).popcount() as f32;
 
                 dia_penalty *= open_dia_neighbours as f32;
                 penalty += dia_penalty
@@ -1358,9 +1372,9 @@ impl TunableBoard for SjadamBoard {
 
                 for square in open_neighbours_squares {
                     orthogonal_penalty -= rook_val * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= rook_val * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.3;
+                    orthogonal_penalty -= rook_wrong_val * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
                     orthogonal_penalty -= queen_val * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= queen_val * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32 * 0.4;
+                    orthogonal_penalty -= queen_wrong_val * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
                 }
 
                 penalty += orthogonal_penalty;
@@ -1380,7 +1394,7 @@ impl TunableBoard for SjadamBoard {
                 for square in open_neighbours_squares {
                     let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
                     knight_penalty -= knight_val * (knights & sjadam_squares).popcount() as f32;
-                    knight_penalty -= knight_val * (knights & !sjadam_squares).popcount() as f32 * 0.3;
+                    knight_penalty -= knight_wrong_val * (knights & !sjadam_squares).popcount() as f32;
                 }
 
                 penalty += knight_penalty;
@@ -1400,7 +1414,7 @@ impl TunableBoard for SjadamBoard {
                 for square in open_neighbours_squares {
                     let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
                     pawn_penalty -= pawn_val * (pawns & sjadam_squares).popcount() as f32;
-                    pawn_penalty -= pawn_val * (pawns & !sjadam_squares).popcount() as f32 * 0.2;
+                    pawn_penalty -= pawn_wrong_val * (pawns & !sjadam_squares).popcount() as f32;
                 }
 
                 penalty += pawn_penalty;
@@ -1409,7 +1423,7 @@ impl TunableBoard for SjadamBoard {
         })
             .collect::<Vec<_>>();
 
-        const I_SPREAD: usize = 18;
+        const I_SPREAD: usize = 23;
 
         let spread = params[I_SPREAD];
 
