@@ -1442,21 +1442,16 @@ impl TunableBoard for SjadamBoard {
         // Bonus for having pieces on your back rank, to protect against promoting pieces
         const I_BACK_RANK_COVERAGE: usize = 24;
 
+        let non_pawn_pieces = self.all_pieces() & !self.bitboards[0] & !self.bitboards[1];
+        debug_assert!(non_pawn_pieces.popcount() <= 16);
+
         let white_back_rank_coverage =
-            if !(self.bitboards[6].rank(7) | self.bitboards[8].rank(7)) > 0 {
-                params[I_BACK_RANK_COVERAGE]
-            }
-            else {
-                0.0
-            };
+            (self.bitboards[6].rank(7) | self.bitboards[8].rank(7)).count_ones() as f32
+                * (16 - non_pawn_pieces.popcount()) as f32 * params[I_BACK_RANK_COVERAGE];
 
         let black_back_rank_coverage =
-            if !(self.bitboards[7].rank(0) | self.bitboards[9].rank(0)) > 0 {
-                params[I_BACK_RANK_COVERAGE]
-            }
-            else {
-                0.0
-            };
+            (self.bitboards[7].rank(0) | self.bitboards[9].rank(0)).count_ones() as f32
+                * (16 - non_pawn_pieces.popcount()) as f32 * params[I_BACK_RANK_COVERAGE];
 
         white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
             + king_safety_penalties[0] - king_safety_penalties[1]
