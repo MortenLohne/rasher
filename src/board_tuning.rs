@@ -3,6 +3,7 @@ use search_algorithms::board::GameResult;
 use search_algorithms::alpha_beta::Score;
 use pgn::PgnBoard;
 use rayon::prelude::*;
+use std::fmt::Debug;
 
 pub trait TunableBoard {
     const PARAMS: &'static [f32];
@@ -18,7 +19,7 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
                                      Score::Win(0), params) {
                 let mut cloned_board = board.clone();
 
-                for mv in pv {
+                for mv in pv.into_iter().rev() {
                     cloned_board.do_move(mv);
                 }
                 cloned_board
@@ -35,11 +36,11 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
 pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
                            test_positions: &mut[B], test_results: &[GameResult],
                            params: &[f32]) -> Vec<f32>
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug {
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
-    const ETA: f32 = 0.1;
+    const ETA: f32 = 0.02;
 
     let mut errors = vec![std::f32::MAX];
     let mut paramss: Vec<Vec<f32>> = vec![params.to_vec()];
@@ -96,7 +97,7 @@ pub fn gradients<B>(positions: &mut [B], results: &[GameResult], params: &[f32])
 }
 
 pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> f32
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug {
     assert_eq!(positions.len(), results.len());
     positions.into_par_iter().zip(results)
         .map(|(board, game_result)| {
@@ -117,21 +118,22 @@ pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f
 }
 
 pub fn error(eval: f32, game_result: GameResult) -> f32 {
-    const K: f32 = 1.6;
     let answer = match game_result {
         GameResult::WhiteWin => 1.0,
         GameResult::Draw => 0.5,
         GameResult::BlackWin => 0.0,
     };
 
-    let error = f32::powf(answer - sigmoid(eval, K), 2.0);
+    let error = f32::powf(answer - sigmoid(eval), 2.0);
     error
 }
 
-pub fn sigmoid(eval: f32, k: f32) -> f32 {
-    1.0 + 10.0_f32.powf(k * eval / 400.0)
+pub fn sigmoid(eval: f32) -> f32 {
+    let k = 0.97;
+    1.0 / (1.0 + 10.0_f32.powf(-k * eval / 4.0))
 }
 
+/// Run quiescence search and returns a score from the side to move's perspective
 fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, params: &[f32])
     -> (Score, Vec<B::Move>)
     where B: TunableBoard + ExtendedBoard {
@@ -157,7 +159,7 @@ fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, param
     for mv in active_moves {
         let reverse_move = board.do_move(mv.clone());
 
-        let (mut score, mut pv) = qsearch(board, beta, alpha, params);
+        let (mut score, mut pv) = qsearch(board, !beta, !alpha, params);
 
         score = !score;
         board.reverse_move(reverse_move);
