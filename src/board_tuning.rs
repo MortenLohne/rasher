@@ -41,6 +41,7 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
     assert_eq!(test_positions.len(), test_results.len());
 
     let mut eta = 0.1;
+    let beta = 0.8;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!("Initial error: {}", initial_error);
@@ -48,16 +49,21 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
     let mut errors = vec![initial_error];
     let mut lowest_error = initial_error;
     let mut paramss: Vec<Vec<f32>> = vec![params.to_vec()];
-    let mut best_paramss = params.to_vec();
+    let mut best_params = params.to_vec();
+    let mut gradients = vec![0.0; params.len()];
 
     loop {
         let last_params = paramss.last().unwrap().clone();
-        let gradients = gradients(positions, results, &last_params);
+        let slopes = calc_slope(positions, results, &last_params);
+        gradients = gradients.iter()
+            .zip(slopes)
+            .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
+            .collect();
         println!("Gradients: {:?}", gradients);
 
         let new_params: Vec<f32> = last_params.iter()
-            .zip(gradients)
-            .map(|(param, grad)| param + grad * eta)
+            .zip(gradients.iter())
+            .map(|(param, gradient)| param + gradient * eta)
             .collect();
         println!("New parameters: {:?}", new_params);
 
@@ -66,20 +72,21 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
 
         if error < lowest_error {
             lowest_error = error;
-            best_paramss = new_params.to_vec();
+            best_params = new_params.to_vec();
         }
-        else if errors.len() > 2
+        else if errors.len() > 3
             && error > lowest_error
             && errors[errors.len() - 1] > lowest_error
             && errors[errors.len() - 2] > lowest_error
             && errors[errors.len() - 3] > lowest_error
+            && errors[errors.len() - 4] > lowest_error
         {
             if eta < 0.005 {
-                return best_paramss
+                return best_params
             }
             else {
                 eta = eta / 10.0;
-                paramss = vec![best_paramss.clone()];
+                paramss = vec![best_params.clone()];
                 errors = vec![lowest_error];
                 println!("Reduced eta to {}\n", eta);
                 continue;
@@ -90,7 +97,7 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
     }
 }
 
-pub fn gradients<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
+pub fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
     where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Sync {
 
     let critical_positions = get_critical_positions(positions, params);
