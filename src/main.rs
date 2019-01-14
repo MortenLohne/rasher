@@ -58,6 +58,7 @@ use uci_engine::UciEngine;
 use search_algorithms::monte_carlo::MonteCarlo;
 use std::fs::File;
 use std::io::Read;
+use rand::Rng;
 
 #[cfg(feature = "logging")]
 fn init_log() -> Result<(), Box<std::error::Error>> {
@@ -108,7 +109,7 @@ fn main() {
                             let mut input = String::new();
                             file.read_to_string(&mut input).unwrap();
                             let games = pgn_parse::parse_pgn::<SjadamBoard>(&input).unwrap();
-                            
+
                             for ref game in games.iter() {
                                 let mut board = game.start_board.clone();
                                 for (mv, comment) in game.moves.iter() {
@@ -137,9 +138,14 @@ fn main() {
                     println!("Read {} training positions and {} test positions.",
                              training_positions.len(), test_positions.len());
 
+                    let mut initial_params: Vec<f32> = vec![];
+                    for _ in 0..SjadamBoard::PARAMS.len() {
+                        initial_params.push(rand::thread_rng().gen());
+                    }
+
                     board_tuning::gradient_descent(&mut training_positions, &training_game_results,
                                                    &mut test_positions, &test_game_results,
-                                                   SjadamBoard::PARAMS);
+                                                   &initial_params);
                     break;
                 }
                 "isready" => {

@@ -40,10 +40,15 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
-    const ETA: f32 = 0.02;
+    let mut eta = 0.1;
 
-    let mut errors = vec![std::f32::MAX];
+    let initial_error = average_error(test_positions, test_results, params);
+    println!("Initial error: {}", initial_error);
+
+    let mut errors = vec![initial_error];
+    let mut lowest_error = initial_error;
     let mut paramss: Vec<Vec<f32>> = vec![params.to_vec()];
+    let mut best_paramss = params.to_vec();
 
     loop {
         let last_params = paramss.last().unwrap().clone();
@@ -52,24 +57,35 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
 
         let new_params: Vec<f32> = last_params.iter()
             .zip(gradients)
-            .map(|(param, grad)| param + grad * ETA)
+            .map(|(param, grad)| param + grad * eta)
             .collect();
         println!("New parameters: {:?}", new_params);
 
         let error = average_error(test_positions, test_results, &new_params);
         println!("Error now {}\n", error);
 
-        if !errors.len() > 2
-            && error > errors[errors.len() - 1]
-            && errors[errors.len() - 1] > errors[errors.len() - 2]
-            && errors[errors.len() - 2] > errors[errors.len() - 3]
+        if error < lowest_error {
+            lowest_error = error;
+            best_paramss = new_params.to_vec();
+        }
+        else if !errors.len() > 2
+            && error > lowest_error
+            && errors[errors.len() - 1] > lowest_error
+            && errors[errors.len() - 2] > lowest_error
         {
-            return paramss[paramss.len() - 3].clone()
+            if eta < 0.005 {
+                return best_paramss
+            }
+            else {
+                eta = eta / 10.0;
+                paramss = vec![best_paramss.clone()];
+                errors = vec![lowest_error];
+                println!("Reduced eta to {}\n", eta);
+                continue;
+            }
         }
-        else {
-            errors.push(error);
-            paramss.push(new_params);
-        }
+        errors.push(error);
+        paramss.push(new_params);
     }
 }
 
