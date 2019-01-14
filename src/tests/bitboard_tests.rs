@@ -99,11 +99,16 @@ quickcheck! {
 
 #[test]
 fn rank() {
-    let start_board = BitBoard::all_from_board(&ChessBoard::start_board());
-    assert_eq!(start_board.rank(0), 255);
-    assert_eq!(start_board.rank(1), 255);
-    assert_eq!(start_board.rank(2), 0);
-    assert_eq!(start_board.rank(6), 255);
+    let mut chess_board = ChessBoard::start_board();
+    let bit_board = BitBoard::all_from_board(&chess_board);
+    assert_eq!(bit_board.rank(0), 255);
+    assert_eq!(bit_board.rank(1), 255);
+    assert_eq!(bit_board.rank(2), 0);
+    assert_eq!(bit_board.rank(6), 255);
+
+    let mv = chess_board.move_from_san("e2e4").unwrap();
+    chess_board.do_move(mv);
+    assert_eq!(BitBoard::all_from_board(&chess_board).rank(4), 16);
 }
 
 #[test]

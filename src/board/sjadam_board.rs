@@ -218,7 +218,9 @@ impl BitBoard {
     pub fn popcount(&self) -> u32 {
         self.board.count_ones()
     }
-    
+
+    /// Get a single rank
+    /// Ranks are numbered from 0 (black's back rank) to 7 (white's back rank)
     pub fn rank(self, rank: u8) -> u8 {
         (self.board >> (rank * 8)) as u8
     }
@@ -1266,7 +1268,8 @@ impl TunableBoard for SjadamBoard {
             0.34832636,
             0.07773119, 0.06434948, 0.4119926, 0.30337498, 0.35616165,
             0.015587204, 0.07733913, 0.06595308, 0.193271, 0.17773989,
-            0.1215852];
+            0.1215852,
+            0.2];
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
@@ -1435,8 +1438,29 @@ impl TunableBoard for SjadamBoard {
             .filter(|&&bitboard| !(bitboard & self.black_pieces).is_empty())
             .count() as f32 * spread;
 
+
+        // Bonus for having pieces on your back rank, to protect against promoting pieces
+        const I_BACK_RANK_COVERAGE: usize = 24;
+
+        let white_back_rank_coverage =
+            if !(self.bitboards[6].rank(7) | self.bitboards[8].rank(7)) > 0 {
+                params[I_BACK_RANK_COVERAGE]
+            }
+            else {
+                0.0
+            };
+
+        let black_back_rank_coverage =
+            if !(self.bitboards[7].rank(0) | self.bitboards[9].rank(0)) > 0 {
+                params[I_BACK_RANK_COVERAGE]
+            }
+            else {
+                0.0
+            };
+
         white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
             + king_safety_penalties[0] - king_safety_penalties[1]
+            + white_back_rank_coverage - black_back_rank_coverage
         /*
         TODO: Put pawn advancement eval back
         let pawn_val = match self.board[rank][file].piece_type() {
