@@ -11,8 +11,8 @@ pub trait TunableBoard {
     fn static_eval_with_params(&self, params: &[f32]) -> f32;
 }
 
-pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+pub fn get_critical_positions<B>(positions: &[B], params: &[f32]) -> Vec<B>
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Sync {
     positions.into_par_iter()
         .map(|board| {
             if let (Score::Val(_), pv) = qsearch(&mut board.clone(), Score::Loss(0),
@@ -33,10 +33,10 @@ pub fn get_critical_positions<B>(positions: &mut [B], params: &[f32]) -> Vec<B>
         .collect()
 }
 
-pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
-                           test_positions: &mut[B], test_results: &[GameResult],
+pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
+                           test_positions: &[B], test_results: &[GameResult],
                            params: &[f32]) -> Vec<f32>
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug {
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug + Sync {
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
@@ -90,14 +90,14 @@ pub fn gradient_descent<B>(positions: &mut [B], results: &[GameResult],
     }
 }
 
-pub fn gradients<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> Vec<f32>
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send {
+pub fn gradients<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Sync {
 
     let critical_positions = get_critical_positions(positions, params);
 
     const EPSILON : f32 = 0.001;
 
-    params.iter().enumerate()
+    params.par_iter().enumerate()
         .map(|(i, p)| {
             let mut params_hat: Vec<f32> = params.iter().cloned().collect();
             params_hat[i] = p + EPSILON;
@@ -113,8 +113,8 @@ pub fn gradients<B>(positions: &mut [B], results: &[GameResult], params: &[f32])
         .collect()
 }
 
-pub fn average_error<B>(positions: &mut [B], results: &[GameResult], params: &[f32]) -> f32
-    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug {
+pub fn average_error<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> f32
+    where B: TunableBoard + ExtendedBoard + PgnBoard + Send + Debug + Sync {
     assert_eq!(positions.len(), results.len());
     positions.into_par_iter().zip(results)
         .map(|(board, game_result)| {

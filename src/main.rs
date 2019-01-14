@@ -144,16 +144,16 @@ fn main() {
                     }
 
                     let new_params =
-                        board_tuning::gradient_descent(&mut training_positions, &training_game_results,
-                                                       &mut test_positions, &test_game_results,
+                        board_tuning::gradient_descent(&training_positions, &training_game_results,
+                                                       &test_positions, &test_game_results,
                                                        &initial_params);
 
                     println!("Tuning has converged.");
                     println!("Parameters: {:?}", new_params);
                     println!("Final error: {}",
-                             board_tuning::average_error(&mut test_positions, &test_game_results, &new_params));
+                             board_tuning::average_error(&test_positions, &test_game_results, &new_params));
                     println!("Error on current weights: {}",
-                             board_tuning::average_error(&mut test_positions, &test_game_results, &SjadamBoard::PARAMS));
+                             board_tuning::average_error(&test_positions, &test_game_results, &SjadamBoard::PARAMS));
 
                     break;
                 }
