@@ -1269,7 +1269,7 @@ impl TunableBoard for SjadamBoard {
             0.07773119, 0.06434948, 0.4119926, 0.30337498, 0.35616165,
             0.015587204, 0.07733913, 0.06595308, 0.193271, 0.17773989,
             0.1215852,
-            0.2];
+            0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
@@ -1438,24 +1438,50 @@ impl TunableBoard for SjadamBoard {
             .filter(|&&bitboard| !(bitboard & self.black_pieces).is_empty())
             .count() as f32 * spread;
 
+        const I_SJADAM_MOBILITY: usize = 24;
 
-        // Bonus for having pieces on your back rank, to protect against promoting pieces
-        const I_BACK_RANK_COVERAGE: usize = 24;
+        let get_sjadam_mobility_bonus = |piece: Piece| {
+            let bitboard = self.get_piece(piece);
+            let total_sjadam_squares: i32 = bitboard.into_iter()
+                .map(|square| {
+                    [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)]
+                        .into_iter()
+                        .filter(|(i, j)|
+                            square.file() as i32 + i * 2 >= 0 && square.file() as i32 + i * 2 < 8
+                                && square.rank() as i32 + j * 2 >= 0 && square.rank() as i32 + j * 2 < 8)
+                        .map(|(i, j)| {
+                            let jump_square = Square((square.0 as i32 + i + j * 8) as u8);
+                            let dest_square = Square((square.0 as i32 + i * 2 + j * 16) as u8);
+                            if self.all_pieces().get(jump_square)
+                                && !self.all_pieces().get(dest_square)
+                            {
+                                1
+                            }
+                            else {
+                                0
+                            }
+                        })
+                        .sum::<i32>()
+                })
+                .sum();
 
-        let non_pawn_pieces = self.all_pieces() & !self.bitboards[0] & !self.bitboards[1];
-        debug_assert!(non_pawn_pieces.popcount() <= 16);
+            total_sjadam_squares as f32
+                * params[I_SJADAM_MOBILITY + piece.piece_type() as u8 as usize - 1]
+                * piece.color().unwrap().multiplier() as f32
+        };
 
-        let white_back_rank_coverage =
-            (self.bitboards[6].rank(7) | self.bitboards[8].rank(7)).count_ones() as f32
-                * (16 - non_pawn_pieces.popcount()) as f32 * params[I_BACK_RANK_COVERAGE];
-
-        let black_back_rank_coverage =
-            (self.bitboards[7].rank(0) | self.bitboards[9].rank(0)).count_ones() as f32
-                * (16 - non_pawn_pieces.popcount()) as f32 * params[I_BACK_RANK_COVERAGE];
+        let mut sjadam_mobility_bonus = 0.0;
+        for i in 1..=6 {
+            let piece_type = PieceType::from_disc(i).unwrap();
+            for &color in [White, Black].iter() {
+                let piece = Piece::new(piece_type, color);
+                sjadam_mobility_bonus += get_sjadam_mobility_bonus(piece);
+            }
+        }
 
         white_val - black_val + tempo_bonus + white_spread_bonus - black_spread_bonus
             + king_safety_penalties[0] - king_safety_penalties[1]
-            + white_back_rank_coverage - black_back_rank_coverage
+            + sjadam_mobility_bonus
         /*
         TODO: Put pawn advancement eval back
         let pawn_val = match self.board[rank][file].piece_type() {
