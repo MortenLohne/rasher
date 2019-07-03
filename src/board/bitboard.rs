@@ -1,6 +1,7 @@
 use std::iter;
 use std::{fmt, ops};
 use board::std_board::{Square};
+use std::iter::FusedIterator;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub struct BitBoard {
@@ -221,6 +222,8 @@ impl Iterator for BitBoardIterator {
         }
     }
 }
+
+impl FusedIterator for BitBoardIterator {}
 
 lazy_static!(
     static ref DIAGONAL_NEIGHBOURS : [BitBoard; 64] = {
