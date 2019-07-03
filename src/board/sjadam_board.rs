@@ -278,7 +278,7 @@ impl SjadamBoard {
     pub fn last_move(&self) -> Option<SjadamMove> { self.last_move.clone() }
 
     pub fn all_pieces(&self) -> BitBoard {
-        BitBoard::from_u64(self.white_pieces().board | self.black_pieces().board)
+        self.white_pieces() | self.black_pieces()
     }
 
     pub fn piece_at_square(&self, piece: Piece, square: Square) -> bool {
@@ -713,8 +713,8 @@ impl Board for SjadamBoard {
     fn game_result(&self) -> Option<GameResult> {
         // In sjadam, king may be actually captured.
         // Check if the king is gone
-        match (self.get_piece(Piece::new(King, White)).board != 0,
-               self.get_piece(Piece::new(King, Black)).board != 0) {
+        match (!self.get_piece(Piece::new(King, White)).is_empty(),
+               !self.get_piece(Piece::new(King, Black)).is_empty()) {
             (true, false) => Some(GameResult::WhiteWin),
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
@@ -1041,12 +1041,12 @@ impl TunableBoard for SjadamBoard {
 
     fn static_eval_with_params (&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result() == None);
-        let centre1 = 0b00000000_00000000_00000000_00011000_00011000_00000000_00000000_00000000;
-        let centre2 = 0b00000000_00000000_00111100_00111100_00111100_00111100_00000000_00000000;
-        let centre3 = 0b00000000_01111110_01111110_01111110_01111110_01111110_01111110_00000000;
+        let centre1 = BitBoard::from_u64(0b00000000_00000000_00000000_00011000_00011000_00000000_00000000_00000000);
+        let centre2 = BitBoard::from_u64(0b00000000_00000000_00111100_00111100_00111100_00111100_00000000_00000000);
+        let centre3 = BitBoard::from_u64(0b00000000_01111110_01111110_01111110_01111110_01111110_01111110_00000000);
 
-        let centre_value = |bits: u64| (bits & centre1).count_ones() + (bits & centre2).count_ones()
-            + (bits & centre3).count_ones();
+        let centre_value = |bits: BitBoard| (bits & centre1).popcount() + (bits & centre2).popcount()
+            + (bits & centre3).popcount();
 
         const I_PIECE_VALS: usize = 0;
 
@@ -1055,7 +1055,7 @@ impl TunableBoard for SjadamBoard {
                 let piece_val = params[I_PIECE_VALS + (i / 2) * 2];
                 let piece_center_val = params[I_PIECE_VALS + (i / 2) * 2 + 1];
                 let piece_bitboard = self.bitboards[*i];
-                piece_center_val * centre_value(piece_bitboard.board) as f32 +
+                piece_center_val * centre_value(piece_bitboard) as f32 +
                     piece_val * piece_bitboard.popcount() as f32
             })
             .sum();

@@ -184,7 +184,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
         Bishop => bishop_moves(sjadam_squares, friendly_pieces, all_pieces),
         Queen => {
             let mut queen_moves = bishop_moves(sjadam_squares, friendly_pieces, all_pieces);
-            queen_moves.board |= rook_moves(sjadam_squares, friendly_pieces, all_pieces).board;
+            queen_moves |= rook_moves(sjadam_squares, friendly_pieces, all_pieces);
             queen_moves
         },
         Knight => knight_moves(sjadam_squares, friendly_pieces),
@@ -267,13 +267,13 @@ fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoa
 #[inline(never)]
 fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoard,
                          all_pieces: &BitBoard) {
-    let type1_mask = 0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101;
-    let type2_mask = 0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010;
-    let type3_mask = 0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000;
+    let type1_mask = BitBoard::from_u64(0b00000000_01010101_00000000_01010101_00000000_01010101_00000000_01010101);
+    let type2_mask = BitBoard::from_u64(0b00000000_10101010_00000000_10101010_00000000_10101010_00000000_10101010);
+    let type3_mask = BitBoard::from_u64(0b01010101_00000000_01010101_00000000_01010101_00000000_01010101_00000000);
     
-    let color_offset = if type1_mask & sjadam_squares.board != 0 { 0 }
-    else if type2_mask & sjadam_squares.board != 0 { 1 }
-    else if type3_mask & sjadam_squares.board != 0 { 8 }
+    let color_offset = if !(type1_mask & *sjadam_squares).is_empty() { 0 }
+    else if !(type2_mask & *sjadam_squares).is_empty() { 1 }
+    else if !(type3_mask & *sjadam_squares).is_empty() { 8 }
     else { 9 };
     
     let old_sjadam_squares = *sjadam_squares;
@@ -412,9 +412,9 @@ fn bishop_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
     }
     sjadam_squares_315 = (0..7).fold(sjadam_squares_315, |acc, _| acc.rotate_315());
     
-    bishop_moves.board |= diagonal_moves.board;
-    bishop_moves.board |= sjadam_squares_315.board;
-    bishop_moves.board &= !friendly_pieces.board;
+    bishop_moves |= diagonal_moves;
+    bishop_moves |= sjadam_squares_315;
+    bishop_moves &= !friendly_pieces;
     bishop_moves
 }
 
@@ -429,13 +429,13 @@ fn rook_moves(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
     }
     let mut rook_moves = sjadam_squares_rotated.rotate_270();
     
-    rook_moves.board &= !friendly_pieces.board;
+    rook_moves = rook_moves & !friendly_pieces;
     let mut horizontal_moves = sjadam_squares;
     for rank in 0..8 {
         lookup_rook(rank, &mut horizontal_moves, all_pieces);
     }
-    horizontal_moves.board &= !friendly_pieces.board;
-    rook_moves.board |= horizontal_moves.board;
+    horizontal_moves &= !friendly_pieces;
+    rook_moves |= horizontal_moves;
     rook_moves
 }
 
