@@ -1,6 +1,6 @@
-use std::iter::FromIterator;
+use std::iter;
 use std::{fmt, ops};
-use board::std_board::{Square, BoardIter, ChessBoard, Piece};
+use board::std_board::{Square};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub struct BitBoard {
@@ -34,23 +34,6 @@ impl BitBoard {
     }
     pub fn from_u64(n: u64) -> Self {
         BitBoard { board: n }
-    }
-
-    /// Returns a bitboard representation of the board, with all bits set
-    /// where f(piece) is true for the piece on the square
-    #[allow(dead_code)]
-    pub fn from_board<F: Fn(Piece) -> bool> (board: &ChessBoard, f: F) -> Self {
-        let mut bit_board = BitBoard::empty();
-        for square in BoardIter::new() {
-            if f(board[square]) {
-                bit_board.set(square);
-            }
-        }
-        bit_board
-    }
-    #[allow(dead_code)]
-    pub fn all_from_board(board: &ChessBoard) -> Self {
-        Self::from_board(board, |piece| !piece.is_empty())
     }
 
     /// Returns a board with the diagonal neighbours squares (up to 4) set
@@ -200,7 +183,7 @@ impl IntoIterator for BitBoard {
     }
 }
 
-impl FromIterator<Square> for BitBoard {
+impl iter::FromIterator<Square> for BitBoard {
     fn from_iter<T: IntoIterator<Item=Square>>(iter: T) -> Self {
         let mut board = Self::empty();
         for square in iter {

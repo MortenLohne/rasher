@@ -1,7 +1,7 @@
 use board::sjadam_board;
 use board::bitboard::BitBoard;
 use board::sjadam_board::SjadamBoard;
-use board::std_board::ChessBoard;
+use board::std_board::{ChessBoard, BoardIter};
 use board::std_board::Square;
 use board::std_board::Piece;
 use board::std_board::PieceType::*;
@@ -29,6 +29,25 @@ fn rotate() {
             assert!(!board.get(Square::from_ints(file, rank)),
             "Found piece in the middle of board \n{:?}", board);
         }
+    }
+}
+
+impl BitBoard {
+    /// Returns a bitboard representation of the board, with all bits set
+    /// where f(piece) is true for the piece on the square
+    #[allow(dead_code)]
+    pub fn from_board<F: Fn(Piece) -> bool>(board: &ChessBoard, f: F) -> Self {
+        let mut bit_board = BitBoard::empty();
+        for square in BoardIter::new() {
+            if f(board[square]) {
+                bit_board.set(square);
+            }
+        }
+        bit_board
+    }
+    #[allow(dead_code)]
+    pub fn all_from_board(board: &ChessBoard) -> Self {
+        BitBoard::from_board(board, |piece| !piece.is_empty())
     }
 }
 
