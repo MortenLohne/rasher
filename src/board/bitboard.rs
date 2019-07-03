@@ -14,10 +14,22 @@ impl ops::BitOr for BitBoard {
     }
 }
 
+impl ops::BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: BitBoard) {
+        self.board |= rhs.board
+    }
+}
+
 impl ops::BitAnd for BitBoard {
     type Output = BitBoard;
     fn bitand(self, rhs: BitBoard) -> BitBoard {
         BitBoard::from_u64(self.board & rhs.board)
+    }
+}
+
+impl ops::BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: BitBoard) {
+        self.board &= rhs.board
     }
 }
 
