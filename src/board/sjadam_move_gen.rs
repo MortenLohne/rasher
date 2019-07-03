@@ -25,7 +25,7 @@ lazy_static! {
                         let mut cur_file = file.overflowing_sub(1).0;
                         
                         while cur_file < 8 {
-                            target_squares.set(Square(cur_file));
+                            target_squares = target_squares.set(Square(cur_file));
                             if all_pieces.get(Square(cur_file)) {
                                 break;
                             }
@@ -35,7 +35,7 @@ lazy_static! {
                         cur_file = file + 1;
                         
                         while cur_file < 8 {
-                            target_squares.set(Square(cur_file));
+                            target_squares = target_squares.set(Square(cur_file));
                             if all_pieces.get(Square(cur_file)) {
                                 break;
                             }
@@ -130,7 +130,7 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
         while let Some(square) = bitboard.first_piece() {
             legal_moves_for_square(board, square, piece.piece_type(),
                                    &mut moves, &mut active_moves, &mut winning_moves);
-            bitboard.clear(square);
+            bitboard = bitboard.clear(square);
         }
     }
 
@@ -164,8 +164,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
                           active_moves: &mut Vec<SjadamMove>,
                           winning_moves: &mut Vec<SjadamMove>) {
     
-    let mut sjadam_squares = BitBoard::empty();
-    sjadam_squares.set(square);
+    let mut sjadam_squares = BitBoard::empty().set(square);
     let color = board.side_to_move();
     
     let (friendly_pieces, opponent_pieces) = match color {
@@ -192,7 +191,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
         Pawn => {
             let mut all_pieces_pawns = all_pieces;
             if let Some(ep_square) = board.en_passant_square() {
-                all_pieces_pawns.set(ep_square);
+                all_pieces_pawns = all_pieces_pawns.set(ep_square);
             }
             if board.side_to_move() == White {
                 pawn_moves_white(sjadam_squares, friendly_pieces, all_pieces_pawns)
@@ -205,7 +204,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
         Empty => panic!("Tried to generate moves for empty piece"),
     };
     
-    moves.clear(square);
+    moves = moves.clear(square);
     while let Some(target_square) = moves.first_piece() {
         
         let mv = SjadamMove::new(square, target_square, false, piece_type);
@@ -232,7 +231,7 @@ pub fn legal_moves_for_square(board: &SjadamBoard, square: Square, piece_type: P
                 quiet_moves.push(mv);
             }
         }
-        moves.clear(target_square);
+        moves = moves.clear(target_square);
     }
 }
 
@@ -256,7 +255,7 @@ fn sjadam_friendly_moves(sjadam_squares: &mut BitBoard, friendly_pieces: &BitBoa
             if friendly_pieces.get(jumping_square) && !all_pieces.get(dest_square) &&
                 !sjadam_squares.get(dest_square)
             {
-                sjadam_squares.set(dest_square);
+                *sjadam_squares = sjadam_squares.set(dest_square);
                 sjadam_friendly_moves(sjadam_squares, friendly_pieces,
                                       all_pieces, dest_square);
             }
@@ -298,7 +297,7 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
                 let dest_square = Square(i.wrapping_add((16 * y) as u8).wrapping_add((2 * x) as u8));
                 let jumping_square = Square(i.wrapping_add((8 * y) as u8).wrapping_add(*x as u8));
                 if opponent_pieces.get(jumping_square) && !all_pieces.get(dest_square) {
-                    sjadam_squares.set(dest_square);
+                    *sjadam_squares = sjadam_squares.set(dest_square);
                 }
             }
         }

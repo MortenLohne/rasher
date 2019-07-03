@@ -40,7 +40,7 @@ impl BitBoard {
         let mut bit_board = BitBoard::empty();
         for square in BoardIter::new() {
             if f(board[square]) {
-                bit_board.set(square);
+                bit_board = bit_board.set(square);
             }
         }
         bit_board
@@ -100,7 +100,7 @@ quickcheck! {
     fn iterator(bitboard: BitBoard) -> bool {
         let mut board = BitBoard::empty();
         for square in bitboard {
-            board.set(square);
+            board = board.set(square);
         }
         board == bitboard
     }
@@ -181,8 +181,7 @@ fn diagonal_neighbours() {
     assert_eq!(BitBoard::diagonal_neighbours(Square(8)).popcount(), 2);
     assert_eq!(BitBoard::diagonal_neighbours(Square(9)).popcount(), 4);
 
-    let mut board = BitBoard::empty();
-    board.set(Square(9));
+    let board = BitBoard::empty().set(Square(9));
     assert_eq!(BitBoard::from_u64(a8_neighbours.board & board.board).popcount(), 1);
 }
 

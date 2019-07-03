@@ -52,7 +52,7 @@ lazy_static! {
             for &x in &[u8::overflowing_sub(file, 1).0, file + 1] {
                 for &y in &[u8::overflowing_sub(rank, 1).0, rank + 1] {
                     if x < 8 && y < 8 {
-                        board.set(Square::from_ints(x, y));
+                        board = board.set(Square::from_ints(x, y));
                     }
                 }
             }
@@ -67,10 +67,10 @@ lazy_static! {
             let (file, rank) = Square(i).file_rank();
             let mut board = BitBoard::empty();
             if file > 0 {
-                board.set(Square::from_ints(file - 1, rank));
+                board = board.set(Square::from_ints(file - 1, rank));
             }
             if file < 7 {
-                board.set(Square::from_ints(file + 1, rank));
+                board = board.set(Square::from_ints(file + 1, rank));
             }
             table[i as usize] = board;
         }
@@ -84,10 +84,10 @@ lazy_static! {
             let (file, rank) = Square(i).file_rank();
             let mut board = BitBoard::empty();
             if rank > 0 {
-                board.set(Square::from_ints(file, rank - 1));
+                board = board.set(Square::from_ints(file, rank - 1));
             }
             if rank < 7 {
-                board.set(Square::from_ints(file, rank + 1));
+                board = board.set(Square::from_ints(file, rank + 1));
             }
             table[i as usize] = board;
         }
@@ -123,7 +123,7 @@ lazy_static! {
         for i in 0..16 {
             let square : u8 = (i % 4) * 2 + (i / 4) * 16;
             for j in [0, 1, 8, 9].iter() {
-                table[i as usize].set(Square(square + j));
+                table[i as usize] = table[i as usize].set(Square(square + j));
             }
         }
         table
@@ -287,24 +287,24 @@ impl SjadamBoard {
 
     pub fn set_piece_at_square(&mut self, piece: Piece, square: Square) {
         debug_assert!(!piece.is_empty());
-        self.bitboards[piece as u8 as usize - 2].set(square);
+        self.bitboards[piece as u8 as usize - 2] = self.bitboards[piece as u8 as usize - 2].set(square);
         if piece.color().unwrap() == White {
-            self.white_pieces.set(square);
+            self.white_pieces = self.white_pieces.set(square);
         }
         else {
-            self.black_pieces.set(square);
+            self.black_pieces = self.black_pieces.set(square);
         }
         self.hash ^= ZOBRIST_KEYS[(64 * (piece as u16 - 2) + square.0 as u16) as usize]
     }
 
     pub fn clear_piece_at_square(&mut self, piece: Piece, square: Square) {
         debug_assert!(!piece.is_empty());
-        self.bitboards[piece as u8 as usize - 2].clear(square);
+        self.bitboards[piece as u8 as usize - 2] = self.bitboards[piece as u8 as usize - 2].clear(square);
         if piece.color().unwrap() == White {
-            self.white_pieces.clear(square);
+            self.white_pieces = self.white_pieces.clear(square);
         }
         else {
-            self.black_pieces.clear(square);
+            self.black_pieces = self.black_pieces.clear(square);
         }
         self.hash ^= ZOBRIST_KEYS[(64 * (piece as u16 - 2) + square.0 as u16) as usize]
     }

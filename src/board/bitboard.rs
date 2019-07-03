@@ -45,22 +45,17 @@ impl BitBoard {
         ORTHOGONAL_NEIGHBOURS[square.0 as usize]
     }
 
-    pub const fn get(&self, idx: Square) -> bool {
-        let Square(i) = idx;
-        self.board & (1<<i) != 0
+    pub const fn get(&self, square: Square) -> bool {
+        self.board & (1<<square.0) != 0
     }
     // Sets the square to true
-    pub fn set(&mut self, idx: Square) {
-        let Square(i) = idx;
-        debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
-        self.board |= 1<<i;
+    pub const fn set(self, square: Square) -> Self {
+        BitBoard::from_u64(self.board | 1<<square.0)
     }
     #[allow(dead_code)]
     // Sets the square to false
-    pub fn clear(&mut self, idx: Square) {
-        let Square(i) = idx;
-        debug_assert!(i < 64, format!("Tried to index pos {} on board{:?}!", idx, self));
-        self.board &= !(1<<i);
+    pub const fn clear(self, square: Square) -> Self {
+        BitBoard::from_u64(self.board & !(1<<square.0))
     }
 
     pub const fn is_empty(&self) -> bool {
@@ -186,7 +181,7 @@ impl iter::FromIterator<Square> for BitBoard {
     fn from_iter<T: IntoIterator<Item=Square>>(iter: T) -> Self {
         let mut board = Self::empty();
         for square in iter {
-            board.set(square);
+            board = board.set(square);
         }
         board
     }
@@ -206,7 +201,7 @@ impl Iterator for BitBoardIterator {
     type Item = Square;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next) = self.board.first_piece() {
-            self.board.clear(next);
+            self.board = self.board.clear(next);
             Some(next)
         }
         else {
@@ -226,7 +221,7 @@ lazy_static!(
             for &x in &[u8::overflowing_sub(file, 1).0, file + 1] {
                 for &y in &[u8::overflowing_sub(rank, 1).0, rank + 1] {
                     if x < 8 && y < 8 {
-                        board.set(Square::from_ints(x, y));
+                        board = board.set(Square::from_ints(x, y));
                     }
                 }
             }
@@ -241,10 +236,10 @@ lazy_static!(
             let (file, rank) = Square(i).file_rank();
             let mut board = BitBoard::empty();
             if file > 0 {
-                board.set(Square::from_ints(file - 1, rank));
+                board = board.set(Square::from_ints(file - 1, rank));
             }
             if file < 7 {
-                board.set(Square::from_ints(file + 1, rank));
+                board = board.set(Square::from_ints(file + 1, rank));
             }
             table[i as usize] = board;
         }
@@ -258,10 +253,10 @@ lazy_static!(
             let (file, rank) = Square(i).file_rank();
             let mut board = BitBoard::empty();
             if rank > 0 {
-                board.set(Square::from_ints(file, rank - 1));
+                board = board.set(Square::from_ints(file, rank - 1));
             }
             if rank < 7 {
-                board.set(Square::from_ints(file, rank + 1));
+                board = board.set(Square::from_ints(file, rank + 1));
             }
             table[i as usize] = board;
         }
