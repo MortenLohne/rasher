@@ -1,7 +1,7 @@
 use board::sjadam_board::SjadamBoard;
 use pgn::PgnBoard;
 use search_algorithms::board::{GameResult, Board};
-use board::sjadam_board::BitBoard;
+use board::bitboard::BitBoard;
 use board::std_board::Square;
 use board::sjadam_move_gen;
 use tests::tools;

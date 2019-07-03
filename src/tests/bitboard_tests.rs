@@ -1,5 +1,5 @@
 use board::sjadam_board;
-use board::sjadam_board::BitBoard;
+use board::bitboard::BitBoard;
 use board::sjadam_board::SjadamBoard;
 use board::std_board::ChessBoard;
 use board::std_board::Square;
@@ -88,12 +88,6 @@ quickcheck! {
 
     fn from_to_iterator(bitboard: BitBoard) -> bool {
         bitboard.into_iter().collect::<BitBoard>() == bitboard
-    }
-
-    fn pawn_attacks_both_ways(square: Square) -> bool {
-        let attacks = BitBoard::pawn_attack_squares(square, White) | BitBoard::pawn_attack_squares(square, Black);
-        assert!(!attacks.is_empty());
-        attacks == BitBoard::diagonal_neighbours(square)
     }
 }
 

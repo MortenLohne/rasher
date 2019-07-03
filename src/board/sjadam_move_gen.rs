@@ -8,7 +8,7 @@ use search_algorithms::board::Color::*;
 
 use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
-use board::sjadam_board::BitBoard;
+use board::bitboard::BitBoard;
 use search_algorithms::board::Board;
 
 lazy_static! {
