@@ -8,3 +8,7 @@ callgrind.out.*
 
 # Engine's debug log
 rasher.log
+
+# Intellij files
+*.iml
+.idea
