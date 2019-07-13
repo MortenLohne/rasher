@@ -1,4 +1,4 @@
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use std::io::Write;
 use board_game_traits::board::GameResult;
 use std::io;

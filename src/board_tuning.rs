@@ -1,7 +1,7 @@
 use board_game_traits::board::ExtendedBoard;
 use board_game_traits::board::GameResult;
 use search_algorithms::alpha_beta::Score;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
 

@@ -6,8 +6,8 @@ use board::std_move_gen::move_gen;
 use board::std_move::ChessMove;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
-use pgn;
-use pgn::PgnBoard;
+use pgn_traits::pgn;
+use pgn_traits::pgn::PgnBoard;
 
 use std::ops;
 use std::fmt;

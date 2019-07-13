@@ -2,12 +2,12 @@ mod uci;
 pub mod board;
 mod tests;
 pub mod search_algorithms;
-pub mod pgn;
 pub mod pgn_parse;
 pub mod uci_engine;
 pub mod board_tuning;
 
 extern crate board_game_traits;
+extern crate pgn_traits;
 
 #[cfg(test)]
 #[macro_use]
@@ -39,7 +39,7 @@ use std::time;
 
 use search_algorithms::alpha_beta::Score;
 use board_game_traits::board::GameResult;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board_tuning::TunableBoard;
 
 use board::std_board::ChessBoard;

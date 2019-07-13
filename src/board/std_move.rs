@@ -1,5 +1,5 @@
 use board::std_board::*;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::Board;
 
 use std::fmt;

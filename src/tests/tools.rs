@@ -1,6 +1,6 @@
 use board_game_traits::board::Board;
 #[cfg(test)]
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 #[cfg(test)]
 use rand::Rng;
 #[cfg(test)]

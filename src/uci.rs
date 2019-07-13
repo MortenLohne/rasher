@@ -346,7 +346,7 @@ impl EngineComm {
     }
 }
 
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::Board;
 use search_algorithms::alpha_beta::AlphaBeta;
 use search_algorithms::monte_carlo::MonteCarlo;

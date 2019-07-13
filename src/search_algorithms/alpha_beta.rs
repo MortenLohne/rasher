@@ -13,7 +13,7 @@ use std::ops;
 
 use board_game_traits::board::GameResult;
 use board_game_traits::board::ExtendedBoard;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
 use self::Score::*;

@@ -1,6 +1,6 @@
 use board::sjadam_board::SjadamBoard;
 use board_game_traits::board::{GameResult, Board};
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use tests::tools;
 
 use std::collections::hash_map::DefaultHasher;

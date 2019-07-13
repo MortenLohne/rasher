@@ -21,7 +21,7 @@ use search_algorithms::alpha_beta;
 use std::fmt::Debug;
 use search_algorithms::alpha_beta::AlphaBeta;
 use board_game_traits::board::ExtendedBoard;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use std::hash::Hash;
 use uci_engine::UciOptionType;
 use uci::TimeInfo;

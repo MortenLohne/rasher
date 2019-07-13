@@ -1,5 +1,5 @@
 use board::sjadam_board::SjadamBoard;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::{GameResult, Board};
 use board::bitboard::BitBoard;
 use board::std_board::Square;

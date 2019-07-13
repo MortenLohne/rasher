@@ -9,11 +9,11 @@ use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
 use board_game_traits::board::GameResult;
 
-use pgn;
+use pgn_traits::pgn;
 use board_tuning::TunableBoard;
 
 use std::fmt;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 
 use rand;
 use rand::Rng;

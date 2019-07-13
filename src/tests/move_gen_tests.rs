@@ -2,7 +2,7 @@ use board::std_board::*;
 use board::std_move::ChessMove;
 use board_game_traits::board::Board;
 
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 
 use super::super::board::std_move_gen::move_gen;
 

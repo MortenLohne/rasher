@@ -8,7 +8,7 @@ use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
 use board::std_move_gen::move_gen;
 use board_game_traits::board;
-use pgn;
+use pgn_traits::pgn;
 
 use std::hash::{Hash, Hasher};
 use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
@@ -245,7 +245,7 @@ impl ExtendedBoard for CrazyhouseBoard {
 use std::fmt;
 use board_game_traits::board::Board;
 use board_game_traits::board::ExtendedBoard;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board::std_move::ChessReverseNullMove;
 
 impl fmt::Debug for CrazyhouseBoard {

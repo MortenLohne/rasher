@@ -7,7 +7,7 @@ use board::std_board::Piece;
 use board::std_board::PieceType::*;
 use board_game_traits::board::Color::*;
 use board_game_traits::board::Board;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 
 #[test]
 fn rotate() {

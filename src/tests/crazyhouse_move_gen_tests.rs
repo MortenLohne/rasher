@@ -1,5 +1,5 @@
 use board_game_traits::board::Board;
-use pgn::PgnBoard;
+use pgn_traits::pgn::PgnBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 
 use tests::tools;
