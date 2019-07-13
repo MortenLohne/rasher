@@ -1,5 +1,5 @@
-use search_algorithms::board::ExtendedBoard;
-use search_algorithms::board::GameResult;
+use board_game_traits::board::ExtendedBoard;
+use board_game_traits::board::GameResult;
 use search_algorithms::alpha_beta::Score;
 use pgn::PgnBoard;
 use rayon::prelude::*;

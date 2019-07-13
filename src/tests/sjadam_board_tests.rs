@@ -1,5 +1,5 @@
 use board::sjadam_board::SjadamBoard;
-use search_algorithms::board::{GameResult, Board};
+use board_game_traits::board::{GameResult, Board};
 use pgn::PgnBoard;
 use tests::tools;
 

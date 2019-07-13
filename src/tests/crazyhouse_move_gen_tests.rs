@@ -1,4 +1,4 @@
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 use pgn::PgnBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 

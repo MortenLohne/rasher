@@ -1,5 +1,5 @@
 use board::crazyhouse_board::CrazyhouseBoard;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 use tests::tools;
 
 #[test]

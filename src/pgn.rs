@@ -4,7 +4,7 @@
 //!
 //! [1]: https://en.wikipedia.org/wiki/Portable_Game_Notation
 
-use search_algorithms::board;
+use board_game_traits::board;
 use std::error;
 use std::fmt;
 

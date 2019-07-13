@@ -1,10 +1,10 @@
 use board::std_board::PieceType::*;
-use search_algorithms::board::Color::{Black, White};
+use board_game_traits::board::Color::{Black, White};
 use search_algorithms::alpha_beta::Score::Val;
 
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::board::EvalBoard;
+use board_game_traits::board::EvalBoard;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
 use search_algorithms::alpha_beta::Score::*;

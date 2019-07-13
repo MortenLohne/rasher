@@ -1,4 +1,4 @@
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 #[cfg(test)]
 use pgn::PgnBoard;
 #[cfg(test)]

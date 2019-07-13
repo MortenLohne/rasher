@@ -1,6 +1,6 @@
 use board::sjadam_board::SjadamBoard;
 use pgn::PgnBoard;
-use search_algorithms::board::{GameResult, Board};
+use board_game_traits::board::{GameResult, Board};
 use board::bitboard::BitBoard;
 use board::std_board::Square;
 use board::sjadam_move_gen;

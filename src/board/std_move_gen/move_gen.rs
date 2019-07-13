@@ -4,11 +4,11 @@ use board::std_board::Square;
 use board::std_move::ChessMove;
 use board::std_board::PieceType;
 use board::std_board::PieceType::*;
-use search_algorithms::board::Color::*;
+use board_game_traits::board::Color::*;
 
 use std::cmp::Ordering;
-use search_algorithms::board::Board;
-use search_algorithms::board::Color;
+use board_game_traits::board::Board;
+use board_game_traits::board::Color;
 
 #[inline(never)]
 pub fn all_legal_moves (board : &ChessBoard) -> (Vec<ChessMove>, Vec<ChessMove>) {

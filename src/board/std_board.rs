@@ -1,11 +1,11 @@
 use self::PieceType::*;
 use board::std_move;
-use search_algorithms::board;
-use search_algorithms::board::EvalBoard;
+use board_game_traits::board;
+use board_game_traits::board::EvalBoard;
 use board::std_move_gen::move_gen;
 use board::std_move::ChessMove;
-use search_algorithms::board::Color;
-use search_algorithms::board::Color::*;
+use board_game_traits::board::Color;
+use board_game_traits::board::Color::*;
 use pgn;
 use pgn::PgnBoard;
 
@@ -14,8 +14,8 @@ use std::fmt;
 use std::fmt::Write;
 use std::mem;
 use std::hash::{Hash, Hasher};
-use search_algorithms::board::Board;
-use search_algorithms::board::ExtendedBoard;
+use board_game_traits::board::Board;
+use board_game_traits::board::ExtendedBoard;
 use board::std_move::ChessReverseNullMove;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq, Serialize, Deserialize)]

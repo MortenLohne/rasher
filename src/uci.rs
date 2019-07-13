@@ -2,10 +2,10 @@ use board::std_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use tests::tools;
-use search_algorithms::board;
+use board_game_traits::board;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::board::EvalBoard;
+use board_game_traits::board::EvalBoard;
 use uci_engine::UciEngine;
 
 use std::error;
@@ -15,7 +15,7 @@ use std::sync::{Mutex, Arc};
 use std::io;
 use std::time;
 use std::hash::Hash;
-use search_algorithms::board::ExtendedBoard;
+use board_game_traits::board::ExtendedBoard;
 
 /// Connects the engine to a GUI using UCI. 
 /// Assumes "uci has already been sent"
@@ -347,7 +347,7 @@ impl EngineComm {
 }
 
 use pgn::PgnBoard;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 use search_algorithms::alpha_beta::AlphaBeta;
 use search_algorithms::monte_carlo::MonteCarlo;
 use uci_engine::UciOption;

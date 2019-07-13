@@ -3,7 +3,7 @@ use board::std_board::{Piece, PieceType};
 use board::sjadam_board::SjadamBoard;
 
 use std::fmt;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SjadamReverseMove {

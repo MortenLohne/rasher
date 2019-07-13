@@ -1,9 +1,9 @@
 use pgn::PgnBoard;
 use std::io::Write;
-use search_algorithms::board::GameResult;
+use board_game_traits::board::GameResult;
 use std::io;
-use search_algorithms::board::Color;
-use search_algorithms::board::Board;
+use board_game_traits::board::Color;
+use board_game_traits::board::Board;
 use std::error;
 use std::fmt::Debug;
 

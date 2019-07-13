@@ -1,13 +1,13 @@
 use board::sjadam_board::SjadamBoard;
 use pgn::PgnBoard;
 use board::sjadam_move::SjadamMove;
-use search_algorithms::board::Board;
-use search_algorithms::board::Color;
-use search_algorithms::board::Color::*;
+use board_game_traits::board::Board;
+use board_game_traits::board::Color;
+use board_game_traits::board::Color::*;
 use uci;
 use std::sync;
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::board::GameResult;
+use board_game_traits::board::GameResult;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
 

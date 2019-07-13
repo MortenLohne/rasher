@@ -7,6 +7,8 @@ pub mod pgn_parse;
 pub mod uci_engine;
 pub mod board_tuning;
 
+extern crate board_game_traits;
+
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
@@ -36,7 +38,7 @@ use std::hash::Hash;
 use std::time;
 
 use search_algorithms::alpha_beta::Score;
-use search_algorithms::board::GameResult;
+use board_game_traits::board::GameResult;
 use pgn::PgnBoard;
 use board_tuning::TunableBoard;
 
@@ -51,8 +53,8 @@ use std::io::Write;
 
 #[cfg(feature = "profile")]
 use cpuprofiler::PROFILER;
-use search_algorithms::board::Board;
-use search_algorithms::board::ExtendedBoard;
+use board_game_traits::board::Board;
+use board_game_traits::board::ExtendedBoard;
 use search_algorithms::alpha_beta::AlphaBeta;
 use uci_engine::UciEngine;
 use search_algorithms::monte_carlo::MonteCarlo;
@@ -250,7 +252,7 @@ fn play_human<B>(mut board : B)
 {
     match board.game_result() {
         None => {
-            use search_algorithms::board::Color::*;
+            use board_game_traits::board::Color::*;
             println!("Board:\n{:?}", board);
             // If black, play as human
             if board.side_to_move() == White {

@@ -4,12 +4,12 @@ use board::std_board::Piece;
 use board::std_board::PieceType;
 use board::std_board::PieceType::*;
 
-use search_algorithms::board::Color::*;
+use board_game_traits::board::Color::*;
 
 use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
 use board::bitboard::BitBoard;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 
 lazy_static! {
     static ref ROOK_TABLE : [[u8; 256]; 32] = {

@@ -1,5 +1,5 @@
 use uci;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;

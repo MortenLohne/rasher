@@ -1,6 +1,6 @@
 use board::std_board::*;
 use pgn::PgnBoard;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 
 use std::fmt;
 

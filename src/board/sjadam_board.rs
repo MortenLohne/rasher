@@ -4,10 +4,10 @@ use board::sjadam_move::{SjadamMove, SjadamReverseMove};
 use board::sjadam_move_gen;
 use board::bitboard::BitBoard;
 
-use search_algorithms::board::EvalBoard;
-use search_algorithms::board::Color;
-use search_algorithms::board::Color::*;
-use search_algorithms::board::GameResult;
+use board_game_traits::board::EvalBoard;
+use board_game_traits::board::Color;
+use board_game_traits::board::Color::*;
+use board_game_traits::board::GameResult;
 
 use pgn;
 use board_tuning::TunableBoard;
@@ -173,8 +173,8 @@ impl Eq for SjadamBoard {}
 
 use std::hash::Hasher;
 use std::hash::Hash;
-use search_algorithms::board::Board;
-use search_algorithms::board::ExtendedBoard;
+use board_game_traits::board::Board;
+use board_game_traits::board::ExtendedBoard;
 use board::sjadam_move::SjadamReverseNullMove;
 
 impl Hash for SjadamBoard {

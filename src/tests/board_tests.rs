@@ -2,7 +2,7 @@ use board::std_board::PieceType;
 use board::std_board::Square;
 use board::std_board::ChessBoard;
 use pgn::PgnBoard;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 use board::std_move::ChessMove;
 use tests::tools;
 

@@ -3,11 +3,11 @@ use board::std_board::ChessBoard;
 use board::std_board;
 use board::std_board::Square;
 use board::std_board::Piece;
-use search_algorithms::board::EvalBoard;
-use search_algorithms::board::Color;
-use search_algorithms::board::Color::*;
+use board_game_traits::board::EvalBoard;
+use board_game_traits::board::Color;
+use board_game_traits::board::Color::*;
 use board::std_move_gen::move_gen;
-use search_algorithms::board;
+use board_game_traits::board;
 use pgn;
 
 use std::hash::{Hash, Hasher};
@@ -243,8 +243,8 @@ impl ExtendedBoard for CrazyhouseBoard {
 }
 
 use std::fmt;
-use search_algorithms::board::Board;
-use search_algorithms::board::ExtendedBoard;
+use board_game_traits::board::Board;
+use board_game_traits::board::ExtendedBoard;
 use pgn::PgnBoard;
 use board::std_move::ChessReverseNullMove;
 

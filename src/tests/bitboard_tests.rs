@@ -5,8 +5,8 @@ use board::std_board::{ChessBoard, BoardIter};
 use board::std_board::Square;
 use board::std_board::Piece;
 use board::std_board::PieceType::*;
-use search_algorithms::board::Color::*;
-use search_algorithms::board::Board;
+use board_game_traits::board::Color::*;
+use board_game_traits::board::Board;
 use pgn::PgnBoard;
 
 #[test]

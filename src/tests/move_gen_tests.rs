@@ -1,13 +1,13 @@
 use board::std_board::*;
 use board::std_move::ChessMove;
-use search_algorithms::board::Board;
+use board_game_traits::board::Board;
 
 use pgn::PgnBoard;
 
 use super::super::board::std_move_gen::move_gen;
 
 use board::std_board::PieceType::*;
-use search_algorithms::board::Color::{Black, White};
+use board_game_traits::board::Color::{Black, White};
 
 use tests::tactics_tests::basic_tactics_prop;
 use tests::tools;
