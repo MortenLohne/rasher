@@ -69,7 +69,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "chess-bitboard"
 version = "0.1.0"
-source = "git+https://github.com/MortenLohne/chess-bitboard#1e4610506789b8fcb21dc3458a606c5d8d35ec7d"
+source = "git+https://github.com/MortenLohne/chess-bitboard#e3d5a02c035f270c3424b8c9a3ce4879ee475ba5"
 
 [[package]]
 name = "chrono"
