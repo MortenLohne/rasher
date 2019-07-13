@@ -8,10 +8,8 @@ pub mod board_tuning;
 
 extern crate board_game_traits;
 extern crate pgn_traits;
+extern crate chess_bitboard;
 
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
 #[macro_use]
 extern crate log;
 #[macro_use]

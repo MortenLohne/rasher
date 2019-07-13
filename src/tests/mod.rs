@@ -26,9 +26,6 @@ mod score_tests;
 mod board_tests;
 
 #[cfg(test)]
-mod bitboard_tests;
-
-#[cfg(test)]
 mod sjadam_board_tests;
 
 pub mod tools;

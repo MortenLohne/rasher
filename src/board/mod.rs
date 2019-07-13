@@ -1,4 +1,3 @@
-pub mod bitboard;
 pub mod std_move_gen;
 pub mod std_board;
 pub mod crazyhouse_board;

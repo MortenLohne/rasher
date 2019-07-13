@@ -1,8 +1,8 @@
 use board::sjadam_board::SjadamBoard;
 use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::{GameResult, Board};
-use board::bitboard::BitBoard;
-use board::std_board::Square;
+use chess_bitboard::bitboard::BitBoard;
+use chess_bitboard::bitboard::Square;
 use board::sjadam_move_gen;
 use tests::tools;
 

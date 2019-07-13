@@ -1,13 +1,19 @@
-use board::std_board::Square;
+use chess_bitboard::bitboard::Square;
 use board::std_board::{Piece, PieceType};
 use board::sjadam_board::SjadamBoard;
 
 use std::fmt;
 use board_game_traits::board::Board;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "Square")]
+struct SquareRef(u8);
+
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct SjadamReverseMove {
+    #[serde(with = "SquareRef")]
     pub from: Square,
+    #[serde(with = "SquareRef")]
     pub to: Square,
     pub en_passant: bool,
     pub castling: bool,
@@ -37,7 +43,9 @@ impl SjadamReverseMove {
 
 #[derive(PartialEq, Eq, Clone, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct SjadamMove {
+    #[serde(with = "SquareRef")]
     from: Square,
+    #[serde(with = "SquareRef")]
     to: Square,
     piece_moved: PieceType,
     castling: bool,
@@ -52,7 +60,7 @@ impl SjadamMove {
         (self.from, self.to)
     }
 
-    pub fn en_passant_bitboard(&self, board: &SjadamBoard) -> bool {
+    pub fn is_en_passant_move(&self, board: &SjadamBoard) -> bool {
          (self.from().file() as i8 - self.to().file() as i8).abs() % 2 == 1
             && !board.all_pieces().get(self.to)
             && board.piece_at_square(Piece::new(PieceType::Pawn, board.side_to_move()), self.from)

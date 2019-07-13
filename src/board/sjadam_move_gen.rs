@@ -1,5 +1,4 @@
 use board::sjadam_move::SjadamMove;
-use board::std_board::Square;
 use board::std_board::Piece;
 use board::std_board::PieceType;
 use board::std_board::PieceType::*;
@@ -8,7 +7,8 @@ use board_game_traits::board::Color::*;
 
 use board::sjadam_board;
 use board::sjadam_board::SjadamBoard;
-use board::bitboard::BitBoard;
+use chess_bitboard::bitboard::BitBoard;
+use chess_bitboard::bitboard::Square;
 use board_game_traits::board::Board;
 
 lazy_static! {
@@ -136,21 +136,21 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
 
     if color == White {
         if board.can_castle_kingside(White)
-            && all_pieces.rank(7) & 0b01100000 == 0 {
+            && all_pieces.rank(0) & 0b01100000 == 0 {
                 moves.push(SjadamMove::new(Square::E1, Square::G1, true, King));
             }
         if board.can_castle_queenside(White)
-            && all_pieces.rank(7) & 0b1110 == 0 {
+            && all_pieces.rank(0) & 0b1110 == 0 {
                 moves.push(SjadamMove::new(Square::E1, Square::C1, true, King));
             }
     }
     else {
         if board.can_castle_kingside(Black)
-            && all_pieces.rank(0) & 0b0110_0000 == 0 {
+            && all_pieces.rank(7) & 0b0110_0000 == 0 {
                 moves.push(SjadamMove::new(Square::E8, Square::G8, true, King));
             }
         if board.can_castle_queenside(Black)
-            && all_pieces.rank(0) & 0b1110 == 0 {
+            && all_pieces.rank(7) & 0b1110 == 0 {
                 moves.push(SjadamMove::new(Square::E8, Square::C8, true, King));
             }
     }
@@ -346,7 +346,7 @@ const RIGHT_MASK : u64 = 0b01111111_01111111_01111111_01111111_01111111_01111111
 const LEFT_MASK : u64 = 0b11111110_11111110_11111110_11111110_11111110_11111110_11111110_11111110;
 
 #[inline(never)]
-fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
     let left_captures = ((sjadam_squares.board & LEFT_MASK) << 7) & opponent_pieces.board; // & LEFT_MASK;
@@ -359,7 +359,7 @@ fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
 }
 
 #[inline(never)]
-fn pawn_moves_white(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
+fn pawn_moves_black(sjadam_squares: BitBoard, friendly_pieces: BitBoard,
               all_pieces: BitBoard) -> BitBoard {
     let opponent_pieces = BitBoard::from_u64(all_pieces.board ^ friendly_pieces.board);
     

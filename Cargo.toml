@@ -21,6 +21,7 @@ serde_derive = "1.0.*"
 serde_json = "1.0.*"
 board-game-traits = "0.1"
 pgn-traits = "0.1"
+chess-bitboard = { git = "https://github.com/MortenLohne/chess-bitboard" }
 
 [dependencies.nom]
 version = "4.1.*"
@@ -35,9 +36,6 @@ features = ["file_appender"]
 [dependencies.cpuprofiler]
 version = "0.0.3"
 optional = true
-
-[dev-dependencies]
-quickcheck = "0.7"
 
 [profile.release]
 debug = true
