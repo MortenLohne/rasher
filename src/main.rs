@@ -131,10 +131,10 @@ fn main() {
                         (positions, game_results)
                     }
 
-                    let (mut training_positions, training_game_results) =
+                    let (training_positions, training_game_results) =
                         read_positions(&tokens[1]);
 
-                    let (mut test_positions, test_game_results) =
+                    let (test_positions, test_game_results) =
                         read_positions(&tokens[2]);
 
                     println!("Read {} training positions and {} test positions.",
@@ -230,7 +230,7 @@ fn play_game<B> (mut board : B)
     println!("\n");
     match board.game_result() {
         None => {
-            let mut engine = AlphaBeta::init();
+            let engine = AlphaBeta::init();
             let (score, mv) =
                 engine.best_move(board.clone(),
                                  uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),
@@ -285,7 +285,7 @@ fn play_human<B>(mut board : B)
             }
             else {
 
-                let mut engine = AlphaBeta::init();
+                let engine = AlphaBeta::init();
                 let (score, best_move) =
                     engine.best_move(board.clone(),
                                      uci::TimeRestriction::MoveTime(time::Duration::from_secs(5)),

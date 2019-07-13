@@ -179,7 +179,7 @@ fn qsearch<B: ExtendedBoard>(board: &mut B, mut alpha: Score, beta: Score, param
     for mv in active_moves {
         let reverse_move = board.do_move(mv.clone());
 
-        let (mut score, mut pv) = qsearch(board, !beta, !alpha, params);
+        let (mut score, pv) = qsearch(board, !beta, !alpha, params);
 
         score = !score;
         board.reverse_move(reverse_move);

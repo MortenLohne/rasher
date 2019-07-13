@@ -527,7 +527,7 @@ pub fn eval_game<Board: EvalBoard>(mut board: Board, moves: &[&str])
         board.do_move(mv.clone());
 
         engine = AlphaBeta::init();
-        let (eval, mut best_move) =
+        let (eval, best_move) =
             engine.best_move(board.clone(),
                              TimeRestriction::MoveTime(time::Duration::from_millis(5_000)),
                              None).unwrap();
