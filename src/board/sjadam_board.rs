@@ -264,7 +264,7 @@ impl SjadamBoard {
                 .map(|&i| self.bitboards[i])
                 .enumerate()
                 .find(|&(_, bitboard)| bitboard.get(square))
-                .map(|(i, _)| Piece::new(PieceType::from_disc(i as u32 + 1).unwrap(), White))
+                .map(|(i, _)| Piece::from_type_color(PieceType::from_disc(i as u32 + 1).unwrap(), White))
                 .unwrap()
         }
         else if self.black_pieces().get(square) {
@@ -272,7 +272,7 @@ impl SjadamBoard {
                 .map(|&i| self.bitboards[i])
                 .enumerate()
                 .find(|&(_, bitboard)| bitboard.get(square))
-                .map(|(i, _)| Piece::new(PieceType::from_disc(i as u32 + 1).unwrap(), Black))
+                .map(|(i, _)| Piece::from_type_color(PieceType::from_disc(i as u32 + 1).unwrap(), Black))
                 .unwrap()
         }
         else {
@@ -732,8 +732,8 @@ impl Board for SjadamBoard {
     fn game_result(&self) -> Option<GameResult> {
         // In sjadam, king may be actually captured.
         // Check if the king is gone
-        match (!self.get_piece(Piece::new(King, White)).is_empty(),
-               !self.get_piece(Piece::new(King, Black)).is_empty()) {
+        match (!self.get_piece(Piece::from_type_color(King, White)).is_empty(),
+               !self.get_piece(Piece::from_type_color(King, Black)).is_empty()) {
             (true, false) => Some(GameResult::WhiteWin),
             (false, true) => Some(GameResult::BlackWin),
             (false, false) => panic!("Neither side has a king on the board:\n{:?}", self),
@@ -818,7 +818,7 @@ impl Board for SjadamBoard {
         let mid_sq = Square::from_ints(mv.to().file(), (mv.from().rank() + mv.to().rank()) / 2);
         if mv.piece_moved() == Pawn && mv.from().file() == mv.to().file()
             && i8::abs(mv.from().rank() as i8 - mv.to().rank() as i8) == 2
-            && !self.piece_at_square(Piece::new(Pawn, start_color), mid_sq)
+            && !self.piece_at_square(Piece::from_type_color(Pawn, start_color), mid_sq)
             && (start_color == White && mv.from().rank() == 1
             || start_color == Black && mv.from().rank() == 6)
             {
@@ -827,24 +827,24 @@ impl Board for SjadamBoard {
 
             }
 
-        self.move_piece(Piece::new(mv.piece_moved(), start_color), mv.from(), mv.to());
+        self.move_piece(Piece::from_type_color(mv.piece_moved(), start_color), mv.from(), mv.to());
 
         if reverse_move.capture != Empty {
-            self.clear_piece_at_square(Piece::new(reverse_move.capture, !start_color), mv.to());
+            self.clear_piece_at_square(Piece::from_type_color(reverse_move.capture, !start_color), mv.to());
             self.half_move_clock = 0;
         }
 
         if mv.castling() {
             // Move the rook too
             let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
-            self.move_piece(Piece::new(Rook, start_color),
+            self.move_piece(Piece::from_type_color(Rook, start_color),
                             Square::from_ints(rook_from, mv.from().rank()),
                             Square::from_ints(rook_to, mv.from().rank()));
         }
             else if en_passant {
                 // Remove the captured pawn
                 let ep_square_rank = if start_color == Black { mv.to().rank() + 1 } else { mv.to().rank() - 1 };
-                self.clear_piece_at_square(Piece::new(Pawn, !start_color),
+                self.clear_piece_at_square(Piece::from_type_color(Pawn, !start_color),
                                            Square::from_ints(mv.to().file(), ep_square_rank));
             }
                 else if (start_color == White && mv.to().rank() == 7)
@@ -853,10 +853,10 @@ impl Board for SjadamBoard {
                         // Promote to queen
                         debug_assert!(!self.is_empty(mv.to()));
 
-                        if !(self.piece_at_square(Piece::new(King, start_color), mv.to())
-                        || self.piece_at_square(Piece::new(Queen, start_color), mv.to())) {
-                            self.clear_piece_at_square(Piece::new(mv.piece_moved(), start_color), mv.to());
-                            self.set_piece_at_square(Piece::new(Queen, start_color), mv.to());
+                        if !(self.piece_at_square(Piece::from_type_color(King, start_color), mv.to())
+                        || self.piece_at_square(Piece::from_type_color(Queen, start_color), mv.to())) {
+                            self.clear_piece_at_square(Piece::from_type_color(mv.piece_moved(), start_color), mv.to());
+                            self.set_piece_at_square(Piece::from_type_color(Queen, start_color), mv.to());
                             self.half_move_clock = 0;
                         }
                     }
@@ -910,29 +910,29 @@ impl Board for SjadamBoard {
         debug_assert!(old_hash.is_some());
 
         if mv.piece_moved != Queen
-            && self.piece_at_square(Piece::new(Queen, start_color), mv.to()) {
-            self.clear_piece_at_square(Piece::new(Queen, start_color), mv.to());
-            self.set_piece_at_square(Piece::new(mv.piece_moved, start_color), mv.from());
+            && self.piece_at_square(Piece::from_type_color(Queen, start_color), mv.to()) {
+            self.clear_piece_at_square(Piece::from_type_color(Queen, start_color), mv.to());
+            self.set_piece_at_square(Piece::from_type_color(mv.piece_moved, start_color), mv.from());
         }
             else { // If move was not promotion
-                self.move_piece(Piece::new(mv.piece_moved, start_color), mv.to(), mv.from());
+                self.move_piece(Piece::from_type_color(mv.piece_moved, start_color), mv.to(), mv.from());
             }
 
         if mv.capture != Empty {
-            self.set_piece_at_square(Piece::new(mv.capture, !start_color), mv.to());
+            self.set_piece_at_square(Piece::from_type_color(mv.capture, !start_color), mv.to());
         }
 
         if mv.castling() {
             // Move the rook too
             let (rook_from, rook_to) = if mv.to().file() == 6 { (7, 5) } else { (0, 3) };
-            self.move_piece(Piece::new(Rook, start_color),
+            self.move_piece(Piece::from_type_color(Rook, start_color),
                             Square::from_ints(rook_to, mv.from().rank()),
                             Square::from_ints(rook_from, mv.from().rank()));
         }
             else if mv.en_passant() {
                 // Replace the captured pawn
                 let ep_square_rank = if start_color == Black { mv.to().rank() + 1 } else { mv.to().rank() - 1 };
-                self.set_piece_at_square(Piece::new(Pawn, !start_color),
+                self.set_piece_at_square(Piece::from_type_color(Pawn, !start_color),
                                          Square::from_ints(mv.to().file(), ep_square_rank));
             }
 
@@ -1264,7 +1264,7 @@ impl TunableBoard for SjadamBoard {
         for i in 1..=6 {
             let piece_type = PieceType::from_disc(i).unwrap();
             for &color in [White, Black].iter() {
-                let piece = Piece::new(piece_type, color);
+                let piece = Piece::from_type_color(piece_type, color);
                 sjadam_mobility_bonus += get_sjadam_mobility_bonus(piece);
             }
         }

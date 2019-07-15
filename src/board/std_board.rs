@@ -125,13 +125,13 @@ impl Piece {
     pub fn from_letter(ch: char) -> Option<Self> {
         match (PieceType::from_letter(ch.to_ascii_uppercase()), ch.is_lowercase()) {
             (Some(Empty), _) => Some(Piece::Empty),
-            (Some(piece_type), true) => Some(Self::new(piece_type, Black)),
-            (Some(piece_type), false) => Some(Self::new(piece_type, White)),
+            (Some(piece_type), true) => Some(Self::from_type_color(piece_type, Black)),
+            (Some(piece_type), false) => Some(Self::from_type_color(piece_type, White)),
             (None, _) => None,
         }
     }
     
-    pub fn new(piece_type: PieceType, color: Color) -> Self {
+    pub fn from_type_color(piece_type: PieceType, color: Color) -> Self {
         if piece_type == Empty {
             Piece::Empty
         }
@@ -426,14 +426,14 @@ impl PgnBoard for ChessBoard {
         board.move_num = move_num;
 
         if (board.can_castle_kingside(White) || board.can_castle_queenside(White))
-            && board[Square::E1] != Piece::new(King, White) {
+            && board[Square::E1] != Piece::from_type_color(King, White) {
             return Err(pgn::Error::new(
                 pgn::ErrorKind::IllegalPosition,
                 "FEN string has white castling rights, but white's king is not on e1"));
             }
 
         if (board.can_castle_kingside(Black) || board.can_castle_queenside(Black))
-            && board[Square::E8] != Piece::new(King, Black) {
+            && board[Square::E8] != Piece::from_type_color(King, Black) {
             return Err(pgn::Error::new(
                 pgn::ErrorKind::IllegalPosition,
                 "FEN string has black castling rights, but black's king is not on e8"));
@@ -811,7 +811,7 @@ impl Board for ChessBoard {
                     // Does the move, depending on whether the move promotes or not
                     match c_move.prom {
                         Some(piece_type) => self.board[rank_to as usize][file_to as usize]
-                            = Piece::new(piece_type, self.side_to_move()),
+                            = Piece::from_type_color(piece_type, self.side_to_move()),
                         None => self.board[rank_to as usize][file_to as usize]
                             = self.board[rank_from as usize][file_from as usize],
 
@@ -907,14 +907,14 @@ impl Board for ChessBoard {
                 self.board[rank_to as usize][file_to as usize] = Piece::empty();
 
                 match color {
-                    Black => self.board[rank_to as usize - 1][file_to as usize] = Piece::new(Pawn, White),
-                    White => self.board[rank_to as usize + 1][file_to as usize] = Piece::new(Pawn, Black),
+                    Black => self.board[rank_to as usize - 1][file_to as usize] = Piece::from_type_color(Pawn, White),
+                    White => self.board[rank_to as usize + 1][file_to as usize] = Piece::from_type_color(Pawn, Black),
                 }
             }
                 else {
                     if c_move.prom {
                         self.board[rank_from as usize][file_from as usize] =
-                            Piece::new(Pawn, color);
+                            Piece::from_type_color(Pawn, color);
                     }
                         else {
                             self.board[rank_from as usize][file_from as usize] =
@@ -924,7 +924,7 @@ impl Board for ChessBoard {
                     if c_move.capture != Empty
                         {
                             self.board[rank_to as usize][file_to as usize] =
-                                Piece::new(c_move.capture, self.to_move);
+                                Piece::from_type_color(c_move.capture, self.to_move);
                         }
                         else {
                             self.board[rank_to as usize][file_to as usize] = Piece::empty();
@@ -1150,7 +1150,7 @@ impl ChessBoard {
     }
 
     pub fn king_pos(&self, color: Color) -> Square {
-        match self.pos_of(Piece::new(King, color)) {
+        match self.pos_of(Piece::from_type_color(King, color)) {
             Some(square) => square,
             None => panic!("Error: There is no king on the board:\n{}", self),
         }

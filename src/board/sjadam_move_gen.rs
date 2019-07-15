@@ -124,8 +124,8 @@ pub fn all_legal_moves(board: &SjadamBoard) -> (Vec<SjadamMove>, Vec<SjadamMove>
     let all_pieces = board.all_pieces();
 
     for (piece, mut bitboard) in [Knight, Bishop, Rook, Queen, Pawn, King].iter()
-        .map(|&piece_type| (Piece::new(piece_type, color),
-                            board.get_piece(Piece::new(piece_type, color))))
+        .map(|&piece_type| (Piece::from_type_color(piece_type, color),
+                            board.get_piece(Piece::from_type_color(piece_type, color))))
     {
         while let Some(square) = bitboard.first_piece() {
             legal_moves_for_square(board, square, piece.piece_type(),

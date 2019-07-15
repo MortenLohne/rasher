@@ -25,11 +25,11 @@ fn test_piece_at () {
     let h8 = square("h8");
     let e4 = square("e4");
 
-    assert_eq!(start_board.piece_at(d1), Piece::new(Queen, White));
-    assert_eq!(start_board.piece_at(e1), Piece::new(King, White));
-    assert_eq!(start_board.piece_at(a1), Piece::new(Rook, White));
-    assert_eq!(start_board.piece_at(h8), Piece::new(Rook, Black));
-    assert_eq!(start_board.piece_at(e4), Piece::new(Empty, White));
+    assert_eq!(start_board.piece_at(d1), Piece::from_type_color(Queen, White));
+    assert_eq!(start_board.piece_at(e1), Piece::from_type_color(King, White));
+    assert_eq!(start_board.piece_at(a1), Piece::from_type_color(Rook, White));
+    assert_eq!(start_board.piece_at(h8), Piece::from_type_color(Rook, Black));
+    assert_eq!(start_board.piece_at(e4), Piece::from_type_color(Empty, White));
 }
 
 #[test]

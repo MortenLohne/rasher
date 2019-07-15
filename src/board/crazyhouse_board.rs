@@ -138,7 +138,7 @@ impl Board for CrazyhouseBoard {
                         .rposition(|&p| p == piecetype) {
                         Some(index) =>
                             self.base_board.board[rank as usize][file as usize] =
-                                Piece::new(self.white_available_pieces.remove(index), White),
+                                Piece::from_type_color(self.white_available_pieces.remove(index), White),
                         None => panic!("{:?}\nWhite tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.white_available_pieces),
                     }
                 }
@@ -147,7 +147,7 @@ impl Board for CrazyhouseBoard {
                             .rposition(|&p| p == piecetype) {
                             Some (index) =>
                                 self.base_board.board[rank as usize][file as usize] =
-                                    Piece::new(self.black_available_pieces.remove(index), Black),
+                                    Piece::from_type_color(self.black_available_pieces.remove(index), Black),
                             None => panic!("{:?}\nBlack tried to make illegal move {:?}, but available pieces were only {:?}", self, mv, self.black_available_pieces),
 
                         }

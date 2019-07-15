@@ -63,7 +63,7 @@ impl SjadamMove {
     pub fn is_en_passant_move(&self, board: &SjadamBoard) -> bool {
          (self.from().file() as i8 - self.to().file() as i8).abs() % 2 == 1
             && !board.all_pieces().get(self.to)
-            && board.piece_at_square(Piece::new(PieceType::Pawn, board.side_to_move()), self.from)
+            && board.piece_at_square(Piece::from_type_color(PieceType::Pawn, board.side_to_move()), self.from)
     }
 
     pub fn castling(&self) -> bool {
