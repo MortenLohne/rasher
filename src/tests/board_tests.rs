@@ -2,9 +2,80 @@ use board::std_board::PieceType;
 use board::std_board::Square;
 use board::std_board::ChessBoard;
 use pgn_traits::pgn::PgnBoard;
-use board_game_traits::board::Board;
+use board_game_traits::board::{Board, Color, GameResult};
 use board::std_move::ChessMove;
 use tests::tools;
+use search_algorithms::alpha_beta::{AlphaBeta};
+use uci;
+use uci_engine::UciEngine;
+
+#[test]
+fn repetitions_test1() {
+    let mut board = ChessBoard::from_fen("r3k2r/1bp4p/p3p1N1/5pNQ/1p2p3/1P2P3/P1K2qPP/R7 w kq - 0 20").unwrap();
+    for mv_str in "Kb1 Qe1+ Kc2 Qf2+ Kb1 Qe1+ Kb2".split_whitespace() {
+        let mv = board.move_from_san(mv_str).unwrap();
+        board.do_move(mv);
+    }
+
+    // Check that the engine does not play a move that allows a repetition
+    let engine = AlphaBeta::init();
+    let (_, mv) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(5),
+                         None).unwrap();
+
+    assert_ne!(mv, board.move_from_san("Qf2+").unwrap());
+
+    board.do_move(board.move_from_san("Qf2+").unwrap());
+
+    // Check that it plays the draw by repetition
+    let engine = AlphaBeta::init();
+    let (score, mv) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(5),
+                         None).unwrap();
+
+    assert_eq!(score.to_cp(Color::White), 0);
+    assert_eq!(mv, board.move_from_san("Kb1").unwrap());
+
+    board.do_move(board.move_from_san("Kb1").unwrap());
+
+    assert_eq!(board.game_result(), Some(GameResult::Draw));
+}
+
+#[test]
+fn repetitions_test2() {
+    let mut board = ChessBoard::from_fen("1r2r3/Q4pkp/5bp1/3P1p2/2P5/1P6/P3NPPP/1R3RK1 b - - 0 24").unwrap();
+    for mv_str in " Ra8 Qb7 Rab8 Qc7 Rbc8 Qb7 Rb8 Qc7 Rbc8".split_whitespace() {
+        let mv = board.move_from_san(mv_str).unwrap();
+        board.do_move(mv);
+    }
+
+    // Check that the engine does not play a move that allows a repetition
+    let engine = AlphaBeta::init();
+    let (_, mv) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(5),
+                         None).unwrap();
+
+    assert_ne!(mv, board.move_from_san("Qb7").unwrap());
+
+    board.do_move(board.move_from_san("Qb7").unwrap());
+
+    // Check that it plays the draw by repetition
+    let engine = AlphaBeta::init();
+    let (score, mv) =
+        engine.best_move(board.clone(),
+                         uci::TimeRestriction::Depth(5),
+                         None).unwrap();
+
+    assert_eq!(score.to_cp(Color::Black), 0);
+    assert_eq!(mv, board.move_from_san("Rb8").unwrap());
+
+    board.do_move(board.move_from_san("Rb8").unwrap());
+
+    assert_eq!(board.game_result(), Some(GameResult::Draw));
+}
 
 #[test]
 fn from_alg_test() {
