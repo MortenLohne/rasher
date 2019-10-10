@@ -8,6 +8,8 @@ use tests::tools;
 use search_algorithms::alpha_beta::{AlphaBeta};
 use uci;
 use uci_engine::UciEngine;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hasher, Hash};
 
 #[test]
 fn repetitions_test1() {
@@ -21,10 +23,12 @@ fn repetitions_test1() {
     let engine = AlphaBeta::init();
     let (_, mv) =
         engine.best_move(board.clone(),
-                         uci::TimeRestriction::Depth(5),
+                         uci::TimeRestriction::Depth(4),
                          None).unwrap();
 
-    assert_ne!(mv, board.move_from_san("Qf2+").unwrap());
+    assert_ne!(mv, board.move_from_san("Qf2+").unwrap(),
+    "{:?} was played which allows a draw, past hashes: {:?}",
+    mv, board.past_board_hashes);
 
     board.do_move(board.move_from_san("Qf2+").unwrap());
 
@@ -32,11 +36,13 @@ fn repetitions_test1() {
     let engine = AlphaBeta::init();
     let (score, mv) =
         engine.best_move(board.clone(),
-                         uci::TimeRestriction::Depth(5),
+                         uci::TimeRestriction::Depth(4),
                          None).unwrap();
 
+    assert_eq!(mv, board.move_from_san("Kb1").unwrap(),
+               "{:?} was played which declines a draw, past hashes: {:?}",
+               mv, board.past_board_hashes);
     assert_eq!(score.to_cp(Color::White), 0);
-    assert_eq!(mv, board.move_from_san("Kb1").unwrap());
 
     board.do_move(board.move_from_san("Kb1").unwrap());
 
@@ -55,10 +61,12 @@ fn repetitions_test2() {
     let engine = AlphaBeta::init();
     let (_, mv) =
         engine.best_move(board.clone(),
-                         uci::TimeRestriction::Depth(5),
+                         uci::TimeRestriction::Depth(4),
                          None).unwrap();
 
-    assert_ne!(mv, board.move_from_san("Qb7").unwrap());
+    assert_ne!(mv, board.move_from_san("Qb7").unwrap(),
+               "{:?} was played which allows a draw, past hashes: {:?}",
+               mv, board.past_board_hashes);
 
     board.do_move(board.move_from_san("Qb7").unwrap());
 
@@ -66,11 +74,17 @@ fn repetitions_test2() {
     let engine = AlphaBeta::init();
     let (score, mv) =
         engine.best_move(board.clone(),
-                         uci::TimeRestriction::Depth(5),
+                         uci::TimeRestriction::Depth(4),
                          None).unwrap();
 
+    let mut hasher = DefaultHasher::new();
+    board.hash(&mut hasher);
+    let hash = hasher.finish();
+
+    assert_eq!(mv, board.move_from_san("Rb8").unwrap(),
+               "{:?} was played which declines a draw, hash: {}, past hashes: {:?}",
+               mv, hash, board.past_board_hashes);
     assert_eq!(score.to_cp(Color::Black), 0);
-    assert_eq!(mv, board.move_from_san("Rb8").unwrap());
 
     board.do_move(board.move_from_san("Rb8").unwrap());
 

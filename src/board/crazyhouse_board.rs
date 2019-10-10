@@ -166,20 +166,20 @@ impl Board for CrazyhouseBoard {
         match mv {
             // If the normal move was a capture, remove
             CrazyhouseReverseMove::NormalMove(normal_move) => {
-                self.base_board.reverse_move(normal_move);
+                self.base_board.reverse_move(normal_move.clone());
                 match (self.side_to_move(), normal_move.capture) {
                     (_, PieceType::Empty) => PieceType::Empty, // This is not used for anything
                     (White, piecetype) =>
                         match self.white_available_pieces.iter().rposition(|&p| p == piecetype) {
                             Some(index) =>
                                 self.white_available_pieces.remove(index),
-                            None => panic!("Tried to make illegal move {:?}", mv),
+                            None => panic!("Tried to make illegal move {:?}", normal_move),
                         },
                     (Black, piecetype) =>
                         match self.black_available_pieces.iter().rposition(|&p| p == piecetype) {
                             Some(index) =>
                                 self.black_available_pieces.remove(index),
-                            None => panic!("Tried to make illegal move {:?}", mv),
+                            None => panic!("Tried to make illegal move {:?}", normal_move),
                         },
                 };
             },

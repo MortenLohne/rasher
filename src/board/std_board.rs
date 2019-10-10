@@ -1,7 +1,7 @@
 use self::PieceType::*;
 use board::std_move;
 use board_game_traits::board;
-use board_game_traits::board::EvalBoard;
+use board_game_traits::board::{EvalBoard, GameResult};
 use board::std_move_gen::move_gen;
 use board::std_move::ChessMove;
 use board_game_traits::board::Color;
@@ -17,6 +17,7 @@ use std::hash::{Hash, Hasher};
 use board_game_traits::board::Board;
 use board_game_traits::board::ExtendedBoard;
 use board::std_move::ChessReverseNullMove;
+use std::collections::hash_map::DefaultHasher;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq, Serialize, Deserialize)]
 pub enum PieceType {
@@ -245,6 +246,7 @@ pub struct ChessBoard {
     pub castling_en_passant : u8,
     pub half_move_clock : u8,
     pub move_num : u16,
+    pub past_board_hashes: Vec<u64>,
 }
 
 impl Hash for ChessBoard {
@@ -259,6 +261,7 @@ impl PartialEq for ChessBoard {
     fn eq(&self, other: &ChessBoard) -> bool {
         self.board == other.board && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
+            && self.past_board_hashes == other.past_board_hashes
     }
 }
 
@@ -296,7 +299,7 @@ impl IntoIterator for ChessBoard {
 }
 
 // Parses the first token in a FEN string, which describes the positions
-/// of the pieces
+// of the pieces
 fn parse_fen_board(fen_board : &str) -> Result<[[Piece;8];8], pgn::Error> {
     let mut board = [[Piece::empty(); 8]; 8];
     let ranks : Vec<&str> = fen_board.split('/').collect();
@@ -380,7 +383,8 @@ impl PgnBoard for ChessBoard {
         }
 
         let mut board = ChessBoard { board: [[Piece::empty(); 8]; 8], to_move: White,
-                                     castling_en_passant: 15, half_move_clock: 0, move_num: 0 };
+                                     castling_en_passant: 15, half_move_clock: 0, move_num: 0,
+            past_board_hashes: vec![] };
         board.board = parse_fen_board(fen_split[0])?;
         
         if fen_split[1].len() != 1 {
@@ -749,13 +753,20 @@ impl Board for ChessBoard {
         let color = self.to_move;
         let piece_moved = self.piece_at(c_move.from).piece_type();
         let captured_piece : PieceType = self[c_move.to].piece_type();
-        let reverse_move = std_move::ChessReverseMove::from_move(c_move, self);
+        let mut reverse_move = std_move::ChessReverseMove::from_move(c_move, self);
 
         // Increment or reset the half-move clock
-        match (piece_moved, self.piece_at(c_move.to).piece_type()) {
-            (Pawn, _) => self.half_move_clock = 0,
-            (_, Empty) => self.half_move_clock += 1,
-            (_, _) => self.half_move_clock = 0,
+        if piece_moved == Pawn || captured_piece != Empty {
+            self.half_move_clock = 0;
+            reverse_move.old_past_move_hashes = Some(self.past_board_hashes.clone());
+            self.past_board_hashes.clear();
+        }
+        else {
+            self.half_move_clock += 1;
+            let mut hasher = DefaultHasher::new();
+            self.hash(&mut hasher);
+            let hash = hasher.finish();
+            self.past_board_hashes.push(hash);
         }
 
         self.move_num += 1;
@@ -930,6 +941,10 @@ impl Board for ChessBoard {
                             self.board[rank_to as usize][file_to as usize] = Piece::empty();
                         }
                 }
+        match c_move.old_past_move_hashes {
+            Some(hashes) => self.past_board_hashes = hashes.clone(),
+            None => { self.past_board_hashes.pop(); },
+        };
         self.castling_en_passant = c_move.old_castling_en_passant;
         self.half_move_clock = c_move.old_half_move_clock;
         self.move_num -= 1;
@@ -952,6 +967,18 @@ impl Board for ChessBoard {
         if self.half_move_clock >= 100 {
             return Some(board::GameResult::Draw);
         }
+
+        // Check for repetitions
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if self.past_board_hashes.iter()
+            .filter(|past_hash| **past_hash == hash)
+            .count() >= 2 {
+            return Some(GameResult::Draw)
+        }
+
         // TODO: This shouldn't call generate_moves(), but instead store whether its mate or not
         let mut moves = vec![];
         self.generate_moves(&mut moves);
@@ -1107,8 +1134,9 @@ impl fmt::Display for ChessBoard {
             }
             writeln!(fmt).unwrap();
         }
-        writeln!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}",
-               self.to_move, self.move_num, self.castling_en_passant, self.half_move_clock)
+        writeln!(fmt, "To move: {}, move_number: {}, flags: {:b}, half_move_clock: {}, past_board_hashes: {:?}",
+                 self.to_move, self.move_num, self.castling_en_passant, self.half_move_clock,
+                 self.past_board_hashes)
             .unwrap();
         Ok(())   
     }
@@ -1140,7 +1168,7 @@ impl ops::IndexMut<Square> for ChessBoard {
 impl ChessBoard {
     pub fn empty() -> Self {
         Self { board: [[Piece::Empty; 8]; 8], to_move: White, castling_en_passant: 0,
-               half_move_clock: 0, move_num: 0
+               half_move_clock: 0, move_num: 0, past_board_hashes: vec![]
         }
     }
     

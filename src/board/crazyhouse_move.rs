@@ -1,7 +1,7 @@
 use board::std_move::{ChessMove, ChessReverseMove};
 use board::std_board::*;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CrazyhouseReverseMove {
     NormalMove(ChessReverseMove),
     CrazyMove(PieceType, Square, u8),
