@@ -261,7 +261,6 @@ impl PartialEq for ChessBoard {
     fn eq(&self, other: &ChessBoard) -> bool {
         self.board == other.board && self.to_move == other.to_move
             && self.castling_en_passant == other.castling_en_passant
-            && self.past_board_hashes == other.past_board_hashes
     }
 }
 
