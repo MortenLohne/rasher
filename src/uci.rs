@@ -1,6 +1,6 @@
-use board::chess::chess_board::ChessBoard;
+use board::chess::board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
-use board::crazyhouse_board::CrazyhouseBoard;
+use board::crazyhouse::board::CrazyhouseBoard;
 use tests::tools;
 use board_game_traits::board;
 use search_algorithms::alpha_beta;

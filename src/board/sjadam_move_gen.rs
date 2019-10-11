@@ -1,7 +1,7 @@
 use board::sjadam_move::SjadamMove;
-use board::chess::chess_board::Piece;
-use board::chess::chess_board::PieceType;
-use board::chess::chess_board::PieceType::*;
+use board::chess::board::Piece;
+use board::chess::board::PieceType;
+use board::chess::board::PieceType::*;
 
 use board_game_traits::board::Color::*;
 

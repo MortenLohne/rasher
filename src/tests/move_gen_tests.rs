@@ -1,4 +1,4 @@
-use board::chess::chess_board::*;
+use board::chess::board::*;
 use board::chess::mv::ChessMove;
 use board_game_traits::board::Board;
 
@@ -6,7 +6,7 @@ use pgn_traits::pgn::PgnBoard;
 
 use super::super::board::chess::move_gen;
 
-use board::chess::chess_board::PieceType::*;
+use board::chess::board::PieceType::*;
 use board_game_traits::board::Color::{Black, White};
 
 use tests::tactics_tests::basic_tactics_prop;

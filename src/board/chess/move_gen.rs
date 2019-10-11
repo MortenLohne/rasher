@@ -1,9 +1,9 @@
-use board::chess::chess_board::ChessBoard;
-use board::chess::chess_board::Piece;
-use board::chess::chess_board::Square;
+use board::chess::board::ChessBoard;
+use board::chess::board::Piece;
+use board::chess::board::Square;
 use board::chess::mv::ChessMove;
-use board::chess::chess_board::PieceType;
-use board::chess::chess_board::PieceType::*;
+use board::chess::board::PieceType;
+use board::chess::board::PieceType::*;
 use board_game_traits::board::Color::*;
 
 use std::cmp::Ordering;

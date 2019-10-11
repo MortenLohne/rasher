@@ -1,6 +1,6 @@
-use board::chess::chess_board::PieceType;
-use board::chess::chess_board::Square;
-use board::chess::chess_board::ChessBoard;
+use board::chess::board::PieceType;
+use board::chess::board::Square;
+use board::chess::board::ChessBoard;
 use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::{Board, Color, GameResult};
 use board::chess::mv::ChessMove;

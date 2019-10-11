@@ -1,4 +1,4 @@
-use board::crazyhouse_board::CrazyhouseBoard;
+use board::crazyhouse::board::CrazyhouseBoard;
 use board_game_traits::board::Board;
 use tests::tools;
 

@@ -1,5 +1,5 @@
 use board::chess::mv::{ChessMove, ChessReverseMove};
-use board::chess::chess_board::*;
+use board::chess::board::*;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CrazyhouseReverseMove {

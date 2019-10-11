@@ -40,8 +40,8 @@ use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use board_tuning::TunableBoard;
 
-use board::chess::chess_board::ChessBoard;
-use board::crazyhouse_board::CrazyhouseBoard;
+use board::chess::board::ChessBoard;
+use board::crazyhouse::board::CrazyhouseBoard;
 use board::sjadam_board::SjadamBoard;
 
 #[cfg(feature = "logging")] 
@@ -164,9 +164,9 @@ fn main() {
                 
                 "mem_usage" => {
                     use std::mem;
-                    println!("Standard board: {}", mem::size_of::<board::chess::chess_board::ChessBoard>());
+                    println!("Standard board: {}", mem::size_of::<board::chess::board::ChessBoard>());
                     println!("Standard move: {}", mem::size_of::<board::chess::mv::ChessMove>());
-                    println!("Standard piece: {}", mem::size_of::<board::chess::chess_board::Piece>());
+                    println!("Standard piece: {}", mem::size_of::<board::chess::board::Piece>());
                     println!("Sjadam board: {}", mem::size_of::<SjadamBoard>());
                     println!("Sjadam move: {}", mem::size_of::<board::sjadam_move::SjadamMove>());
                     println!("Board score: {}", mem::size_of::<Score>());

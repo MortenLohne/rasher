@@ -1,17 +1,22 @@
-use board::chess::chess_board::PieceType;
-use board::chess::chess_board::ChessBoard;
-use board::chess::chess_board;
-use board::chess::chess_board::Square;
-use board::chess::chess_board::Piece;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+
+use board::chess::board::PieceType;
+use board::chess::board::ChessBoard;
+use board::chess::board;
+use board::chess::board::Square;
+use board::chess::board::Piece;
 use board_game_traits::board::EvalBoard;
+use board_game_traits::board::GameResult;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
 use board::chess::move_gen;
-use board_game_traits::board;
+use board_game_traits::board::Board;
 use pgn_traits::pgn;
-
-use std::hash::{Hash, Hasher};
-use board::crazyhouse_move::{CrazyhouseMove, CrazyhouseReverseMove};
+use board_game_traits::board::ExtendedBoard;
+use pgn_traits::pgn::PgnBoard;
+use board::chess::mv::ChessReverseNullMove;
+use board::crazyhouse::mv::{CrazyhouseMove, CrazyhouseReverseMove};
 
 #[derive(Clone, Eq)]
 pub struct CrazyhouseBoard {
@@ -63,7 +68,7 @@ impl Board for CrazyhouseBoard {
             black_available_pieces: vec![],
             crazyhouse_moves: vec![]}
     }
-    fn game_result(&self) -> Option<board::GameResult> {
+    fn game_result(&self) -> Option<GameResult> {
         self.base_board.game_result()
     }
 
@@ -72,7 +77,7 @@ impl Board for CrazyhouseBoard {
         self.base_board.generate_moves(&mut normal_moves);
         moves.extend(normal_moves.iter()
             .map(|&mv| CrazyhouseMove::NormalMove(mv)));
-        let board_iter = chess_board::BoardIter::new();
+        let board_iter = board::BoardIter::new();
         let king_pos = move_gen::king_pos(&self.base_board);
         let is_in_check = move_gen::is_attacked(&self.base_board, king_pos);
 
@@ -242,12 +247,6 @@ impl ExtendedBoard for CrazyhouseBoard {
     }
 }
 
-use std::fmt;
-use board_game_traits::board::Board;
-use board_game_traits::board::ExtendedBoard;
-use pgn_traits::pgn::PgnBoard;
-use board::chess::mv::ChessReverseNullMove;
-
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\nCrazyhouse moves: {:?}\nWhite pieces: {:?}\nBlack pieces: {:?}",
@@ -332,7 +331,7 @@ impl PgnBoard for CrazyhouseBoard {
     }
 
     fn move_from_lan(&self, input : &str) -> Result<Self::Move, pgn::Error> {
-        use board::chess::chess_board::PieceType::*;
+        use board::chess::board::PieceType::*;
         if input.contains('@') {
             let piece_type = match input.chars().next().unwrap() {
                 '@' => Pawn,
@@ -362,7 +361,7 @@ impl PgnBoard for CrazyhouseBoard {
     }
     
     fn move_to_lan(&self, mv: &Self::Move) -> String {
-        use board::chess::chess_board::PieceType::*;
+        use board::chess::board::PieceType::*;
         match *mv {
             CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_lan(&mv),
             CrazyhouseMove::CrazyMove(piece, square, _) => match piece {
