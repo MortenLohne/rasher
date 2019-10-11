@@ -1,9 +1,9 @@
 use self::PieceType::*;
-use board::std_move;
+use board::chess::mv;
 use board_game_traits::board;
 use board_game_traits::board::{EvalBoard, GameResult};
-use board::std_move_gen::move_gen;
-use board::std_move::ChessMove;
+use board::chess::move_gen;
+use board::chess::mv::ChessMove;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
 use pgn_traits::pgn;
@@ -16,7 +16,7 @@ use std::mem;
 use std::hash::{Hash, Hasher};
 use board_game_traits::board::Board;
 use board_game_traits::board::ExtendedBoard;
-use board::std_move::ChessReverseNullMove;
+use board::chess::mv::ChessReverseNullMove;
 use std::collections::hash_map::DefaultHasher;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialOrd, Ord, PartialEq, Serialize, Deserialize)]
@@ -738,8 +738,8 @@ impl PgnBoard for ChessBoard {
 }
 
 impl Board for ChessBoard {
-    type Move = std_move::ChessMove;
-    type ReverseMove = std_move::ChessReverseMove;
+    type Move = mv::ChessMove;
+    type ReverseMove = mv::ChessReverseMove;
 
     fn side_to_move(&self) -> Color {
         self.to_move
@@ -752,7 +752,7 @@ impl Board for ChessBoard {
         let color = self.to_move;
         let piece_moved = self.piece_at(c_move.from).piece_type();
         let captured_piece : PieceType = self[c_move.to].piece_type();
-        let mut reverse_move = std_move::ChessReverseMove::from_move(c_move, self);
+        let mut reverse_move = mv::ChessReverseMove::from_move(c_move, self);
 
         // Increment or reset the half-move clock
         if piece_moved == Pawn || captured_piece != Empty {

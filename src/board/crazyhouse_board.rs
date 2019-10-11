@@ -1,12 +1,12 @@
-use board::std_board::PieceType;
-use board::std_board::ChessBoard;
-use board::std_board;
-use board::std_board::Square;
-use board::std_board::Piece;
+use board::chess::chess_board::PieceType;
+use board::chess::chess_board::ChessBoard;
+use board::chess::chess_board;
+use board::chess::chess_board::Square;
+use board::chess::chess_board::Piece;
 use board_game_traits::board::EvalBoard;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;
-use board::std_move_gen::move_gen;
+use board::chess::move_gen;
 use board_game_traits::board;
 use pgn_traits::pgn;
 
@@ -72,7 +72,7 @@ impl Board for CrazyhouseBoard {
         self.base_board.generate_moves(&mut normal_moves);
         moves.extend(normal_moves.iter()
             .map(|&mv| CrazyhouseMove::NormalMove(mv)));
-        let board_iter = std_board::BoardIter::new();
+        let board_iter = chess_board::BoardIter::new();
         let king_pos = move_gen::king_pos(&self.base_board);
         let is_in_check = move_gen::is_attacked(&self.base_board, king_pos);
 
@@ -246,7 +246,7 @@ use std::fmt;
 use board_game_traits::board::Board;
 use board_game_traits::board::ExtendedBoard;
 use pgn_traits::pgn::PgnBoard;
-use board::std_move::ChessReverseNullMove;
+use board::chess::mv::ChessReverseNullMove;
 
 impl fmt::Debug for CrazyhouseBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -286,10 +286,10 @@ impl PgnBoard for CrazyhouseBoard {
             .collect::<Vec<String>>()
             .join(" "));
         
-        let std_board = try!(ChessBoard::from_fen(&std_fen_string));
+        let chess_board = try!(ChessBoard::from_fen(&std_fen_string));
 
         let mut board = Self::start_board().clone();
-        board.base_board = std_board;
+        board.base_board = chess_board;
         
         for ch in captured_pieces.chars() {
             if let Some(piece) = Piece::from_letter(ch) {
@@ -332,7 +332,7 @@ impl PgnBoard for CrazyhouseBoard {
     }
 
     fn move_from_lan(&self, input : &str) -> Result<Self::Move, pgn::Error> {
-        use board::std_board::PieceType::*;
+        use board::chess::chess_board::PieceType::*;
         if input.contains('@') {
             let piece_type = match input.chars().next().unwrap() {
                 '@' => Pawn,
@@ -362,7 +362,7 @@ impl PgnBoard for CrazyhouseBoard {
     }
     
     fn move_to_lan(&self, mv: &Self::Move) -> String {
-        use board::std_board::PieceType::*;
+        use board::chess::chess_board::PieceType::*;
         match *mv {
             CrazyhouseMove::NormalMove(mv) => self.base_board.move_to_lan(&mv),
             CrazyhouseMove::CrazyMove(piece, square, _) => match piece {

@@ -1,6 +1,6 @@
-use board::std_board;
-use board::std_board::{ChessBoard, Piece, PieceType};
-use board::std_board::PieceType::*;
+use board::chess::chess_board;
+use board::chess::chess_board::{ChessBoard, Piece, PieceType};
+use board::chess::chess_board::PieceType::*;
 use board::sjadam_move::{SjadamMove, SjadamReverseMove};
 use board::sjadam_move_gen;
 use chess_bitboard::bitboard::BitBoard;
@@ -226,7 +226,7 @@ impl SjadamBoard {
                                move_history: Vec::with_capacity(10),
                                repetitions: 1};
 
-        for square in std_board::BoardIter::new() {
+        for square in chess_board::BoardIter::new() {
             let (file, rank) = square.file_rank();
             if !other[square].is_empty() {
                 board.set_piece_at_square(other[square], Square::from_ints(file, 7 - rank));
@@ -241,7 +241,7 @@ impl SjadamBoard {
         let mut board = ChessBoard::empty();
         for square in bitboard::SquaresIterator::new() {
             let (file, rank) = square.file_rank();
-            board[std_board::Square::from_ints(file, 7 - rank)] = self.get_square(square);
+            board[chess_board::Square::from_ints(file, 7 - rank)] = self.get_square(square);
         }
         board.castling_en_passant = self.castling_en_passant;
         board.to_move = self.side_to_move();

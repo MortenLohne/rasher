@@ -1,4 +1,4 @@
-use board::std_board::*;
+use board::chess::chess_board::*;
 use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::Board;
 

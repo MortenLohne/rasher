@@ -1,4 +1,4 @@
-use board::std_board::ChessBoard;
+use board::chess::chess_board::ChessBoard;
 use board::sjadam_board::SjadamBoard;
 use board::crazyhouse_board::CrazyhouseBoard;
 use tests::tools;

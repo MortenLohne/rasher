@@ -1,19 +1,19 @@
-use board::std_board::*;
-use board::std_move::ChessMove;
+use board::chess::chess_board::*;
+use board::chess::mv::ChessMove;
 use board_game_traits::board::Board;
 
 use pgn_traits::pgn::PgnBoard;
 
-use super::super::board::std_move_gen::move_gen;
+use super::super::board::chess::move_gen;
 
-use board::std_board::PieceType::*;
+use board::chess::chess_board::PieceType::*;
 use board_game_traits::board::Color::{Black, White};
 
 use tests::tactics_tests::basic_tactics_prop;
 use tests::tools;
 
 /// Tests that Board.piece_at() and Square::from_alg() work correctly
-/// Also assumes that std_board::START_BOARD is correct
+/// Also assumes that chess::board::START_BOARD is correct
 #[test]
 fn test_piece_at () {
     let square = |str| Square::from_alg(str).unwrap();

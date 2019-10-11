@@ -1,5 +1,5 @@
 use chess_bitboard::bitboard::Square;
-use board::std_board::{Piece, PieceType};
+use board::chess::chess_board::{Piece, PieceType};
 use board::sjadam_board::SjadamBoard;
 
 use std::fmt;

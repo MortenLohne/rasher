@@ -1,9 +1,9 @@
-use board::std_board::PieceType;
-use board::std_board::Square;
-use board::std_board::ChessBoard;
+use board::chess::chess_board::PieceType;
+use board::chess::chess_board::Square;
+use board::chess::chess_board::ChessBoard;
 use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::{Board, Color, GameResult};
-use board::std_move::ChessMove;
+use board::chess::mv::ChessMove;
 use tests::tools;
 use search_algorithms::alpha_beta::{AlphaBeta};
 use uci;

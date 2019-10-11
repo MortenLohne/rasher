@@ -1,9 +1,9 @@
-use board::std_board::PieceType::*;
+use board::chess::chess_board::PieceType::*;
 use board_game_traits::board::Color::{Black, White};
 use search_algorithms::alpha_beta::Score::Val;
 
-use board::std_board::*;
-use board::std_move::ChessMove;
+use board::chess::chess_board::*;
+use board::chess::mv::ChessMove;
 use board_game_traits::board::EvalBoard;
 use search_algorithms::alpha_beta;
 use search_algorithms::alpha_beta::Score;
