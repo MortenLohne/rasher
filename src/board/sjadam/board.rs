@@ -1,8 +1,8 @@
 use board::chess::board;
 use board::chess::board::{ChessBoard, Piece, PieceType};
 use board::chess::board::PieceType::*;
-use board::sjadam_move::{SjadamMove, SjadamReverseMove};
-use board::sjadam_move_gen;
+use board::sjadam::mv::{SjadamMove, SjadamReverseMove};
+use board::sjadam::move_gen;
 use chess_bitboard::bitboard::BitBoard;
 use chess_bitboard::bitboard::Square;
 use chess_bitboard::bitboard;
@@ -186,7 +186,7 @@ use std::hash::Hasher;
 use std::hash::Hash;
 use board_game_traits::board::Board;
 use board_game_traits::board::ExtendedBoard;
-use board::sjadam_move::SjadamReverseNullMove;
+use board::sjadam::mv::SjadamReverseNullMove;
 
 impl Hash for SjadamBoard {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -953,7 +953,7 @@ impl Board for SjadamBoard {
     #[inline(never)]
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
         debug_assert!(moves.is_empty());
-        let (mut active_moves, mut inactive_moves) = sjadam_move_gen::all_legal_moves(self);
+        let (mut active_moves, mut inactive_moves) = move_gen::all_legal_moves(self);
         moves.append(&mut active_moves);
         moves.append(&mut inactive_moves);
     }
@@ -986,7 +986,7 @@ impl ExtendedBoard for SjadamBoard {
         let mut moves2 = vec![];
         let mut moves3 = vec![];
 
-        sjadam_move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
+        move_gen::legal_moves_for_square(self, mv.from(), piece_moved.piece_type(),
                                                 &mut moves1, &mut moves2, &mut moves3);
 
         if moves1.contains(&mv) || moves2.contains(&mv) || moves3.contains(&mv) {
@@ -1000,7 +1000,7 @@ impl ExtendedBoard for SjadamBoard {
 
     #[inline(never)]
     fn active_moves (&self, moves: &mut Vec<Self::Move>) {
-        let (mut active_moves, _) = sjadam_move_gen::all_legal_moves(self);
+        let (mut active_moves, _) = move_gen::all_legal_moves(self);
         moves.append(&mut active_moves);
     }
 
@@ -1164,10 +1164,10 @@ impl TunableBoard for SjadamBoard {
                 let queens = self.bitboards[8 + (!color).disc()];
 
                 for square in open_neighbours_squares {
-                    orthogonal_penalty -= rook_val * (rooks & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= rook_wrong_val * (rooks & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= queen_val * (queens & sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
-                    orthogonal_penalty -= queen_wrong_val * (queens & !sjadam_move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= rook_val * (rooks & move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= rook_wrong_val * (rooks & !move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= queen_val * (queens & move_gen::possible_sjadam_squares(square)).popcount() as f32;
+                    orthogonal_penalty -= queen_wrong_val * (queens & !move_gen::possible_sjadam_squares(square)).popcount() as f32;
                 }
 
                 penalty += orthogonal_penalty;
@@ -1179,13 +1179,13 @@ impl TunableBoard for SjadamBoard {
             {
                 let mut knight_penalty = 0.0;
 
-                let open_neighbours_squares = sjadam_move_gen::knight_moves(kings, friendly_pieces);
+                let open_neighbours_squares = move_gen::knight_moves(kings, friendly_pieces);
                 debug_assert!((open_neighbours_squares & friendly_pieces).is_empty());
 
                 let knights = self.bitboards[2 + (!color).disc()];
 
                 for square in open_neighbours_squares {
-                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    let sjadam_squares = move_gen::possible_sjadam_squares(square);
                     knight_penalty -= knight_val * (knights & sjadam_squares).popcount() as f32;
                     knight_penalty -= knight_wrong_val * (knights & !sjadam_squares).popcount() as f32;
                 }
@@ -1205,7 +1205,7 @@ impl TunableBoard for SjadamBoard {
                 let pawns = self.bitboards[(!color).disc()];
 
                 for square in open_neighbours_squares {
-                    let sjadam_squares = sjadam_move_gen::possible_sjadam_squares(square);
+                    let sjadam_squares = move_gen::possible_sjadam_squares(square);
                     pawn_penalty -= pawn_val * (pawns & sjadam_squares).popcount() as f32;
                     pawn_penalty -= pawn_wrong_val * (pawns & !sjadam_squares).popcount() as f32;
                 }

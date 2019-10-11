@@ -1,5 +1,5 @@
 use board::chess::board::ChessBoard;
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 use board::crazyhouse::board::CrazyhouseBoard;
 use tests::tools;
 use board_game_traits::board;

@@ -42,7 +42,7 @@ use board_tuning::TunableBoard;
 
 use board::chess::board::ChessBoard;
 use board::crazyhouse::board::CrazyhouseBoard;
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 
 #[cfg(feature = "logging")] 
 use log4rs::config::{Appender, Config, Root};
@@ -168,7 +168,7 @@ fn main() {
                     println!("Standard move: {}", mem::size_of::<board::chess::mv::ChessMove>());
                     println!("Standard piece: {}", mem::size_of::<board::chess::board::Piece>());
                     println!("Sjadam board: {}", mem::size_of::<SjadamBoard>());
-                    println!("Sjadam move: {}", mem::size_of::<board::sjadam_move::SjadamMove>());
+                    println!("Sjadam move: {}", mem::size_of::<board::sjadam::mv::SjadamMove>());
                     println!("Board score: {}", mem::size_of::<Score>());
                     
                 },

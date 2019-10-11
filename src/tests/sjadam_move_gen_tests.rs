@@ -1,16 +1,16 @@
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 use pgn_traits::pgn::PgnBoard;
 use board_game_traits::board::{GameResult, Board};
 use chess_bitboard::bitboard::BitBoard;
 use chess_bitboard::bitboard::Square;
-use board::sjadam_move_gen;
+use board::sjadam::move_gen;
 use tests::tools;
 
 #[test]
 fn possible_sjadam_squares() {
     let mut squares = BitBoard::empty();
     for square in [Square(0), Square(1), Square(8), Square(9)].iter().cloned() {
-        let board = sjadam_move_gen::possible_sjadam_squares(square);
+        let board = move_gen::possible_sjadam_squares(square);
         assert_eq!(board.popcount(), 16);
         squares = squares | board;
     }

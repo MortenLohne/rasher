@@ -1,12 +1,12 @@
-use board::sjadam_move::SjadamMove;
+use board::sjadam::mv::SjadamMove;
 use board::chess::board::Piece;
 use board::chess::board::PieceType;
 use board::chess::board::PieceType::*;
 
 use board_game_traits::board::Color::*;
 
-use board::sjadam_board;
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board;
+use board::sjadam::board::SjadamBoard;
 use chess_bitboard::bitboard::BitBoard;
 use chess_bitboard::bitboard::Square;
 use board_game_traits::board::Board;
@@ -307,10 +307,10 @@ fn sjadam_opponent_moves(sjadam_squares: &mut BitBoard, opponent_pieces: &BitBoa
 pub fn possible_sjadam_squares(square: Square) -> BitBoard{
     let (file, rank) = square.file_rank();
     match (file % 2 == 0, rank % 2 == 0) {
-        (false, false) => sjadam_board::SJADAM_SQUARE_TYPES[3],
-        (true, false) => sjadam_board::SJADAM_SQUARE_TYPES[2],
-        (false, true) => sjadam_board::SJADAM_SQUARE_TYPES[1],
-        (true, true) => sjadam_board::SJADAM_SQUARE_TYPES[0],
+        (false, false) => board::SJADAM_SQUARE_TYPES[3],
+        (true, false) => board::SJADAM_SQUARE_TYPES[2],
+        (false, true) => board::SJADAM_SQUARE_TYPES[1],
+        (true, true) => board::SJADAM_SQUARE_TYPES[0],
     }
 }
 

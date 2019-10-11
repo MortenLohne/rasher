@@ -1,4 +1,4 @@
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 use board_game_traits::board::{GameResult, Board};
 use pgn_traits::pgn::PgnBoard;
 use tests::tools;

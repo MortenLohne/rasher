@@ -1,6 +1,6 @@
 use chess_bitboard::bitboard::Square;
 use board::chess::board::{Piece, PieceType};
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 
 use std::fmt;
 use board_game_traits::board::Board;

@@ -1,6 +1,6 @@
-use board::sjadam_board::SjadamBoard;
+use board::sjadam::board::SjadamBoard;
 use pgn_traits::pgn::PgnBoard;
-use board::sjadam_move::SjadamMove;
+use board::sjadam::mv::SjadamMove;
 use board_game_traits::board::Board;
 use board_game_traits::board::Color;
 use board_game_traits::board::Color::*;

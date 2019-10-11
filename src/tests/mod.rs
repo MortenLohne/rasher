@@ -10,7 +10,7 @@ mod crazyhouse_board_tests;
 mod uci_tests;
 
 #[cfg(test)]
-mod sjadam_move_gen_tests;
+mod move_gen_tests;
 
 #[allow(unused_imports)]
 #[cfg(test)]
